@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import Link from "next/link";
-import Image from "next/image";
+import Image, { type StaticImageData } from "next/image";
 import { useRouter } from "next/navigation";
 
 import { DIRECTORY_MARKETS } from "@/lib/marketDirectory";
@@ -25,6 +25,7 @@ import {
   useTypedPlaceholder,
 } from "@/components/marketing/anim";
 import { Blob } from "@/components/marketing/Blob";
+import Eyebrow from "@/components/marketing/Eyebrow";
 import { SectionRider, type RiderArt } from "@/components/marketing/SectionRider";
 
 import tomatoes from "@/assets/illustrations/tomatoes.webp";
@@ -46,7 +47,7 @@ import conversation from "@/assets/illustrations/agent-customer-conversation.web
 import delivery from "@/assets/illustrations/delivery-map-route.webp";
 import trustChatTomato from "@/assets/illustrations/trust-chat-tomato.webp";
 import finalCtaKitchen from "@/assets/illustrations/final-cta-kitchen.webp";
-import heroBackdrop from "@/assets/illustrations/bg-hero.webp";
+import heroBackdrop from "@/assets/illustrations/bg-hero-market.webp";
 import riderHero from "@/assets/illustrations/rider-narrator.webp";
 import riderCart from "@/assets/illustrations/shopping-cart.webp";
 import riderScooterAgent from "@/assets/illustrations/rider-scooter-basket-2.webp";
@@ -123,7 +124,7 @@ function FaqList() {
   const [open, setOpen] = useState<number | null>(0);
   const items = useT().faq.items;
   return (
-    <div className="divide-y divide-line rounded-3xl border border-line bg-surface px-5 shadow-sm sm:px-8">
+    <div className="divide-y divide-line rounded-[2rem] border border-line bg-surface px-5 shadow-sm sm:px-8">
       {items.map((item, i) => {
         const isOpen = open === i;
         return (
@@ -167,27 +168,64 @@ function FaqList() {
   );
 }
 
-// The hero's action card: the same first step as the app (write a list),
-// carried straight into /shop as a guest draft - so the landing page IS
-// step 1, not a picture of it.
+// ── Hero list builder ─────────────────────────────────────────────────────
+// Quick-add items carry a quantity the person can change, so the hero list is
+// a real mini-list (icon, name, stepper) rather than a pile of fixed strings.
+type ListItem = { name: string; qty: number; unit: string; src?: StaticImageData };
+
+const UNIT_PLURAL: Record<string, string> = { loaf: "loaves", kg: "kg", whole: "whole" };
+const unitFor = (unit: string, qty: number) =>
+  qty === 1 ? unit : UNIT_PLURAL[unit] ?? unit + "s";
+const unitBase = (unit: string) => {
+  if (unit === "loaves") return "loaf";
+  return unit in UNIT_PLURAL ? unit : unit.replace(/s$/, "");
+};
+
+// "Garri, 2 cups" -> { name: "Garri", qty: 2, unit: "cup" }
+function parseLine(line: string): ListItem {
+  const m = line.match(/^(.*?),\s*(\d+(?:\.\d+)?)\s+(.+)$/);
+  const src = QUICK_ITEMS.find((q) => q.add === line)?.src;
+  if (!m) return { name: line, qty: 1, unit: "", src };
+  return { name: m[1], qty: Number(m[2]), unit: unitBase(m[3]), src };
+}
+const formatItem = (i: ListItem) => (i.unit ? `${i.name}, ${i.qty} ${unitFor(i.unit, i.qty)}` : i.name);
+
 function ListStarter({ id }: { id: string }) {
   const router = useRouter();
   const t = useT();
   const [text, setText] = useState("");
+  const [items, setItems] = useState<ListItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [focused, setFocused] = useState(false);
   const [flash, setFlash] = useState(false);
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const placeholder = useTypedPlaceholder(t.hero.placeholders, !text && !focused);
+  const ref = useRef<HTMLInputElement>(null);
+  const placeholder = useTypedPlaceholder(t.hero.placeholders, !text && !focused && items.length === 0);
 
+  // Tapping something already on the list adds one more instead of ignoring it.
   function addItem(line: string) {
-    setText((t) => (t.trim() ? t.replace(/\n*$/, "\n") + line : line));
-    ref.current?.focus();
+    const next = parseLine(line);
+    setItems((cur) =>
+      cur.some((i) => i.name === next.name)
+        ? cur.map((i) => (i.name === next.name ? { ...i, qty: i.qty + 1 } : i))
+        : [...cur, next]
+    );
     setFlash(true);
     setTimeout(() => setFlash(false), 700);
   }
+  function step(name: string, by: number) {
+    setItems((cur) =>
+      cur.flatMap((i) => {
+        if (i.name !== name) return [i];
+        const qty = i.qty + by;
+        return qty < 1 ? [] : [{ ...i, qty }];
+      })
+    );
+  }
+  function removeItem(name: string) {
+    setItems((cur) => cur.filter((i) => i.name !== name));
+  }
 
-  // The "What are you cooking?" strip further down feeds this same box.
+  // The "What are you cooking?" strip further down feeds this same list.
   useEffect(() => {
     const onAdd = (e: Event) => addItem((e as CustomEvent<{ line: string }>).detail.line);
     window.addEventListener(ADD_ITEM_EVENT, onAdd);
@@ -198,10 +236,11 @@ function ListStarter({ id }: { id: string }) {
     e?.preventDefault();
     setBusy(true);
     try {
-      if (text.trim()) {
+      const list = [...items.map(formatItem), text.trim()].filter(Boolean).join("\n");
+      if (list) {
         // Loaded on demand so the landing page doesn't ship the list builder.
         const { buildDraft } = await import("@/components/ListBuilder");
-        const draft = buildDraft("freetext", [{ item: "", price: "", qty: "1", note: "" }], text.trim(), "");
+        const draft = buildDraft("freetext", [{ item: "", price: "", qty: "1", note: "" }], list, "");
         saveGuestDraft({ marketId: null, step: "list", stagedList: draft, address: "", marketSlug: null });
       }
     } catch {
@@ -210,80 +249,179 @@ function ListStarter({ id }: { id: string }) {
     router.push("/shop");
   }
 
+  const count = items.length;
+
   return (
     <form
       onSubmit={start}
-      className="rounded-3xl border border-line bg-surface p-4 shadow-lg sm:p-5"
       aria-label="Start your list"
+      className={
+        "rounded-[2rem] border bg-white/95 p-2.5 text-left shadow-[0_6px_20px_-10px_rgba(120,70,30,0.2)] backdrop-blur transition-shadow duration-300 sm:p-3 " +
+        (flash ? "border-brand-orange ring-4 ring-brand-orange/30" : "border-white")
+      }
     >
-      <label htmlFor={id} className="mb-2 flex items-center gap-2 font-display text-sm font-bold text-ink">
-        <span className="flex h-2 w-2 animate-pulse rounded-full bg-brand-orange" />
-        {t.hero.listLabel}
-      </label>
-      <textarea
-        id={id}
-        ref={ref}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={3}
-        placeholder={placeholder}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        className={
-          "w-full resize-none rounded-2xl border bg-canvas px-4 py-3 text-base text-ink transition-shadow duration-300 placeholder:text-faint focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange " +
-          (flash ? "border-brand-orange ring-4 ring-brand-orange/40" : "border-line-strong")
-        }
-      />
-      <button
-        type="submit"
-        disabled={busy}
-        className="group/cta mt-3 inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-brand-orange px-6 font-display text-lg font-bold text-[#1A1A1A] shadow-sm transition hover:bg-brand-orange-dark active:scale-[0.98] disabled:opacity-60"
-      >
-        {busy ? t.hero.opening : t.hero.button}
-        <svg viewBox="0 0 24 24" className="h-5 w-5 transition-transform group-hover/cta:translate-x-1" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      <p className="mt-3 text-center text-xs text-faint">{t.hero.fine}</p>
-      <QuickPicks onPick={addItem} />
+      <div className="flex items-center gap-2 rounded-full bg-canvas py-1.5 pl-5 pr-1.5 ring-1 ring-line transition focus-within:ring-2 focus-within:ring-brand-orange sm:gap-3">
+        <label htmlFor={id} className="sr-only">{t.hero.listLabel}</label>
+        <input
+          id={id}
+          ref={ref}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={placeholder || t.hero.searchPlaceholder}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          className="min-w-0 flex-1 bg-transparent py-2.5 text-base text-ink placeholder:text-faint focus:outline-none sm:text-lg"
+        />
+        <button
+          type="submit"
+          disabled={busy}
+          className="group/cta inline-flex min-h-[48px] shrink-0 items-center justify-center gap-2 rounded-full bg-brand-orange px-5 font-display text-base font-bold text-[#1A1A1A] transition hover:bg-brand-orange-dark active:scale-[0.98] disabled:opacity-60 sm:px-7"
+        >
+          {busy ? t.hero.opening : t.hero.button}
+          <svg viewBox="0 0 24 24" className="h-5 w-5 transition-transform group-hover/cta:translate-x-1" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+            <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+
+      <QuickPicks added={items} onPick={addItem} />
+
+      <AnimatePresence initial={false}>
+        {count > 0 && (
+          <motion.div
+            key="list"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 border-t border-line px-1 pt-3">
+              <div className="flex items-center justify-between px-2 pb-2">
+                <span className="font-display text-sm font-extrabold text-ink">
+                  Your list <span className="font-semibold text-faint">· {count} {count === 1 ? "item" : "items"}</span>
+                </span>
+                <button type="button" onClick={() => setItems([])} className="text-xs font-semibold text-faint transition hover:text-ink">
+                  Clear
+                </button>
+              </div>
+              <ul className="grid max-h-44 gap-1.5 overflow-y-auto sm:grid-cols-2">
+                <AnimatePresence initial={false}>
+                  {items.map((i) => (
+                    <motion.li
+                      key={i.name}
+                      layout
+                      initial={{ opacity: 0, scale: 0.96 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.96 }}
+                      transition={{ duration: 0.18 }}
+                      className="flex items-center gap-2.5 rounded-2xl bg-canvas py-1.5 pl-2 pr-1.5"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-line">
+                        {i.src && <Image src={i.src} alt="" aria-hidden className="h-6 w-6 object-contain" />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold text-ink">{i.name}</span>
+                        <span className="block text-xs text-muted">{i.unit ? unitFor(i.unit, i.qty) : ""}</span>
+                      </span>
+                      <span className="flex items-center rounded-full bg-white ring-1 ring-line">
+                        <button type="button" onClick={() => step(i.name, -1)} aria-label={`Less ${i.name}`} className="flex h-8 w-8 items-center justify-center rounded-full text-ink transition hover:bg-sunken active:scale-90">
+                          {i.qty === 1 ? (
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" /></svg>
+                          ) : (
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><path d="M5 12h14" strokeLinecap="round" /></svg>
+                          )}
+                        </button>
+                        <span className="w-6 text-center font-display text-sm font-extrabold tabular-nums text-ink" aria-live="polite">{i.qty}</span>
+                        <button type="button" onClick={() => step(i.name, 1)} aria-label={`More ${i.name}`} className="flex h-8 w-8 items-center justify-center rounded-full text-ink transition hover:bg-sunken active:scale-90">
+                          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
+                        </button>
+                      </span>
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
+              </ul>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </form>
   );
 }
 
-function QuickPicks({ onPick }: { onPick: (line: string) => void }) {
+function QuickPicks({ added, onPick }: { added: ListItem[]; onPick: (line: string) => void }) {
   const t = useT();
   return (
-    <div className="mt-4 border-t border-dashed border-line pt-4">
-      <p className="mb-2 text-xs font-semibold text-muted">{t.hero.tapToAdd}</p>
-      <div className="flex flex-wrap gap-2">
-        {QUICK_ITEMS.slice(0, 8).map((q) => (
+    <div className="flex flex-wrap items-center justify-center gap-2 px-1 pb-1 pt-3">
+      <span className="text-sm font-semibold text-faint">{t.hero.tapToAdd}</span>
+      {QUICK_ITEMS.slice(0, 5).map((q) => {
+        const name = parseLine(q.add).name;
+        const qty = added.find((i) => i.name === name)?.qty ?? 0;
+        return (
           <button
             key={q.label}
             type="button"
             onClick={() => onPick(q.add)}
-            className="rounded-full border border-line bg-canvas px-3 py-1.5 text-sm font-semibold text-ink transition hover:border-brand-orange hover:bg-[#FBE7D5]"
+            className={
+              "inline-flex items-center gap-1.5 rounded-full py-1 pl-1.5 pr-3.5 text-sm font-semibold text-ink transition active:scale-95 " +
+              (qty ? "bg-brand-orange" : "bg-[#FBE7D5] hover:bg-brand-orange/60")
+            }
           >
-            + {q.label}
+            <Image src={q.src} alt="" aria-hidden className="h-6 w-6 object-contain" />
+            {q.label}
+            {qty > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-xs font-extrabold tabular-nums">{qty}</span>
+            )}
           </button>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
 
-// Eased (smoothstep) fade ramp so the edge dissolves gradually instead of
-// showing a visible band where a plain linear gradient starts.
-const ramp = (dir: string, len: number) => {
-  const stops = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1].map((t) => {
-    const a = t * t * (3 - 2 * t);
-    return `rgba(0,0,0,${a.toFixed(3)}) ${(t * len).toFixed(1)}%`;
-  });
-  return `linear-gradient(${dir}, ${stops.join(", ")}, #000 ${len}%)`;
-};
+// Shared section head: the hero's pill eyebrow + display headline whose
+// closing word is picked out in burnt peach, so every section opens the same
+// way the hero does.
+function SectionHeadInline({ eyebrow, title }: { eyebrow: string; title: string }) {
+  const w = title.trim().split(" ");
+  const last = w.pop();
+  return (
+    <>
+      <Eyebrow>{eyebrow}</Eyebrow>
+      <h2 className="mt-2 font-display text-[clamp(2.1rem,4.6vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em] text-balance text-ink">
+        {w.join(" ")} <span className="text-brand-orange-dark">{last}</span>
+      </h2>
+    </>
+  );
+}
 
-// Market street sits along the bottom of the hero; its top and outer edges
-// dissolve into the cream page background.
-const HERO_FADE = [ramp("to bottom", 45), ramp("to right", 8), ramp("to left", 8)].join(", ");
+function SectionHead({
+  eyebrow,
+  title,
+  sub,
+  align = "center",
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  sub?: string;
+  align?: "center" | "left";
+  children?: React.ReactNode;
+}) {
+  const w = title.trim().split(" ");
+  const last = w.pop();
+  const center = align === "center";
+  return (
+    <Reveal className={center ? "mx-auto max-w-2xl text-center" : "max-w-xl"}>
+      <Eyebrow>{eyebrow}</Eyebrow>
+      <h2 className="mt-2 font-display text-[clamp(2.1rem,4.6vw,3.4rem)] font-extrabold leading-[1.05] tracking-[-0.03em] text-balance text-ink">
+        {w.join(" ")} <span className="text-brand-orange-dark">{last}</span>
+      </h2>
+      {sub && <p className={"mt-3 text-lg text-muted " + (center ? "mx-auto max-w-xl" : "")}>{sub}</p>}
+      {children}
+    </Reveal>
+  );
+}
 
 // One narrator per section, chosen to match what that section is saying.
 // Art with lettering on it (QYKA boxes) only ever rides left to right so it
@@ -298,19 +436,22 @@ const RIDER_ART: Record<string, RiderArt> = {
   delivered: { src: momoHandoff, size: "w-28 sm:w-40 lg:w-48" },
 };
 
+// Full-bleed scene behind the whole hero (and the transparent nav above it).
 function HeroBackdrop() {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-0">
+    <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[min(115vw,calc(100%-14rem))] sm:h-[min(56.25vw,calc(100%-14rem))]">
+      {/* Full width at its natural 16:9 shape, anchored to the bottom of the
+          hero. The hero is one screen tall (100svh), so the image is capped to
+          the space below the headline and trimmed from the bottom (hidden
+          behind the trust bar) rather than growing the hero past the
+          viewport. */}
       <Image
         src={heroBackdrop}
         alt=""
-        className="h-auto w-full min-w-[900px] object-cover opacity-90"
-        style={{
-          maskImage: HERO_FADE,
-          WebkitMaskImage: HERO_FADE,
-          maskComposite: "intersect",
-          WebkitMaskComposite: "source-in",
-        }}
+        fill
+        sizes="100vw"
+        quality={85}
+        className="object-cover object-top"
         priority
       />
     </div>
@@ -324,46 +465,42 @@ export default function MarketingPage() {
   return (
     <MotionConfig reducedMotion="user">
     <div className="min-h-screen bg-canvas text-ink">
-      <MarketingHeader />
+      <MarketingHeader overlay />
       <FlyLayer targetId="hero-list" />
 
       <main className="relative">
         {/* HERO */}
-        <section className="relative overflow-hidden">
+        <section className="relative -mt-16 flex min-h-[100svh] flex-col overflow-hidden pt-16 sm:-mt-[72px] sm:pt-[72px]">
           <HeroBackdrop />
           <SectionRider caption={t.rider[0]} art={RIDER_ART.hero} first />
-          <div className="relative z-10 mx-auto max-w-5xl px-4 pb-40 pt-8 text-center sm:px-6 sm:pb-52 sm:pt-12 lg:pb-64 lg:pt-16">
+          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-10 pt-8 text-center sm:px-6 sm:pt-12 lg:pt-16">
             <div className="relative z-10">
-              <span className="inline-flex items-center gap-2 rounded-full border border-brand-orange/30 bg-brand-orange/15 px-3 py-1 text-xs font-bold text-brand-orange-dark">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-brand-orange" />
-                {t.hero.badge}
-              </span>
-              <h1 className="mt-4 font-display text-[clamp(2.75rem,8vw,5.5rem)] font-extrabold leading-[1.02] tracking-tight text-ink">
-                <WordReveal key={t.hero.titleA} text={t.hero.titleA} />{" "}
+              <Eyebrow>{t.hero.eyebrow}</Eyebrow>
+              <h1 className="mt-3 font-display text-[clamp(2.7rem,7.4vw,5.4rem)] font-extrabold leading-[1] tracking-[-0.035em] text-ink">
+                <span className="block"><WordReveal key={t.hero.titleA} text={t.hero.titleA} /></span>
                 {(() => {
-                  // Underline just the closing word(s): an underline under a
-                  // long, wrapped phrase stretches into a full-width bar.
+                  // Line two: first word in burnt peach with the hand-drawn
+                  // underline, the rest in ink.
                   const w = t.hero.titleB.split(" ");
-                  const k = w.length >= 3 ? 2 : w.length;
-                  const lead = w.slice(0, w.length - k).join(" ");
-                  const tail = w.slice(w.length - k).join(" ");
+                  const head = w[0];
+                  const rest = w.slice(1).join(" ");
                   return (
-                    <>
-                      {lead && <WordReveal key={lead} text={lead} delay={0.2} />}{lead && " "}
-                      <span className="relative inline-block">
-                        <WordReveal key={tail} text={tail} delay={0.3} />
-                        <DrawUnderline delay={0.95} />
+                    <span className="block">
+                      <span className="relative inline-block text-brand-orange-dark">
+                        <WordReveal key={head} text={head} delay={0.25} />
+                        <DrawUnderline delay={0.9} />
                       </span>
-                    </>
+                      {rest && <>{" "}<WordReveal key={rest} text={rest} delay={0.35} /></>}
+                    </span>
                   );
                 })()}
               </h1>
               <Reveal y={16} delay={0.35}>
-                <p className="mx-auto mt-5 max-w-xl text-lg text-ink/80">
+                <p className="mx-auto mt-6 max-w-2xl text-balance text-lg leading-relaxed text-muted sm:text-xl">
                   {t.hero.sub}
                 </p>
               </Reveal>
-              <div className="mx-auto mt-8 max-w-2xl text-left">
+              <div className="mx-auto mt-9 max-w-3xl">
                 <ListStarter id="hero-list" />
               </div>
             </div>
@@ -404,22 +541,17 @@ export default function MarketingPage() {
         {/* HOW IT WORKS */}
         <section id="how-it-works" className="relative scroll-mt-24 mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
           <SectionRider caption={t.rider[2]} art={RIDER_ART.agent} dir="rtl" />
-          <Reveal className="max-w-xl">
-            <p className="font-display text-sm font-bold uppercase tracking-[0.12em] text-brand-orange-dark">{t.how.eyebrow}</p>
-            <h2 className="mt-2 font-display text-[clamp(2rem,4.5vw,3.25rem)] font-extrabold leading-tight tracking-tight">
-              {t.how.title}
-            </h2>
-          </Reveal>
-          <Stagger className="mt-10 grid gap-5 md:grid-cols-3" stagger={0.14}>
+          <SectionHead eyebrow={t.how.eyebrow} title={t.how.title} />
+          <Stagger className="mt-12 grid gap-5 md:grid-cols-3" stagger={0.14}>
             {STEPS.map((s, si) => (
               <StaggerItem key={s.n} y={40}>
               <div
-                className={"relative flex h-full flex-col overflow-hidden rounded-3xl border border-line p-6 shadow-sm transition-transform duration-300 hover:-translate-y-1 sm:p-7 " + s.tint}
+                className={"relative flex h-full flex-col overflow-hidden rounded-[2rem] border border-line p-6 shadow-sm transition-transform duration-300 hover:-translate-y-1 sm:p-8 " + s.tint}
               >
                 <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-orange font-display text-lg font-extrabold text-[#1A1A1A]">
                   {s.n}
                 </span>
-                <h3 className="mt-4 font-display text-2xl font-extrabold">{t.how.steps[si].title}</h3>
+                <h3 className="mt-5 font-display text-2xl font-extrabold tracking-tight">{t.how.steps[si].title}</h3>
                 <p className="mt-2 text-muted">{t.how.steps[si].body}</p>
                 <Float amp={5} dur={3.6 + si * 0.5} className="mt-6"><Image src={s.art} alt="" aria-hidden className="h-44 w-full object-contain" /></Float>
               </div>
@@ -432,28 +564,19 @@ export default function MarketingPage() {
         <section id="markets" className="relative scroll-mt-24 border-y border-line bg-surface">
           <SectionRider caption={t.rider[3]} art={RIDER_ART.markets} />
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <Reveal className="max-w-xl">
-                <p className="font-display text-sm font-bold uppercase tracking-[0.12em] text-brand-orange-dark">{t.markets.eyebrow}</p>
-                <h2 className="mt-2 font-display text-[clamp(2rem,4.5vw,3.25rem)] font-extrabold leading-tight tracking-tight">
-                  {t.markets.title}
-                </h2>
-                <p className="mt-2 text-muted">
-                  {t.markets.sub(openCount)}
-                </p>
-              </Reveal>
-              <Link href="/markets" className="font-display font-bold text-brand-orange-dark hover:underline">
+            <SectionHead eyebrow={t.markets.eyebrow} title={t.markets.title} sub={t.markets.sub(openCount)}>
+              <Link href="/markets" className="mt-4 inline-flex items-center rounded-full border border-line bg-white px-5 py-2 font-display text-sm font-bold text-ink shadow-sm transition hover:border-brand-orange hover:bg-[#FBE7D5]">
                 {t.markets.all}
               </Link>
-            </div>
-            <Stagger className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" stagger={0.09}>
+            </SectionHead>
+            <Stagger className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3" stagger={0.09}>
               {DIRECTORY_MARKETS.slice(0, 6).map((m, i) => {
                 const open = m.status === "pilot";
                 return (
                   <StaggerItem key={m.id} y={32}>
                   <Link
                     href={open ? `/shop?market=${m.id}` : `/markets/${m.id}`}
-                    className="group flex h-full flex-col overflow-hidden rounded-3xl border border-line bg-canvas transition hover:-translate-y-1 hover:shadow-md"
+                    className="group flex h-full flex-col overflow-hidden rounded-[2rem] border border-line bg-canvas transition hover:-translate-y-1 hover:shadow-md"
                   >
                     <div className="flex h-40 items-center justify-center bg-[#FBE7D5]/70">
                       <Image
@@ -498,10 +621,7 @@ export default function MarketingPage() {
             <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-brand-orange/10 blur-3xl" />
             <div className="relative grid items-center gap-10 lg:grid-cols-2">
               <Reveal x={-30} y={0}>
-                <p className="font-display text-sm font-bold uppercase tracking-[0.12em] text-brand-orange-dark">{t.trust.eyebrow}</p>
-                <h2 className="mt-2 font-display text-[clamp(2rem,4.5vw,3.25rem)] font-extrabold leading-tight tracking-tight">
-                  {t.trust.title}
-                </h2>
+                <SectionHeadInline eyebrow={t.trust.eyebrow} title={t.trust.title} />
                 <div className="mt-8 grid gap-5 sm:grid-cols-2">
                   {TRUST.map((tr, ti) => (
                     <div key={ti} className="flex gap-3">
@@ -575,12 +695,9 @@ export default function MarketingPage() {
           <SectionRider caption={t.rider[5]} art={RIDER_ART.faq} mode="still" at={6} />
           <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-[1fr_1.6fr]">
             <div>
-              <p className="font-display text-sm font-bold uppercase tracking-[0.12em] text-brand-orange-dark">{t.faq.eyebrow}</p>
-              <h2 className="mt-2 font-display text-[clamp(2rem,4.5vw,3.25rem)] font-extrabold leading-tight tracking-tight">
-                {t.faq.title}
-              </h2>
-              <p className="mt-2 text-muted">{t.faq.lede}</p>
-              <Link href="/help" className="mt-4 inline-block font-display font-bold text-brand-orange-dark hover:underline">
+              <SectionHeadInline eyebrow={t.faq.eyebrow} title={t.faq.title} />
+              <p className="mt-3 text-lg text-muted">{t.faq.lede}</p>
+              <Link href="/help" className="mt-5 inline-flex items-center rounded-full border border-line bg-white px-5 py-2 font-display text-sm font-bold text-ink shadow-sm transition hover:border-brand-orange hover:bg-[#FBE7D5]">
                 {t.faq.link}
               </Link>
             </div>

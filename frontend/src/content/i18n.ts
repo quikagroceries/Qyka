@@ -15,14 +15,15 @@ export const LOCALES: { key: Locale; label: string; short: string }[] = [
 ];
 
 export const en = {
-  nav: { how: "How it works", earn: "Earn with us", signIn: "Sign in", start: "Start a list" },
+  nav: { how: "How it works", markets: "Markets", earn: "Earn with us", signIn: "Sign in", start: "Start a list" },
   hero: {
-    badge: "Personal shopping at the market",
+    eyebrow: "Your personal shopper at the market",
     titleA: "The market,",
-    titleB: "delivered.",
-    sub: "Send your list. A real person shops it fresh, you chat as they go, and it lands at your door.",
+    titleB: "shopped for you.",
+    sub: "Send your list in plain words. A real person shops it fresh, bargains stall prices, sends live photos in chat, and it lands at your door.",
     listLabel: "What do you need from the market?",
-    button: "Find my agent",
+    searchPlaceholder: "What do you need from the market...",
+    button: "Find agent",
     opening: "Opening…",
     fine: "No sign-up to start · Pay only for what's bought",
     tapToAdd: "Tap to add",
@@ -105,14 +106,15 @@ export const en = {
 export type Dict = typeof en;
 
 export const pcm: Dict = {
-  nav: { how: "How e dey work", earn: "Make money with us", signIn: "Sign in", start: "Start list" },
+  nav: { how: "How e dey work", markets: "Markets", earn: "Make money with us", signIn: "Sign in", start: "Start list" },
   hero: {
-    badge: "Person go shop market for you",
+    eyebrow: "Person wey go shop market for you",
     titleA: "Market dey",
     titleB: "come meet you.",
     sub: "Send your list. Person wey sabi market go shop am fresh, you go dey chat with am, and e go reach your door.",
     listLabel: "Wetin you need from market?",
-    button: "Find my agent",
+    searchPlaceholder: "Wetin you need from market...",
+    button: "Find agent",
     opening: "E dey open…",
     fine: "No need to sign up to start · Pay only for wetin dem buy",
     tapToAdd: "Tap to add",

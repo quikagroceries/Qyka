@@ -13,7 +13,7 @@ const LINKS = [
   { key: "earn", href: "/for-agents" },
 ] as const;
 
-export default function MarketingHeader() {
+export default function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
   const [scrolled, setScrolled] = useState(false);
   const t = useT();
 
@@ -28,7 +28,9 @@ export default function MarketingHeader() {
     <header
       className={
         "sticky top-0 z-50 transition-all duration-300 " +
-        (scrolled ? "border-b border-line bg-surface/90 shadow-sm backdrop-blur-md" : "border-b border-transparent bg-canvas")
+        (scrolled
+          ? "border-b border-line bg-surface/90 shadow-sm backdrop-blur-md"
+          : "border-b border-transparent " + (overlay ? "bg-transparent" : "bg-canvas"))
       }
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:h-[72px] sm:px-6">
