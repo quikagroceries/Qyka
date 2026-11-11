@@ -1,14 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import agentCustomerConversation from "@/assets/illustrations/agent-customer-conversation.png";
-import badgeRealTime from "@/assets/illustrations/badge-real-time-updates.png";
-import badgeFreshness from "@/assets/illustrations/badge-fresh-guarantee.png";
-import badgeHumanFirst from "@/assets/illustrations/concierge.png";
-import badgeExpress from "@/assets/illustrations/badge-express-delivery.png";
-import pastaBag from "@/assets/illustrations/pasta-bag.png";
-import riceBag from "@/assets/illustrations/rice-bag.png";
-import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.png";
+import agentCustomerConversation from "@/assets/illustrations/agent-customer-conversation.webp";
+import badgeRealTime from "@/assets/illustrations/badge-real-time-updates.webp";
+import badgeFreshness from "@/assets/illustrations/badge-fresh-guarantee.webp";
+import badgeHumanFirst from "@/assets/illustrations/concierge.webp";
+import badgeExpress from "@/assets/illustrations/badge-express-delivery.webp";
+import pastaBag from "@/assets/illustrations/pasta-bag.webp";
+import riceBag from "@/assets/illustrations/rice-bag.webp";
+import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.webp";
 
 export function ShopHeroSpotlight({
   onStartList,

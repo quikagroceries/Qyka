@@ -9,10 +9,10 @@ import { formatPriceHint, priceHintForItem, smartChipsForMarket } from "@/lib/ma
 import { parseListLine } from "@/lib/parseListLine";
 import { useShopOptional, type ShopListDraft } from "@/components/shop/ShopContext";
 import { illustrationForItem } from "@/lib/foodVisuals";
-import netBag from "@/assets/illustrations/net-bag.png";
-import squiggleArrow from "@/assets/illustrations/decorative-squiggle-arrow.png";
-import dotArrow from "@/assets/illustrations/decorative-dot-arrow.png";
-import dottedSquares from "@/assets/illustrations/decorative-dotted-squares.png";
+import netBag from "@/assets/illustrations/net-bag.webp";
+import squiggleArrow from "@/assets/illustrations/decorative-squiggle-arrow.webp";
+import dotArrow from "@/assets/illustrations/decorative-dot-arrow.webp";
+import dottedSquares from "@/assets/illustrations/decorative-dotted-squares.webp";
 
 const EMPTY_ROW = { item: "", price: "", qty: "1", note: "" };
 

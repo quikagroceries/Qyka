@@ -20,12 +20,12 @@ import DeliveryAddressPicker from "@/components/DeliveryAddressPicker";
 import FlowSteps, { type FlowStepKey } from "@/components/FlowSteps";
 import { clearGuestDraft, loadGuestDraft, saveGuestDraft } from "@/lib/guestDraft";
 import { matchSlugToApiMarket } from "@/lib/marketDirectory";
-import personShoppingList from "@/assets/illustrations/person-shopping-list.png";
+import personShoppingList from "@/assets/illustrations/person-shopping-list.webp";
 import { SHOP_CHIPS } from "@/lib/heroChips";
 import { illustrationForItem } from "@/lib/foodVisuals";
 
-import riderScooter from "@/assets/illustrations/rider-scooter-basket-1.png";
-import weighingScale from "@/assets/illustrations/vendor-weighing-scale.png";
+import riderScooter from "@/assets/illustrations/rider-scooter-basket-1.webp";
+import weighingScale from "@/assets/illustrations/vendor-weighing-scale.webp";
 
 function CheckoutHero({
   isSuper,

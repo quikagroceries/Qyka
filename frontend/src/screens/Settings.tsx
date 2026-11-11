@@ -13,7 +13,7 @@ import SectionHeader from "@/components/SectionHeader";
 import SwitchRow from "@/components/Switch";
 import RoleSwitch from "@/components/RoleSwitch";
 import { usePageSearch } from "@/components/PageSearchContext";
-import settingsArt from "@/assets/illustrations/settings.png";
+import settingsArt from "@/assets/illustrations/settings.webp";
 
 // One Settings screen shared by both personas (customer/agent) - the fields
 // that differ (delivery address is customer-only) are gated on role, not

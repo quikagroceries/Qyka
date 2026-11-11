@@ -3,13 +3,13 @@
 import Image from "next/image";
 import { TONE_COVER, marketInitials, type MarketArtTone } from "@/lib/vendorVisuals";
 
-import marketStallProduce from "@/assets/illustrations/market-stall-produce.png";
-import vendorStallFish from "@/assets/illustrations/vendor-stall-fish.png";
-import vendorStallPantry from "@/assets/illustrations/vendor-stall-pantry-jars.png";
-import marketCartVendor from "@/assets/illustrations/market-cart-vendor.png";
-import groceryBasket from "@/assets/illustrations/grocery-basket.png";
-import produceCrate from "@/assets/illustrations/produce-crate.png";
-import vendorStallDairy from "@/assets/illustrations/vendor-stall-dairy.png";
+import marketStallProduce from "@/assets/illustrations/market-stall-produce.webp";
+import vendorStallFish from "@/assets/illustrations/vendor-stall-fish.webp";
+import vendorStallPantry from "@/assets/illustrations/vendor-stall-pantry-jars.webp";
+import marketCartVendor from "@/assets/illustrations/market-cart-vendor.webp";
+import groceryBasket from "@/assets/illustrations/grocery-basket.webp";
+import produceCrate from "@/assets/illustrations/produce-crate.webp";
+import vendorStallDairy from "@/assets/illustrations/vendor-stall-dairy.webp";
 
 const TONE_ILLUSTRATIONS: Record<MarketArtTone, any> = {
   produce: marketStallProduce,

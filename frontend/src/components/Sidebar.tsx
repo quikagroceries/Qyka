@@ -7,15 +7,15 @@ import Icon from "./Icon";
 import Avatar from "./Avatar";
 import UnreadBadge from "./UnreadBadge";
 import RoleSwitch from "./RoleSwitch";
-import squiggleLeaf from "@/assets/illustrations/decorative-squiggle-leaf.png";
-import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.png";
-import garlic from "@/assets/illustrations/garlic.png";
-import netBag from "@/assets/illustrations/net-bag.png";
-import navShop from "@/assets/illustrations/shop.png";
-import navTrack from "@/assets/illustrations/track.png";
-import navHistory from "@/assets/illustrations/history.png";
-import navWallet from "@/assets/illustrations/wallet.png";
-import navSettings from "@/assets/illustrations/settings.png";
+import squiggleLeaf from "@/assets/illustrations/decorative-squiggle-leaf.webp";
+import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.webp";
+import garlic from "@/assets/illustrations/garlic.webp";
+import netBag from "@/assets/illustrations/net-bag.webp";
+import navShop from "@/assets/illustrations/shop.webp";
+import navTrack from "@/assets/illustrations/track.webp";
+import navHistory from "@/assets/illustrations/history.webp";
+import navWallet from "@/assets/illustrations/wallet.webp";
+import navSettings from "@/assets/illustrations/settings.webp";
 
 const COLLAPSE_KEY = "qyka_sidebar_collapsed";
 

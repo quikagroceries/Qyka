@@ -14,7 +14,7 @@ import Chip from "@/components/Chip";
 import SectionHeader from "@/components/SectionHeader";
 import StatTile from "@/components/StatTile";
 import { usePageSearch } from "@/components/PageSearchContext";
-import walletArt from "@/assets/illustrations/wallet.png";
+import walletArt from "@/assets/illustrations/wallet.webp";
 import { formatDayDivider } from "@/lib/dateFormat";
 
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000];

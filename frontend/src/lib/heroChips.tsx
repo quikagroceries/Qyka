@@ -1,7 +1,7 @@
-import badgeRealTime from "@/assets/illustrations/badge-real-time-updates.png";
-import badgeHumanFirst from "@/assets/illustrations/concierge.png";
-import badgeFreshness from "@/assets/illustrations/badge-fresh-guarantee.png";
-import badgeExpress from "@/assets/illustrations/badge-express-delivery.png";
+import badgeRealTime from "@/assets/illustrations/badge-real-time-updates.webp";
+import badgeHumanFirst from "@/assets/illustrations/concierge.webp";
+import badgeFreshness from "@/assets/illustrations/badge-fresh-guarantee.webp";
+import badgeExpress from "@/assets/illustrations/badge-express-delivery.webp";
 
 // The four trust chips under the shop-family heroes (Track's empty state and
 // Step 1 of the order flow) - one list, so the two can't drift apart.

@@ -10,24 +10,24 @@ import Card from "@/components/Card";
 // suggesting motion from one to the next, and a handful of the sharpest
 // produce icons fill the leftover corners as smaller, quieter texture -
 // three tiers of visual weight instead of everything competing equally.
-import personShoppingList from "@/assets/illustrations/person-shopping-list.png";
-import riderBicycle from "@/assets/illustrations/rider-bicycle.png";
-import riderScooterBasket from "@/assets/illustrations/rider-scooter-basket-2.png";
-import vendorStallFish from "@/assets/illustrations/vendor-stall-fish.png";
-import shoppingCart from "@/assets/illustrations/shopping-cart.png";
-import sceneAgentLaptop from "@/assets/illustrations/scene-agent-laptop-delivery.png";
-import agentCustomerConversation from "@/assets/illustrations/agent-customer-conversation.png";
-import phoneShoppingList from "@/assets/illustrations/phone-shopping-list.png";
-import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.png";
-import squiggle2 from "@/assets/illustrations/decorative-squiggle-2.png";
-import squiggleArrow from "@/assets/illustrations/decorative-squiggle-arrow.png";
-import squiggleLeaf from "@/assets/illustrations/decorative-squiggle-leaf.png";
-import artichoke from "@/assets/illustrations/artichoke.png";
-import grapes from "@/assets/illustrations/grapes.png";
-import pineapple from "@/assets/illustrations/pineapple.png";
-import garlic from "@/assets/illustrations/garlic.png";
-import onion from "@/assets/illustrations/onion.png";
-import raspberries from "@/assets/illustrations/raspberries.png";
+import personShoppingList from "@/assets/illustrations/person-shopping-list.webp";
+import riderBicycle from "@/assets/illustrations/rider-bicycle.webp";
+import riderScooterBasket from "@/assets/illustrations/rider-scooter-basket-2.webp";
+import vendorStallFish from "@/assets/illustrations/vendor-stall-fish.webp";
+import shoppingCart from "@/assets/illustrations/shopping-cart.webp";
+import sceneAgentLaptop from "@/assets/illustrations/scene-agent-laptop-delivery.webp";
+import agentCustomerConversation from "@/assets/illustrations/agent-customer-conversation.webp";
+import phoneShoppingList from "@/assets/illustrations/phone-shopping-list.webp";
+import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.webp";
+import squiggle2 from "@/assets/illustrations/decorative-squiggle-2.webp";
+import squiggleArrow from "@/assets/illustrations/decorative-squiggle-arrow.webp";
+import squiggleLeaf from "@/assets/illustrations/decorative-squiggle-leaf.webp";
+import artichoke from "@/assets/illustrations/artichoke.webp";
+import grapes from "@/assets/illustrations/grapes.webp";
+import pineapple from "@/assets/illustrations/pineapple.webp";
+import garlic from "@/assets/illustrations/garlic.webp";
+import onion from "@/assets/illustrations/onion.webp";
+import raspberries from "@/assets/illustrations/raspberries.webp";
 
 // Arranged clockwise around the card as one flow rather than a loose
 // scatter - 9 o'clock through to the anchor at ~4:30, each position the

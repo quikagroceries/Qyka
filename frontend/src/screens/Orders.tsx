@@ -17,8 +17,8 @@ import { isCancellableOrder, isDeletableOrder, isHistoryStatus, summarizeOrderSt
 import { draftFromOrder } from "@/lib/orderToDraft";
 import { loadGuestDraft, saveGuestDraft } from "@/lib/guestDraft";
 import { SHOP_CHIPS } from "@/lib/heroChips";
-import riderScooter from "@/assets/illustrations/rider-scooter-basket-2.png";
-import netBag from "@/assets/illustrations/net-bag.png";
+import riderScooter from "@/assets/illustrations/rider-scooter-basket-2.webp";
+import netBag from "@/assets/illustrations/net-bag.webp";
 
 // One place for everything about your orders: what's on the move (Active),
 // what's finished (History - the old History page), and lists you

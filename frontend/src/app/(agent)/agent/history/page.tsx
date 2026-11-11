@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import HeroBanner from "@/components/HeroBanner";
 import StatTile from "@/components/StatTile";
-import history from "@/assets/illustrations/history.png";
+import history from "@/assets/illustrations/history.webp";
 import FilterPills from "@/components/FilterPills";
 import HistoryOrderCard from "@/components/HistoryOrderCard";
 import { CardSkeleton } from "@/components/Skeleton";

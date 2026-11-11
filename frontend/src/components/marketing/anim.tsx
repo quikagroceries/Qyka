@@ -12,7 +12,7 @@ import {
   useTransform,
 } from "framer-motion";
 import { EASE } from "@/components/marketing/motion";
-import scooterArt from "@/assets/illustrations/rider-scooter-basket-1.png";
+import scooterArt from "@/assets/illustrations/rider-scooter-basket-1.webp";
 
 /* Small, purposeful landing-page motion. Everything here animates transform /
  * opacity only, and every piece falls back to a static render when the visitor

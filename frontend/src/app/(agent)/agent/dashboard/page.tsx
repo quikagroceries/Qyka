@@ -8,7 +8,7 @@ import Card from "@/components/Card";
 import HeroBanner from "@/components/HeroBanner";
 import SectionHeader from "@/components/SectionHeader";
 import StatTile from "@/components/StatTile";
-import wallet from "@/assets/illustrations/scene-agent-laptop-delivery.png";
+import wallet from "@/assets/illustrations/scene-agent-laptop-delivery.webp";
 import EmptyState from "@/components/EmptyState";
 import ChartTooltip from "@/components/ChartTooltip";
 import { CardSkeleton } from "@/components/Skeleton";

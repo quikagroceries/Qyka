@@ -8,8 +8,8 @@ import FilterPills from "./FilterPills";
 import HeroBanner from "./HeroBanner";
 import { ActiveOrderBanner } from "./ActiveOrderBanner";
 import StatTile from "./StatTile";
-import marketStallArt from "@/assets/illustrations/market-stall-produce.png";
-import shoppingCartArt from "@/assets/illustrations/shopping-cart.png";
+import marketStallArt from "@/assets/illustrations/market-stall-produce.webp";
+import shoppingCartArt from "@/assets/illustrations/shopping-cart.webp";
 import Icon from "./Icon";
 import MarketArt from "@/components/shop/MarketArt";
 import {

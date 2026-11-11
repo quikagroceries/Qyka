@@ -3,17 +3,17 @@
 import EarnPage, { type EarnConfig } from "@/components/marketing/EarnPage";
 import earnAgentEarning from "@/assets/illustrations/earn-agent-earning.webp";
 import earnPayoutMoment from "@/assets/illustrations/earn-payout-moment.webp";
-import conversation from "@/assets/illustrations/agent-customer-conversation.png";
-import scale from "@/assets/illustrations/vendor-weighing-scale.png";
-import phoneList from "@/assets/illustrations/phone-shopping-list.png";
-import handoff from "@/assets/illustrations/order-handoff-vendor-customer.png";
-import tomatoes from "@/assets/illustrations/tomatoes.png";
-import garlic from "@/assets/illustrations/garlic.png";
-import crate from "@/assets/illustrations/produce-crate.png";
-import badgeHuman from "@/assets/illustrations/badge-human-first-shopping.png";
-import badgeLive from "@/assets/illustrations/badge-real-time-updates.png";
-import badgeFresh from "@/assets/illustrations/badge-fresh-guarantee.png";
-import riderBike from "@/assets/illustrations/rider-bicycle.png";
+import conversation from "@/assets/illustrations/agent-customer-conversation.webp";
+import scale from "@/assets/illustrations/vendor-weighing-scale.webp";
+import phoneList from "@/assets/illustrations/phone-shopping-list.webp";
+import handoff from "@/assets/illustrations/order-handoff-vendor-customer.webp";
+import tomatoes from "@/assets/illustrations/tomatoes.webp";
+import garlic from "@/assets/illustrations/garlic.webp";
+import crate from "@/assets/illustrations/produce-crate.webp";
+import badgeHuman from "@/assets/illustrations/badge-human-first-shopping.webp";
+import badgeLive from "@/assets/illustrations/badge-real-time-updates.webp";
+import badgeFresh from "@/assets/illustrations/badge-fresh-guarantee.webp";
+import riderBike from "@/assets/illustrations/rider-bicycle.webp";
 
 const CFG: EarnConfig = {
   eyebrow: "For agents",

@@ -7,7 +7,7 @@ import Icon from "@/components/Icon";
 import ListBuilder from "@/components/ListBuilder";
 import { draftFromOrder } from "@/lib/orderToDraft";
 import HeroBanner from "@/components/HeroBanner";
-import personShoppingList from "@/assets/illustrations/person-shopping-list.png";
+import personShoppingList from "@/assets/illustrations/person-shopping-list.webp";
 
 // Edit a saved draft list. Only drafts are editable (the backend enforces
 // it too - see orders.service.update_draft): once an agent is proposed or

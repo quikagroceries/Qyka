@@ -7,8 +7,8 @@ import Image, { type StaticImageData } from "next/image";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
 import HelpWidget from "@/components/marketing/HelpWidget";
-import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.png";
-import squiggle2 from "@/assets/illustrations/decorative-squiggle-2.png";
+import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.webp";
+import squiggle2 from "@/assets/illustrations/decorative-squiggle-2.webp";
 
 export type EarnConfig = {
   eyebrow: string;

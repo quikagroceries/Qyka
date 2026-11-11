@@ -7,8 +7,8 @@ import Button from "@/components/Button";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
 import { formatDayDivider, formatClockTime } from "@/lib/dateFormat";
-import squiggleLeaf from "@/assets/illustrations/decorative-squiggle-leaf.png";
-import garlic from "@/assets/illustrations/garlic.png";
+import squiggleLeaf from "@/assets/illustrations/decorative-squiggle-leaf.webp";
+import garlic from "@/assets/illustrations/garlic.webp";
 
 const POLL_MS = 5000;
 const QUICK_REPLIES = ["Hello", "On it", "Almost done", "Thank you"];

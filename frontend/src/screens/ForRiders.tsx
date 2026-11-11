@@ -1,20 +1,20 @@
 "use client";
 
 import EarnPage, { type EarnConfig } from "@/components/marketing/EarnPage";
-import riderBike from "@/assets/illustrations/rider-bicycle.png";
-import scooter from "@/assets/illustrations/rider-scooter-basket-1.png";
-import route from "@/assets/illustrations/delivery-map-route.png";
-import handoff from "@/assets/illustrations/order-handoff-vendor-customer.png";
-import phone from "@/assets/illustrations/customer-checking-phone.png";
-import netBag from "@/assets/illustrations/net-bag.png";
-import basket from "@/assets/illustrations/grocery-basket.png";
-import badgeExpress from "@/assets/illustrations/badge-express-delivery.png";
-import badgeHuman from "@/assets/illustrations/badge-human-first-shopping.png";
-import badgeFresh from "@/assets/illustrations/badge-fresh-guarantee.png";
+import riderBike from "@/assets/illustrations/rider-bicycle.webp";
+import scooter from "@/assets/illustrations/rider-scooter-basket-1.webp";
+import route from "@/assets/illustrations/delivery-map-route.webp";
+import handoff from "@/assets/illustrations/order-handoff-vendor-customer.webp";
+import phone from "@/assets/illustrations/customer-checking-phone.webp";
+import netBag from "@/assets/illustrations/net-bag.webp";
+import basket from "@/assets/illustrations/grocery-basket.webp";
+import badgeExpress from "@/assets/illustrations/badge-express-delivery.webp";
+import badgeHuman from "@/assets/illustrations/badge-human-first-shopping.webp";
+import badgeFresh from "@/assets/illustrations/badge-fresh-guarantee.webp";
 import earnRiderBikes from "@/assets/illustrations/earn-rider-bikes.webp";
 import earnKekeCar from "@/assets/illustrations/earn-keke-car.webp";
 import earnPayoutMoment from "@/assets/illustrations/earn-payout-moment.webp";
-import agentScene from "@/assets/illustrations/scene-agent-laptop-delivery.png";
+import agentScene from "@/assets/illustrations/scene-agent-laptop-delivery.webp";
 
 const CFG: EarnConfig = {
   eyebrow: "For riders",

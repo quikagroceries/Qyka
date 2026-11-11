@@ -8,10 +8,10 @@ import EmptyState from "@/components/EmptyState";
 import Icon from "@/components/Icon";
 import { useShop } from "./ShopContext";
 import { illustrationForItem } from "@/lib/foodVisuals";
-import netBag from "@/assets/illustrations/net-bag.png";
-import squiggleLeaf from "@/assets/illustrations/decorative-squiggle-leaf.png";
-import garlic from "@/assets/illustrations/garlic.png";
-import personShoppingList from "@/assets/illustrations/person-shopping-list.png";
+import netBag from "@/assets/illustrations/net-bag.webp";
+import squiggleLeaf from "@/assets/illustrations/decorative-squiggle-leaf.webp";
+import garlic from "@/assets/illustrations/garlic.webp";
+import personShoppingList from "@/assets/illustrations/person-shopping-list.webp";
 
 /** The bag's actual header/content/footer - shared by both the mobile
  * overlay drawer and the desktop layout panel, so the two don't silently

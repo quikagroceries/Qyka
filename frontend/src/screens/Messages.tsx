@@ -11,7 +11,7 @@ import { useChat } from "@/components/chat/ChatContext";
 import { usePageSearch } from "@/components/PageSearchContext";
 import { useConversations } from "@/lib/useConversations";
 import { formatClockTime, formatDayDivider } from "@/lib/dateFormat";
-import conversationArt from "@/assets/illustrations/agent-customer-conversation.png";
+import conversationArt from "@/assets/illustrations/agent-customer-conversation.webp";
 
 function whenLabel(iso: string) {
   const d = new Date(iso);

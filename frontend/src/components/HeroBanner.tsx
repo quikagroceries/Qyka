@@ -2,8 +2,8 @@
 
 import type { ReactNode } from "react";
 import Image from "next/image";
-import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.png";
-import squiggle2 from "@/assets/illustrations/decorative-squiggle-2.png";
+import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.webp";
+import squiggle2 from "@/assets/illustrations/decorative-squiggle-2.webp";
 
 /**
  * The app's one page-hero shape, lifted straight out of ShopHeroSpotlight so

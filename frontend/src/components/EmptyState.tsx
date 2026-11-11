@@ -2,7 +2,7 @@
 
 import Image, { type StaticImageData } from "next/image";
 import Icon from "./Icon";
-import groceryBasket from "@/assets/illustrations/grocery-basket.png";
+import groceryBasket from "@/assets/illustrations/grocery-basket.webp";
 
 export interface EmptyStateProps {
   icon?: string;

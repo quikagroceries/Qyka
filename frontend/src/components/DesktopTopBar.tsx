@@ -11,9 +11,9 @@ import Icon from "./Icon";
 import { useShopOptional } from "./shop/ShopContext";
 import { useChatOptional } from "./chat/ChatContext";
 import BagPeek from "./shop/BagPeek";
-import squiggle2 from "@/assets/illustrations/decorative-squiggle-2.png";
-import dotArrow from "@/assets/illustrations/decorative-dot-arrow.png";
-import squiggleArrow from "@/assets/illustrations/decorative-squiggle-arrow.png";
+import squiggle2 from "@/assets/illustrations/decorative-squiggle-2.webp";
+import dotArrow from "@/assets/illustrations/decorative-dot-arrow.webp";
+import squiggleArrow from "@/assets/illustrations/decorative-squiggle-arrow.webp";
 
 export interface DesktopTopBarProps {
   title?: string;
