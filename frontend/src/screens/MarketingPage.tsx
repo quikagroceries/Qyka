@@ -46,7 +46,7 @@ import conversation from "@/assets/illustrations/agent-customer-conversation.web
 import delivery from "@/assets/illustrations/delivery-map-route.webp";
 import trustChatTomato from "@/assets/illustrations/trust-chat-tomato.webp";
 import finalCtaKitchen from "@/assets/illustrations/final-cta-kitchen.webp";
-import heroScene from "@/assets/illustrations/main-hero.webp";
+import heroBackdrop from "@/assets/illustrations/bg-hero.webp";
 import riderHero from "@/assets/illustrations/rider-narrator.webp";
 import riderCart from "@/assets/illustrations/shopping-cart.webp";
 import riderScooterAgent from "@/assets/illustrations/rider-scooter-basket-2.webp";
@@ -281,12 +281,9 @@ const ramp = (dir: string, len: number) => {
   return `linear-gradient(${dir}, ${stops.join(", ")}, #000 ${len}%)`;
 };
 
-const HERO_FADE = [
-  ramp("to right", 34),
-  ramp("to left", 55),
-  ramp("to bottom", 30),
-  ramp("to top", 22),
-].join(", ");
+// Market street sits along the bottom of the hero; its top and outer edges
+// dissolve into the cream page background.
+const HERO_FADE = [ramp("to bottom", 45), ramp("to right", 8), ramp("to left", 8)].join(", ");
 
 // One narrator per section, chosen to match what that section is saying.
 // Art with lettering on it (QYKA boxes) only ever rides left to right so it
@@ -301,13 +298,13 @@ const RIDER_ART: Record<string, RiderArt> = {
   delivered: { src: momoHandoff, size: "w-28 sm:w-40 lg:w-48" },
 };
 
-function HeroArt() {
+function HeroBackdrop() {
   return (
-    <div className="pointer-events-none relative -mx-[6%] w-[112%] lg:-ml-[24%] lg:mr-0 lg:w-[175%]">
+    <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-0">
       <Image
-        src={heroScene}
-        alt="A Qyka agent at a market stall, checking a customer's shopping list on the phone"
-        className="h-auto w-full"
+        src={heroBackdrop}
+        alt=""
+        className="h-auto w-full min-w-[900px] object-cover opacity-90"
         style={{
           maskImage: HERO_FADE,
           WebkitMaskImage: HERO_FADE,
@@ -333,14 +330,15 @@ export default function MarketingPage() {
       <main className="relative">
         {/* HERO */}
         <section className="relative overflow-hidden">
+          <HeroBackdrop />
           <SectionRider caption={t.rider[0]} art={RIDER_ART.hero} first />
-          <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-10 px-4 pb-14 pt-8 sm:px-6 sm:pt-12 lg:grid-cols-2 lg:gap-12 lg:pb-20 lg:pt-16">
+          <div className="relative z-10 mx-auto max-w-5xl px-4 pb-40 pt-8 text-center sm:px-6 sm:pb-52 sm:pt-12 lg:pb-64 lg:pt-16">
             <div className="relative z-10">
               <span className="inline-flex items-center gap-2 rounded-full border border-brand-orange/30 bg-brand-orange/15 px-3 py-1 text-xs font-bold text-brand-orange-dark">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-brand-orange" />
                 {t.hero.badge}
               </span>
-              <h1 className="mt-4 font-display text-[clamp(2.5rem,6.5vw,4.5rem)] font-extrabold leading-[1.02] tracking-tight text-ink">
+              <h1 className="mt-4 font-display text-[clamp(2.75rem,8vw,5.5rem)] font-extrabold leading-[1.02] tracking-tight text-ink">
                 <WordReveal key={t.hero.titleA} text={t.hero.titleA} />{" "}
                 {(() => {
                   // Underline just the closing word(s): an underline under a
@@ -361,15 +359,14 @@ export default function MarketingPage() {
                 })()}
               </h1>
               <Reveal y={16} delay={0.35}>
-                <p className="mt-4 max-w-md text-lg text-muted">
+                <p className="mx-auto mt-5 max-w-xl text-lg text-ink/80">
                   {t.hero.sub}
                 </p>
               </Reveal>
-              <div className="mt-7 max-w-md">
+              <div className="mx-auto mt-8 max-w-2xl text-left">
                 <ListStarter id="hero-list" />
               </div>
             </div>
-            <HeroArt />
           </div>
         </section>
 
