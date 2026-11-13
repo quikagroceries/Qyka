@@ -438,3 +438,28 @@ body {
   width: 0;
   height: 0;
 }
+
+/* ── Hero sky (components/marketing/SkyScene) ─────────────────────────────
+   Clouds drift across the scene on very slow loops; stars twinkle;
+   the sun's halo breathes. Everything is staggered with negative delays, so
+   under prefers-reduced-motion we just pause the animations and the pieces
+   stay where the stagger put them (a still, composed sky) instead of
+   collapsing into one spot. cqw = % of the sky scene's width. */
+@keyframes sky-drift {
+  from { transform: translate3d(-26cqw, 0, 0); }
+  to   { transform: translate3d(112cqw, 0, 0); }
+}
+@keyframes sky-twinkle {
+  0%, 100% { opacity: 0.45; transform: translate(-50%, -50%) scale(0.88); }
+  50%      { opacity: 1;    transform: translate(-50%, -50%) scale(1.06); }
+}
+@keyframes sky-breathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(1);    opacity: 0.85; }
+  50%      { transform: translate(-50%, -50%) scale(1.12); opacity: 1; }
+}
+.sky-drift   { animation: sky-drift linear infinite; will-change: transform; }
+.sky-twinkle { animation: sky-twinkle ease-in-out infinite; }
+.sky-breathe { animation: sky-breathe ease-in-out 6s infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .sky-drift, .sky-twinkle, .sky-breathe { animation-play-state: paused; }
+}

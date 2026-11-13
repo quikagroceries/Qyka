@@ -26,6 +26,7 @@ import {
 } from "@/components/marketing/anim";
 import { Blob } from "@/components/marketing/Blob";
 import Eyebrow from "@/components/marketing/Eyebrow";
+import SkyScene from "@/components/marketing/SkyScene";
 import { SectionRider, type RiderArt } from "@/components/marketing/SectionRider";
 
 import tomatoes from "@/assets/illustrations/tomatoes.webp";
@@ -47,7 +48,6 @@ import conversation from "@/assets/illustrations/agent-customer-conversation.web
 import delivery from "@/assets/illustrations/delivery-map-route.webp";
 import trustChatTomato from "@/assets/illustrations/trust-chat-tomato.webp";
 import finalCtaKitchen from "@/assets/illustrations/final-cta-kitchen.webp";
-import heroBackdrop from "@/assets/illustrations/bg-hero-market.webp";
 import riderHero from "@/assets/illustrations/rider-narrator.webp";
 import riderCart from "@/assets/illustrations/shopping-cart.webp";
 import riderScooterAgent from "@/assets/illustrations/rider-scooter-basket-2.webp";
@@ -436,28 +436,6 @@ const RIDER_ART: Record<string, RiderArt> = {
   delivered: { src: momoHandoff, size: "w-28 sm:w-40 lg:w-48" },
 };
 
-// Full-bleed scene behind the whole hero (and the transparent nav above it).
-function HeroBackdrop() {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[min(115vw,calc(100%-14rem))] sm:h-[min(56.25vw,calc(100%-14rem))]">
-      {/* Full width at its natural 16:9 shape, anchored to the bottom of the
-          hero. The hero is one screen tall (100svh), so the image is capped to
-          the space below the headline and trimmed from the bottom (hidden
-          behind the trust bar) rather than growing the hero past the
-          viewport. */}
-      <Image
-        src={heroBackdrop}
-        alt=""
-        fill
-        sizes="100vw"
-        quality={85}
-        className="object-cover object-top"
-        priority
-      />
-    </div>
-  );
-}
-
 export default function MarketingPage() {
   const t = useT();
   const openCount = DIRECTORY_MARKETS.filter((m) => m.status === "pilot").length;
@@ -471,7 +449,7 @@ export default function MarketingPage() {
       <main className="relative">
         {/* HERO */}
         <section className="relative -mt-16 flex min-h-[100svh] flex-col overflow-hidden pt-16 sm:-mt-[72px] sm:pt-[72px]">
-          <HeroBackdrop />
+          <SkyScene />
           <SectionRider caption={t.rider[0]} art={RIDER_ART.hero} first />
           <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-10 pt-8 text-center sm:px-6 sm:pt-12 lg:pt-16">
             <div className="relative z-10">
