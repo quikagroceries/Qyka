@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
 import { api } from "@/lib/api";
 import Button from "@/components/Button";
 import Input from "@/components/Input";
@@ -9,7 +8,7 @@ import OtpInput from "@/components/OtpInput";
 import OtpResend from "@/components/OtpResend";
 import GoogleSignInButton, { GOOGLE_SIGN_IN_ENABLED } from "@/components/GoogleSignInButton";
 import WavyDivider from "@/components/WavyDivider";
-import logo from "@/assets/logo.png";
+import Brand from "@/components/Brand";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -155,7 +154,7 @@ function Login({ onLoggedIn }: any) {
 
   return (
     <div>
-      <Image src={logo} alt="" className="mb-4 h-10 w-auto object-contain" priority />
+      <Brand href={null} className="mb-4" />
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-orange">Welcome back</p>
       {/* `font-display` (Bricolage Grotesque) - this was `font-sans` (DM
           Sans, the body text font), so the page's main heading was set in

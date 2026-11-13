@@ -25,9 +25,10 @@ import starM from "@/assets/illustrations/sky-star-m.webp";
 import starS from "@/assets/illustrations/sky-star-s.webp";
 
 // x/y are % of the street scene; w is in cqw (% of the scene's width).
-// The hero text covers the middle of the sky, so everything that drifts or
-// twinkles lives in the two open pockets above the rooftops (x < 26% and
-// x > 74%) and is faded out over the text column (see POCKET_MASK).
+// Clouds drift across the whole width, behind the street and behind the hero
+// text (the words sit on top of them, nothing fades them out). Stars stay in
+// the two open pockets above the rooftops (x < 26% and x > 74%) so they never
+// fight the headline.
 // Negative delays spread the loops so the sky is already populated on load.
 const CLOUDS = [
   { src: cloudRound, y: 4, w: 10, dur: 190, delay: -39 },
@@ -44,12 +45,6 @@ const STARS = [
   { src: starS, x: 81, y: 4, w: 3.8, dur: 4.8, delay: -0.6 },
   { src: starM, x: 86, y: 18, w: 4.4, dur: 3.9, delay: -2.8 },
 ];
-
-// Fades whatever is inside to nothing across the hero's text column. The
-// column is a roughly fixed width (the headline caps at ~680px), so the clear
-// zone is measured in px from the centre, not as a % of the screen.
-const POCKET_MASK =
-  "linear-gradient(to right, #000 calc(50% - 460px), transparent calc(50% - 370px), transparent calc(50% + 370px), #000 calc(50% + 460px))";
 
 // Crescent: two circular arcs (outer r38, inner bite r33), traced by hand.
 const MOON_PATH = "M48.15 12.05 A38 38 0 1 0 84.33 66.29 A33 33 0 1 1 48.15 12.05 Z";
@@ -188,9 +183,10 @@ export default function SkyScene() {
                 <div
                   className="sky-breathe absolute left-0 top-0 rounded-full"
                   style={{
-                    width: "64cqw",
-                    height: "64cqw",
-                    background: `radial-gradient(closest-side, ${s.glow} 0%, ${s.glow} 12%, transparent 100%)`,
+                    width: "22cqw",
+                    height: "22cqw",
+                    transform: "translate(-50%, -50%)",
+                    background: `radial-gradient(closest-side, ${s.glow} 0%, ${s.glow} 30%, transparent 100%)`,
                   }}
                 />
                 <div
@@ -232,8 +228,8 @@ export default function SkyScene() {
               </div>
             </motion.div>
 
-            {/* clouds */}
-            <motion.div className="absolute inset-0" style={{ x: midX, y: midY, opacity: s.cloudOpacity, WebkitMaskImage: POCKET_MASK, maskImage: POCKET_MASK }}>
+            {/* clouds: behind the street and behind the hero text, visible the whole way across */}
+            <motion.div className="absolute inset-0" style={{ x: midX, y: midY, opacity: s.cloudOpacity }}>
               {CLOUDS.map((c, i) => (
                 <div
                   key={i}
@@ -247,7 +243,7 @@ export default function SkyScene() {
           </div>
 
           {/* the street: its sky is transparent, so everything above sits behind it */}
-          <Image src={street} alt="" fill sizes="100vw" quality={85} priority className="object-fill" />
+          <Image src={street} alt="" fill sizes="100vw" quality={95} priority className="object-fill" />
 
           {/* light falling on the street: a multiply tint clipped to the street's own shape */}
           <div
