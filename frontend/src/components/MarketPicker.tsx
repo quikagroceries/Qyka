@@ -18,6 +18,7 @@ import {
   type VenueType,
 } from "@/lib/marketDirectory";
 import { marketTone, stallTone, TONE_COVER } from "@/lib/vendorVisuals";
+import { CAT_PANTRY, CAT_PRODUCE, CAT_PROTEIN, TRUST_BASKET } from "@/lib/cdnImages";
 import { catalogForStall, categoriesForCatalog } from "@/lib/stallCatalog";
 import { useShopOptional } from "@/components/shop/ShopContext";
 import { api } from "@/lib/api";
@@ -98,7 +99,7 @@ function enrichMarket(m: any) {
     featured: venueType === "local_market",
     image:
       dir?.image ||
-      (venueType === "supermarket" ? "/qyka-cat-pantry.jpg" : "/qyka-cat-produce.jpg"),
+      (venueType === "supermarket" ? CAT_PANTRY : CAT_PRODUCE),
   };
 }
 
@@ -333,7 +334,7 @@ function ShopHeroBanner({
   const isSuper = venueType === "supermarket";
 
   let bg = isSuper ? TONE_COVER.produce.bg : TONE_COVER.mixed.bg;
-  let image = isSuper ? "/qyka-cat-pantry.jpg" : "/qyka-cat-produce.jpg";
+  let image = isSuper ? CAT_PANTRY : CAT_PRODUCE;
   let imageAlt = isSuper ? "Shelved grocery provisions" : "Open-air market produce";
   let eyebrow = isSuper ? "Supermarkets" : "Local markets";
   let title = isSuper
@@ -353,7 +354,7 @@ function ShopHeroBanner({
     // Light tint, not a dark field - cream/white surfaces only, per the
     // app's no-dark-surfaces rule (see vendorVisuals.ts::TONE_COVER).
     bg = superList ? TONE_COVER.produce.bg : TONE_COVER.mixed.bg;
-    image = enriched.image || (superList ? "/qyka-cat-pantry.jpg" : "/qyka-trust-basket.jpg");
+    image = enriched.image || (superList ? CAT_PANTRY : TRUST_BASKET);
     imageAlt = market.name;
     eyebrow = superList ? `${market.name} · cart` : `${market.name} · list`;
     title = superList ? "Build your cart" : "Build your list";
@@ -367,12 +368,12 @@ function ShopHeroBanner({
     bg = TONE_COVER[tone].bg;
     image =
       tone === "protein"
-        ? "/qyka-cat-protein.jpg"
+        ? CAT_PROTEIN
         : tone === "provisions"
-          ? "/qyka-cat-pantry.jpg"
+          ? CAT_PANTRY
           : tone === "produce"
-            ? "/qyka-cat-produce.jpg"
-            : "/qyka-trust-basket.jpg";
+            ? CAT_PRODUCE
+            : TRUST_BASKET;
     imageAlt = stall.name;
     eyebrow = `${market.name} · stall`;
     title = stall.name;

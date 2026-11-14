@@ -14,8 +14,8 @@ import Image from "next/image";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "framer-motion";
 
 import { formatHour, skyAt, smoothstep } from "@/lib/skyTime";
+import { HERO_STREET_SKY } from "@/lib/cdnImages";
 
-import street from "@/assets/illustrations/hero-street-sky.webp";
 import cloudRound from "@/assets/illustrations/sky-cloud-round.webp";
 import cloudFlat from "@/assets/illustrations/sky-cloud-flat.webp";
 import cloudSmall from "@/assets/illustrations/sky-cloud-small.webp";
@@ -243,7 +243,7 @@ export default function SkyScene() {
           </div>
 
           {/* the street: its sky is transparent, so everything above sits behind it */}
-          <Image src={street} alt="" fill sizes="100vw" quality={95} priority className="object-fill" />
+          <Image src={HERO_STREET_SKY} alt="" fill sizes="100vw" quality={95} priority className="object-fill" />
 
           {/* light falling on the street: a multiply tint clipped to the street's own shape */}
           <div
@@ -251,8 +251,8 @@ export default function SkyScene() {
             style={{
               opacity: ready ? 1 : 0,
               backgroundColor: s.tint,
-              WebkitMaskImage: `url(${street.src})`,
-              maskImage: `url(${street.src})`,
+              WebkitMaskImage: `url(${HERO_STREET_SKY})`,
+              maskImage: `url(${HERO_STREET_SKY})`,
               WebkitMaskSize: "100% 100%",
               maskSize: "100% 100%",
             }}

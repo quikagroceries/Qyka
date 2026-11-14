@@ -1,5 +1,7 @@
 /** Public market directory — marketing + shop enrichment (slugs map onto API markets). */
 
+import { CAT_PANTRY, CAT_PRODUCE, CAT_PROTEIN, TRUST_BASKET } from "@/lib/cdnImages";
+
 export type VenueType = "local_market" | "supermarket";
 
 export type FoodCategory =
@@ -37,7 +39,7 @@ export const DIRECTORY_MARKETS: DirectoryMarket[] = [
     blurb: "Dense stalls, sharp bargaining, provisions and produce in one dense loop.",
     venueType: "local_market",
     categories: ["provisions", "produce", "spices"],
-    image: "/qyka-cat-produce.jpg",
+    image: CAT_PRODUCE,
   },
   {
     id: "mile-12",
@@ -48,7 +50,7 @@ export const DIRECTORY_MARKETS: DirectoryMarket[] = [
     blurb: "Wholesale produce hub — peppers, tomatoes, and bulk restocks.",
     venueType: "local_market",
     categories: ["produce", "fish", "grains"],
-    image: "/qyka-cat-protein.jpg",
+    image: CAT_PROTEIN,
   },
   {
     id: "bodija",
@@ -59,7 +61,7 @@ export const DIRECTORY_MARKETS: DirectoryMarket[] = [
     blurb: "Classic open-air shopping for families across Ibadan.",
     venueType: "local_market",
     categories: ["produce", "provisions", "grains"],
-    image: "/qyka-cat-pantry.jpg",
+    image: CAT_PANTRY,
   },
   {
     id: "wuse",
@@ -70,7 +72,7 @@ export const DIRECTORY_MARKETS: DirectoryMarket[] = [
     blurb: "Capital city stalls for everyday groceries and specialty finds.",
     venueType: "local_market",
     categories: ["provisions", "protein", "household"],
-    image: "/qyka-trust-basket.jpg",
+    image: TRUST_BASKET,
   },
   {
     id: "shoprite-ikeja",
@@ -81,7 +83,7 @@ export const DIRECTORY_MARKETS: DirectoryMarket[] = [
     blurb: "Fixed prices, labelled aisles — faster when you know exactly what you need.",
     venueType: "supermarket",
     categories: ["provisions", "produce", "protein", "household"],
-    image: "/qyka-cat-pantry.jpg",
+    image: CAT_PANTRY,
   },
   {
     id: "spar-lekki",
@@ -92,7 +94,7 @@ export const DIRECTORY_MARKETS: DirectoryMarket[] = [
     blurb: "Shelf prices you can trust — Qyka still picks and delivers.",
     venueType: "supermarket",
     categories: ["provisions", "produce", "household"],
-    image: "/qyka-trust-basket.jpg",
+    image: TRUST_BASKET,
   },
 ];
 
@@ -138,5 +140,5 @@ export function findDirectoryMarket(m: { name?: string | null }): DirectoryMarke
 export function coverImageForMarket(m: { name?: string | null; venue_type?: string | null }): string {
   const dir = findDirectoryMarket(m);
   if (dir?.image) return dir.image;
-  return (m.venue_type || "") === "supermarket" ? "/qyka-cat-pantry.jpg" : "/qyka-cat-produce.jpg";
+  return (m.venue_type || "") === "supermarket" ? CAT_PANTRY : CAT_PRODUCE;
 }

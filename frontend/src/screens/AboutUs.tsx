@@ -11,6 +11,7 @@ import { HeroIn, Reveal, Stagger, StaggerItem, ClipReveal } from "@/components/m
 import SplitReveal from "@/components/marketing/SplitReveal";
 import StickyCta from "@/components/marketing/StickyCta";
 import { hashFromHref, scrollToSection } from "@/lib/scrollToSection";
+import { CAT_PRODUCE, TRUST_BASKET } from "@/lib/cdnImages";
 
 const BELIEFS = [
   {
@@ -131,7 +132,7 @@ export default function AboutUs() {
             <ClipReveal delay={0.3} className="overflow-hidden rounded-[2rem] shadow-[0_24px_50px_rgba(33,26,20,0.14)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/qyka-cat-produce.jpg"
+                src={CAT_PRODUCE}
                 alt="Open-air market produce"
                 className="aspect-[4/5] w-full object-cover sm:aspect-square"
               />
@@ -295,7 +296,7 @@ export default function AboutUs() {
             <ClipReveal direction="right" className="overflow-hidden rounded-[1.75rem]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/qyka-trust-basket.jpg"
+                src={TRUST_BASKET}
                 alt="Market basket"
                 className="aspect-[4/3] w-full object-cover"
               />

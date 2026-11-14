@@ -10,6 +10,7 @@ import MarketingHeader from "@/components/marketing/MarketingHeader";
 import { EASE, HeroIn, Reveal, Stagger, StaggerItem, ClipReveal } from "@/components/marketing/motion";
 import SplitReveal from "@/components/marketing/SplitReveal";
 import StickyCta from "@/components/marketing/StickyCta";
+import { CAT_PRODUCE, CAT_PROTEIN, HERO_PERSON, TRUST_BASKET } from "@/lib/cdnImages";
 
 const TRAIL = [
   {
@@ -48,22 +49,22 @@ const PILLARS = [
   {
     title: "Transfer pay, not pocket cash",
     body: "Agents pay stalls by bank transfer. No unauthorized cash handling — every spend leaves a trail you can follow.",
-    img: "/qyka-cat-produce.jpg",
+    img: CAT_PRODUCE,
   },
   {
     title: "Photo proof on the run",
     body: "Purchases and packing are documented so you can see what left the market before it reaches your door.",
-    img: "/qyka-trust-basket.jpg",
+    img: TRUST_BASKET,
   },
   {
     title: "Deposit or balance first",
     body: "Orders move when payment is clear. Float recycles through the system instead of sitting in someone's pocket.",
-    img: "/qyka-hero-person.jpg",
+    img: HERO_PERSON,
   },
   {
     title: "You confirm delivery",
     body: "The run isn't done until you confirm. Issues can be raised against the order trail — list, transfers, and photos.",
-    img: "/qyka-cat-protein.jpg",
+    img: CAT_PROTEIN,
   },
 ];
 
@@ -123,7 +124,7 @@ export default function TrustAndSafety() {
             <ClipReveal delay={0.3} className="overflow-hidden rounded-[2rem] shadow-[0_24px_50px_rgba(33,26,20,0.14)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/qyka-trust-basket.jpg"
+                src={TRUST_BASKET}
                 alt="Market basket ready for delivery"
                 className="aspect-[4/5] w-full object-cover sm:aspect-square"
               />
@@ -299,7 +300,7 @@ export default function TrustAndSafety() {
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/qyka-trust-basket.jpg"
+            src={TRUST_BASKET}
             alt="Market basket packed for delivery"
             className="mx-auto aspect-[4/3] w-full max-w-md rounded-[1.25rem] object-cover lg:max-w-none"
           />

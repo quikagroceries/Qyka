@@ -7,6 +7,7 @@
 
 import { priceHintForItem } from "@/lib/marketHints";
 import { stallTone, type MarketArtTone } from "@/lib/vendorVisuals";
+import { CAT_PANTRY, CAT_PRODUCE, CAT_PROTEIN, TRUST_BASKET } from "@/lib/cdnImages";
 
 export type StallCatalogItem = {
   id: string;
@@ -22,10 +23,10 @@ export type StallCatalogItem = {
 export type StallCategoryNav = { id: string; label: string };
 
 const IMG = {
-  produce: "/qyka-cat-produce.jpg",
-  protein: "/qyka-cat-protein.jpg",
-  provisions: "/qyka-cat-pantry.jpg",
-  spices: "/qyka-trust-basket.jpg",
+  produce: CAT_PRODUCE,
+  protein: CAT_PROTEIN,
+  provisions: CAT_PANTRY,
+  spices: TRUST_BASKET,
 } as const;
 
 function item(
