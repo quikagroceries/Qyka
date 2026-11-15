@@ -2,7 +2,11 @@
 
 import type { ReactNode } from "react";
 import Image from "next/image";
-import Card from "@/components/Card";
+import Card from "@/components/ui/Card";
+import momoHandoff from "@/assets/illustrations/momo-handoff.webp";
+import badgeFreshGuarantee from "@/assets/illustrations/badge-fresh-guarantee.webp";
+import badgeRealTimeUpdates from "@/assets/illustrations/badge-real-time-updates.webp";
+import produceCrate from "@/assets/illustrations/produce-crate.webp";
 // A layered mosaic, not a single flat row: the 8-beat "market delivery"
 // story (a customer's list, an agent conversation, the market, the cart,
 // the rider) carries the composition at full size/opacity, the four
@@ -119,21 +123,107 @@ function Flourishes() {
   );
 }
 
+// The split layout's right-hand panel - the same headline Home's hero opens
+// with (not a single customer's anecdote) plus three of the exact
+// icon+copy pairings already established on the market detail page
+// ("How a Qyka agent shops this market"), so the illustrations are doing
+// real work - each one is the thing its line of text is describing, not
+// decoration. Warm peach, same illustrated-brand language as the rest of
+// the marketing site rather than a generic stock-photo split login.
+const PANEL_POINTS = [
+  {
+    art: badgeFreshGuarantee,
+    title: "Careful selection",
+    body: "Agents check for freshness and quality just like you would, picking the best produce.",
+  },
+  {
+    art: badgeRealTimeUpdates,
+    title: "Real-time chat",
+    body: "If an item is out of stock, they message you directly to find a replacement.",
+  },
+  {
+    art: produceCrate,
+    title: "Safe packaging",
+    body: "Items are packed carefully so nothing gets crushed or spoiled on the way to your door.",
+  },
+];
+
+function SplitPanel() {
+  return (
+    <div className="relative hidden w-1/2 flex-col overflow-hidden bg-[#FBE7D5] p-10 lg:flex xl:p-14">
+      <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-brand-orange/20 blur-3xl" aria-hidden />
+      {/* quiet scattered texture, same small-fruit/squiggle language as the
+          single-column AuthShell's Flourishes - just two pieces, tucked in
+          corners the text doesn't use, so the panel reads as calm rather
+          than busy. */}
+      <Image src={squiggle2} alt="" aria-hidden className="pointer-events-none absolute left-[8%] top-[6%] w-12 rotate-12 opacity-40" />
+      <Image src={raspberries} alt="" aria-hidden className="pointer-events-none absolute bottom-[4%] right-[8%] w-14 opacity-50" />
+
+      <h2 className="relative font-display text-3xl font-extrabold leading-[1.1] tracking-tight text-ink xl:text-4xl">
+        The market, <span className="text-brand-orange-dark">shopped for you.</span>
+      </h2>
+      <p className="relative mt-4 max-w-md text-lg leading-relaxed text-ink/70">
+        Send your list in plain words. A real person shops it fresh, bargains stall prices, and sends live photos in chat.
+      </p>
+
+      <div className="relative mt-8 space-y-5">
+        {PANEL_POINTS.map((p) => (
+          <div key={p.title} className="flex items-start gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-surface ring-1 ring-black/5">
+              <Image src={p.art} alt="" aria-hidden className="h-8 w-8 object-contain" />
+            </span>
+            <div>
+              <p className="font-display text-base font-bold text-ink">{p.title}</p>
+              <p className="mt-0.5 text-sm text-ink/60">{p.body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Image
+        src={momoHandoff}
+        alt=""
+        aria-hidden
+        className="pointer-events-none relative mt-auto w-full max-w-[14rem] self-center object-contain"
+      />
+    </div>
+  );
+}
+
 /**
  * Single-column chrome for every sidebar-less page — login, profile setup,
  * agent registration, guarantor verification. Just the focused form,
  * centered on the canvas, with small illustration flourishes from the
  * moodboard set scattered around it — no editorial side panel.
+ *
+ * `split` opts a single screen (currently just /login) into a two-pane card
+ * instead - the form on one side, an illustrated testimonial panel on the
+ * other. Every other caller is unaffected.
  */
 function AuthShell({
   children,
   size = "md",
+  split = false,
 }: {
   children: ReactNode;
   /** card max-width — "md" for the OTP/setup flows, "lg" for the multi-step wizard. */
   size?: "sm" | "md" | "lg";
+  split?: boolean;
 }) {
   const maxW = size === "lg" ? "max-w-2xl" : size === "sm" ? "max-w-sm" : "max-w-md";
+
+  if (split) {
+    return (
+      <div className="force-light flex min-h-screen w-full overflow-hidden bg-surface">
+        <div className="relative flex w-full flex-col justify-center overflow-hidden px-6 py-12 sm:px-12 lg:w-1/2 lg:px-16 xl:px-24">
+          <Image src={grapes} alt="" aria-hidden className="pointer-events-none absolute right-[8%] top-[10%] hidden w-12 opacity-30 lg:block" />
+          <Image src={garlic} alt="" aria-hidden className="pointer-events-none absolute bottom-[8%] left-[6%] hidden w-14 -rotate-6 opacity-30 lg:block" />
+          <div className="relative mx-auto w-full max-w-md">{children}</div>
+        </div>
+        <SplitPanel />
+      </div>
+    );
+  }
 
   return (
     <div className="force-light grain-overlay relative flex min-h-screen flex-col overflow-hidden bg-canvas">

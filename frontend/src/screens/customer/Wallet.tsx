@@ -2,18 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import Button from "@/components/Button";
-import Card from "@/components/Card";
-import Icon from "@/components/Icon";
-import Input from "@/components/Input";
-import EmptyState from "@/components/EmptyState";
-import { Skeleton } from "@/components/Skeleton";
-import HeroBanner from "@/components/HeroBanner";
-import { ActiveOrderBanner } from "@/components/ActiveOrderBanner";
-import Chip from "@/components/Chip";
-import SectionHeader from "@/components/SectionHeader";
-import StatTile from "@/components/StatTile";
-import { usePageSearch } from "@/components/PageSearchContext";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import Icon from "@/components/ui/Icon";
+import Input from "@/components/ui/Input";
+import EmptyState from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/Skeleton";
+import HeroBanner from "@/components/layout/HeroBanner";
+import { ActiveOrderBanner } from "@/components/order/ActiveOrderBanner";
+import Chip from "@/components/ui/Chip";
+import SectionHeader from "@/components/ui/SectionHeader";
+import StatTile from "@/components/ui/StatTile";
+import { usePageSearch } from "@/components/layout/PageSearchContext";
 import walletArt from "@/assets/illustrations/wallet.webp";
 import { formatDayDivider } from "@/lib/dateFormat";
 

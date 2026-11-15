@@ -121,6 +121,27 @@ export function matchSlugToApiMarket<T extends { id: string; name: string; city?
   );
 }
 
+export type MarketCardStatus = "open" | "closed" | "soon";
+
+/**
+ * The one "is this market card open/closed/soon" calculation - shared by
+ * every place a market shows up as a card (Home's teaser row, the full
+ * Markets directory) so they can't quietly drift onto different rules.
+ * null liveMarkets = still loading; treat pilot markets as active so the
+ * badge doesn't flash "soon" before the fetch resolves.
+ */
+export function getMarketCardStatus(
+  market: DirectoryMarket,
+  liveMarkets: { id: string; name: string; city?: string; is_active?: boolean }[] | null,
+  shopHoursOpen: boolean
+): MarketCardStatus {
+  const launched = market.status === "pilot";
+  const live = launched && liveMarkets ? matchSlugToApiMarket(market.id, liveMarkets) : null;
+  const inactive = launched && liveMarkets && liveMarkets.length > 0 && live?.is_active === false;
+  if (!launched || inactive) return "soon";
+  return shopHoursOpen ? "open" : "closed";
+}
+
 export function isLocalMarket(m: { venue_type?: string; venueType?: string }) {
   const v = m.venue_type || m.venueType || "local_market";
   return v === "local_market";

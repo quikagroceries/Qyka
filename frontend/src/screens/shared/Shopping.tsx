@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
-import ChatPanel from "@/screens/ChatPanel";
-import Notifications from "@/screens/Notifications";
-import Button from "@/components/Button";
-import Card from "@/components/Card";
-import Input from "@/components/Input";
-import PackagingPanel from "@/components/PackagingPanel";
-import StatusBadge from "@/components/StatusBadge";
-import Icon from "@/components/Icon";
+import ChatPanel from "@/screens/shared/ChatPanel";
+import Notifications from "@/screens/shared/Notifications";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
+import PackagingPanel from "@/components/order/PackagingPanel";
+import StatusBadge from "@/components/ui/StatusBadge";
+import Icon from "@/components/ui/Icon";
 import { isChatAvailable } from "@/lib/orderStatus";
 import { marketTone, TONE_COVER } from "@/lib/vendorVisuals";
 import { coverImageForMarket } from "@/lib/marketDirectory";

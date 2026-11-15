@@ -29,7 +29,7 @@ export default function HelpPage() {
   };
 
   return (
-    <div className="bg-canvas text-ink min-h-screen flex flex-col font-sans selection:bg-brand-orange/20">
+    <div className="grain-overlay bg-canvas text-ink min-h-screen flex flex-col font-sans selection:bg-brand-orange/20">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

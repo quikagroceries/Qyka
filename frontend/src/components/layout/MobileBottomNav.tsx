@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Icon from "./Icon";
-import UnreadBadge from "./UnreadBadge";
+import Icon from "@/components/ui/Icon";
+import UnreadBadge from "@/components/ui/UnreadBadge";
 import { useActiveOrders } from "@/lib/useActiveOrders";
 
 // Only mounted for the Track tab (customers), so agents/admins never fetch

@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import Button from "./Button";
-import Icon from "./Icon";
-import SectionHeader from "./SectionHeader";
+import Button from "@/components/ui/Button";
+import Icon from "@/components/ui/Icon";
+import SectionHeader from "@/components/ui/SectionHeader";
 import {
   getRecentLocations,
   reverseGeocodeCoordinates,
@@ -13,7 +13,7 @@ import {
   trackLocationSearch,
   type LocationSuggestion,
 } from "@/lib/locationService";
-import type { LatLng, MapPin } from "./DeliveryMap";
+import type { LatLng, MapPin } from "@/components/order/DeliveryMap";
 
 const DeliveryMap = dynamic(() => import("./DeliveryMap"), {
   ssr: false,

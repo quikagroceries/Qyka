@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Settings from "@/screens/Settings";
-import Card from "@/components/Card";
-import Icon from "@/components/Icon";
-import SectionHeader from "@/components/SectionHeader";
+import Settings from "@/screens/shared/Settings";
+import Card from "@/components/ui/Card";
+import Icon from "@/components/ui/Icon";
+import SectionHeader from "@/components/ui/SectionHeader";
 import ChangePasswordForm from "@/components/admin/ChangePasswordForm";
 import { api } from "@/lib/api";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 // The one thing an admin's own Settings page needs that the shared screen
 // (profile + account, identical for customer/agent/admin) doesn't cover:

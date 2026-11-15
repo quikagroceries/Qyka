@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { api } from "@/lib/api";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { isHistoryStatus } from "@/lib/orderStatus";
 import { useSharedQuery } from "@/lib/sharedQuery";
 

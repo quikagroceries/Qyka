@@ -1,7 +1,7 @@
 "use client";
 
-import Settings from "@/screens/Settings";
-import { useAuth } from "@/components/AuthProvider";
+import Settings from "@/screens/shared/Settings";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 export default function SettingsPage() {
   const { user, setUser, handleLogout, roleSwitch } = useAuth();

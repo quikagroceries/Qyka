@@ -1,6 +1,6 @@
 'use client';
 
-import Icon from "./Icon";
+import Icon from "@/components/ui/Icon";
 
 // A person's profile photo, or - when they haven't added one - their initials
 // on the brand tint (or a generic user glyph when there's nothing to take

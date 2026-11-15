@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import Button from "./Button";
-import Input from "./Input";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 import { api } from "@/lib/api";
 import { formatPriceHint, priceHintForItem, smartChipsForMarket } from "@/lib/marketHints";
 import { parseListLine } from "@/lib/parseListLine";

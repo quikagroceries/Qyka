@@ -2,9 +2,9 @@
 
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import AdminLogin from "@/screens/AdminLogin";
-import AuthShell from "@/components/AuthShell";
-import { useAuth } from "@/components/AuthProvider";
+import AdminLogin from "@/screens/admin/AdminLogin";
+import AuthShell from "@/components/auth/AuthShell";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 function safeNext(raw: string | null) {
   if (!raw) return null;

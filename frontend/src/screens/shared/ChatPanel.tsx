@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from "react";
-import Icon from "@/components/Icon";
+import Icon from "@/components/ui/Icon";
 import { useChat } from "@/components/chat/ChatContext";
 
 // The chat trigger that sits on the order screen. Just a button now - the

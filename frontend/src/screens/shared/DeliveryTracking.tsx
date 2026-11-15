@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import Card from "@/components/Card";
-import Button from "@/components/Button";
-import Icon from "@/components/Icon";
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Icon from "@/components/ui/Icon";
 
 // Post-payment status screen: a vertical timeline built entirely from the
 // order's own timestamps (created_at / agent_assigned_at / paid_at /

@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import Button from "@/components/Button";
-import Input from "@/components/Input";
-import OtpInput from "@/components/OtpInput";
-import OtpResend from "@/components/OtpResend";
-import GoogleSignInButton, { GOOGLE_SIGN_IN_ENABLED } from "@/components/GoogleSignInButton";
-import { useAuth } from "@/components/AuthProvider";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import OtpInput from "@/components/auth/OtpInput";
+import OtpResend from "@/components/auth/OtpResend";
+import GoogleSignInButton, { GOOGLE_SIGN_IN_ENABLED } from "@/components/auth/GoogleSignInButton";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 const CHANNELS = [
   { key: "sms", label: "SMS" },

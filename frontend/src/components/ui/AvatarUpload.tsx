@@ -2,8 +2,8 @@
 
 import { useRef, useState } from "react";
 import { api } from "@/lib/api";
-import Avatar from "./Avatar";
-import Icon from "./Icon";
+import Avatar from "@/components/ui/Avatar";
+import Icon from "@/components/ui/Icon";
 
 const MAX_INPUT_BYTES = 10 * 1024 * 1024;
 const OUTPUT_PX = 512;

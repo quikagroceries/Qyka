@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import Button from "./Button";
-import Card from "./Card";
-import Icon from "./Icon";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import Icon from "@/components/ui/Icon";
 
 // Phase 2+3: agent's Packaging step, shown once the balance is paid. The
 // ~10-minute window is guidance only - it never blocks "Mark packed", it

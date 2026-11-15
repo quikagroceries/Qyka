@@ -1,9 +1,9 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import RequireAuth from "@/components/RequireAuth";
-import AppShell from "@/components/AppShell";
-import { useAuth } from "@/components/AuthProvider";
+import RequireAuth from "@/components/auth/RequireAuth";
+import AppShell from "@/components/layout/AppShell";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { AGENT_NAV } from "@/lib/nav";
 
 function activeKeyFromPath(pathname) {

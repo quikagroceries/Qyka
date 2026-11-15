@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import Button from "@/components/Button";
-import Input from "@/components/Input";
-import OtpInput from "@/components/OtpInput";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import OtpInput from "@/components/auth/OtpInput";
 
 const isDev = process.env.NODE_ENV !== "production";
 

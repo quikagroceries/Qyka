@@ -1,6 +1,6 @@
 'use client';
 
-import Button from "./Button";
+import Button from "@/components/ui/Button";
 
 // Used for both payment moments (deposit before shopping, balance after) -
 // same choice either way: pay from wallet (only when it covers the amount)

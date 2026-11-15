@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Brand from "@/components/Brand";
+import Brand from "@/components/ui/Brand";
 import LanguageSwitcher from "@/components/marketing/LanguageSwitcher";
 import { useT } from "@/lib/locale";
 
-// Deliberately tiny: two destinations, sign in, and the one action. Markets,
-// pricing, help and company links live in the footer.
+// Deliberately tiny: a few destination links, sign in, and the one action.
+// Pricing, help and company links live in the footer.
 const LINKS = [
   { key: "how", href: "/#how-it-works" },
-  { key: "earn", href: "/for-agents" },
+  { key: "markets", href: "/markets" },
+  { key: "earnAgent", href: "/for-agents" },
+  { key: "earnRider", href: "/for-riders" },
 ] as const;
 
 export default function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
@@ -40,7 +42,7 @@ export default function MarketingHeader({ overlay = false }: { overlay?: boolean
             <Link
               key={l.href}
               href={l.href}
-              className="hidden rounded-full px-4 py-2 font-display text-[0.95rem] font-semibold text-ink transition hover:bg-sunken md:inline-flex"
+              className="hidden rounded-full px-4 py-2 font-display text-[0.95rem] font-semibold text-ink transition hover:bg-[#FBE7D5] hover:text-brand-orange-dark md:inline-flex"
             >
               {t.nav[l.key]}
             </Link>
@@ -48,7 +50,7 @@ export default function MarketingHeader({ overlay = false }: { overlay?: boolean
           <LanguageSwitcher className="mr-1 hidden md:inline-flex" />
           <Link
             href="/login"
-            className="rounded-full px-3 py-2 font-display text-[0.95rem] font-semibold text-ink transition hover:bg-sunken sm:px-4"
+            className="rounded-full px-3 py-2 font-display text-[0.95rem] font-semibold text-ink transition hover:bg-[#FBE7D5] hover:text-brand-orange-dark sm:px-4"
           >
             {t.nav.signIn}
           </Link>

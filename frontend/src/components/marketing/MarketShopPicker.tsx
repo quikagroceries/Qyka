@@ -1,6 +1,6 @@
 "use client";
 
-import { CONTACT_EMAIL } from "@/lib/contact";
+import { notifyMeMailto } from "@/lib/contact";
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -112,11 +112,7 @@ export default function MarketShopPicker({
   function submitNotify(e: FormEvent) {
     e.preventDefault();
     if (!notifyMarket || !notifyEmail.trim()) return;
-    const subject = encodeURIComponent(`Notify me — ${notifyMarket.name}`);
-    const body = encodeURIComponent(
-      `Please notify me when Qyka opens at ${notifyMarket.name} (${notifyMarket.city}).\n\nEmail: ${notifyEmail.trim()}\n`
-    );
-    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
+    window.location.href = notifyMeMailto(`${notifyMarket.name} (${notifyMarket.city})`, notifyEmail);
     setNotifySent(true);
   }
 

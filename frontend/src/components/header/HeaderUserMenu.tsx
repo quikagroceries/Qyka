@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useAuth } from "@/components/AuthProvider";
-import Avatar from "@/components/Avatar";
+import { useAuth } from "@/components/auth/AuthProvider";
+import Avatar from "@/components/ui/Avatar";
 
 export function HeaderUserMenu({ className = "" }: { className?: string }) {
   const { user, handleLogout, roleSwitch } = useAuth();

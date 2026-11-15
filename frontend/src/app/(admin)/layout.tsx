@@ -2,11 +2,11 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import RequireAuth from "@/components/RequireAuth";
-import AppShell from "@/components/AppShell";
-import AuthShell from "@/components/AuthShell";
+import RequireAuth from "@/components/auth/RequireAuth";
+import AppShell from "@/components/layout/AppShell";
+import AuthShell from "@/components/auth/AuthShell";
 import ChangePasswordForm from "@/components/admin/ChangePasswordForm";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { api } from "@/lib/api";
 import { ADMIN_NAV } from "@/lib/nav";
 

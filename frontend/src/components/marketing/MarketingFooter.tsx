@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import Brand from "@/components/Brand";
+import Brand from "@/components/ui/Brand";
 import LanguageSwitcher from "@/components/marketing/LanguageSwitcher";
 import { useT } from "@/lib/locale";
 import footerStrip from "@/assets/illustrations/footer.webp";

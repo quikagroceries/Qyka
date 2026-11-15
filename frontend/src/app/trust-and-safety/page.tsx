@@ -1,4 +1,4 @@
-import TrustAndSafety from "@/screens/TrustAndSafety";
+import TrustAndSafety from "@/screens/marketing/TrustAndSafety";
 
 export const metadata = {
   title: "Trust & Safety — Qyka Groceries",

@@ -2,6 +2,7 @@
 
 import React, { ReactNode, useId } from 'react';
 import { Reveal } from './motion';
+import Eyebrow from './Eyebrow';
 
 export interface SectionProps {
   id?: string;
@@ -12,6 +13,9 @@ export interface SectionProps {
   children: ReactNode;
   className?: string;
   narrow?: boolean;
+  /** 'center' also centers the lede's own box (mx-auto), not just its text -
+   * text-center alone leaves a max-w'd block pinned to the left edge. */
+  align?: 'left' | 'center';
 }
 
 export function Section({
@@ -23,7 +27,9 @@ export function Section({
   children,
   className = '',
   narrow = false,
+  align = 'left',
 }: SectionProps) {
+  const centered = align === 'center';
   const generatedId = useId();
   
   const titleId = id ? `${id}-title` : title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || generatedId : undefined;
@@ -45,15 +51,11 @@ export function Section({
     >
       <div className={`mx-auto ${narrow ? 'max-w-4xl' : 'max-w-6xl'}`}>
         {hasHeader && (
-          <Reveal className="mb-12 md:mb-16">
-            {eyebrow && (
-              <p className="text-[0.75rem] uppercase tracking-[0.12em] font-semibold text-brand-orange-dark mb-4">
-                {eyebrow}
-              </p>
-            )}
+          <Reveal className={`mb-12 md:mb-16 ${centered ? 'text-center' : ''}`}>
+            {eyebrow && <Eyebrow className="mb-4">{eyebrow}</Eyebrow>}
             {title && (
-              <h2 
-                id={titleId} 
+              <h2
+                id={titleId}
                 className={`font-display font-extrabold tracking-tight text-balance ${bg === 'orange' ? 'text-[#1A1A1A]' : 'text-ink'} mb-4`}
                 style={{ fontSize: 'clamp(1.875rem, 4vw, 3rem)' }}
               >
@@ -61,7 +63,7 @@ export function Section({
               </h2>
             )}
             {lede && (
-              <p className={`max-w-2xl text-pretty ${bg === 'orange' ? 'text-[#1A1A1A]/80' : 'text-muted'} text-lg sm:text-xl`}>
+              <p className={`max-w-2xl text-pretty ${centered ? 'mx-auto' : ''} ${bg === 'orange' ? 'text-[#1A1A1A]/80' : 'text-muted'} text-lg sm:text-xl`}>
                 {lede}
               </p>
             )}

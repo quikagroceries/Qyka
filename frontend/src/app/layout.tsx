@@ -1,6 +1,6 @@
 import "./globals.css";
 import { Bagel_Fat_One, Bricolage_Grotesque, DM_Sans, Fraunces } from "next/font/google";
-import { AuthProvider } from "@/components/AuthProvider";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 import LocaleSync from "@/components/marketing/LocaleSync";
 import { CONTACT_EMAIL } from "@/lib/contact";
 

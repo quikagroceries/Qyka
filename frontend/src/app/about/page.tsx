@@ -1,4 +1,4 @@
-import AboutUs from "@/screens/AboutUs";
+import AboutUs from "@/screens/marketing/AboutUs";
 
 export const metadata = {
   title: "About Us — Qyka Groceries",

@@ -7,10 +7,10 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell,
 } from "recharts";
 import { api } from "@/lib/api";
-import Card from "@/components/Card";
-import Icon from "@/components/Icon";
-import ChartTooltip from "@/components/ChartTooltip";
-import { CardSkeleton } from "@/components/Skeleton";
+import Card from "@/components/ui/Card";
+import Icon from "@/components/ui/Icon";
+import ChartTooltip from "@/components/ui/ChartTooltip";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 import { CHART_STATUS, CHART_GRID, CHART_AXIS_TEXT } from "@/lib/adminUtils";
 
 // Qyka's own brand hues for the two single-series charts (order volume,

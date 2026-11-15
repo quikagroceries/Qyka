@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import Shopping from "@/screens/Shopping";
+import Shopping from "@/screens/shared/Shopping";
 
 export default function AgentOrderPage() {
   const { id } = useParams();

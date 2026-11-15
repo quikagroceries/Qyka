@@ -1,6 +1,6 @@
 'use client';
 
-import Icon from "./Icon";
+import Icon from "@/components/ui/Icon";
 
 // THE header/page search field. One look everywhere it appears - the shop
 // header, and every other page's top bar - so the search doesn't change

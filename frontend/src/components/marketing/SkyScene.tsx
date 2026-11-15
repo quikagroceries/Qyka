@@ -20,9 +20,6 @@ import cloudRound from "@/assets/illustrations/sky-cloud-round.webp";
 import cloudFlat from "@/assets/illustrations/sky-cloud-flat.webp";
 import cloudSmall from "@/assets/illustrations/sky-cloud-small.webp";
 import cloudPuffy from "@/assets/illustrations/sky-cloud-puffy.webp";
-import starL from "@/assets/illustrations/sky-star-l.webp";
-import starM from "@/assets/illustrations/sky-star-m.webp";
-import starS from "@/assets/illustrations/sky-star-s.webp";
 
 // x/y are % of the street scene; w is in cqw (% of the scene's width).
 // Clouds drift across the whole width, behind the street and behind the hero
@@ -35,15 +32,6 @@ const CLOUDS = [
   { src: cloudFlat, y: 14, w: 12, dur: 270, delay: -215 },
   { src: cloudSmall, y: 1, w: 5.5, dur: 150, delay: -45 },
   { src: cloudPuffy, y: 18, w: 8, dur: 320, delay: -234 },
-];
-
-const STARS = [
-  { src: starL, x: 8, y: 6, w: 4.6, dur: 3.4, delay: 0 },
-  { src: starM, x: 18, y: 14, w: 4.8, dur: 4.2, delay: -1.2 },
-  { src: starS, x: 12, y: 21, w: 4, dur: 3.1, delay: -2.1 },
-  { src: starL, x: 90, y: 7, w: 4.4, dur: 4.4, delay: -1.7 },
-  { src: starS, x: 81, y: 4, w: 3.8, dur: 4.8, delay: -0.6 },
-  { src: starM, x: 86, y: 18, w: 4.4, dur: 3.9, delay: -2.8 },
 ];
 
 // Crescent: two circular arcs (outer r38, inner bite r33), traced by hand.
@@ -150,26 +138,6 @@ export default function SkyScene() {
           />
 
           <div className="absolute inset-0 transition-opacity duration-1000" style={{ opacity: ready ? 1 : 0 }}>
-            {/* stars */}
-            <motion.div className="absolute inset-0" style={{ x: farX, y: farY, opacity: s.starsOpacity }}>
-              {STARS.map((st, i) => (
-                <Image
-                  key={i}
-                  src={st.src}
-                  alt=""
-                  className="sky-twinkle absolute"
-                  style={{
-                    left: `${st.x}%`,
-                    top: `${st.y}%`,
-                    width: `${st.w}cqw`,
-                    height: "auto",
-                    animationDuration: `${st.dur}s`,
-                    animationDelay: `${st.delay}s`,
-                  }}
-                />
-              ))}
-            </motion.div>
-
             {/* sun: soft breathing halo + flat disc */}
             <motion.div className="absolute inset-0" style={{ x: farX, y: farY }}>
               <div
@@ -209,19 +177,10 @@ export default function SkyScene() {
                   opacity: s.moonBody.visible ? s.starsOpacity * moonFade : 0,
                 }}
               >
-                <div
-                  className="absolute left-0 top-0 rounded-full"
-                  style={{
-                    width: "15cqw",
-                    height: "15cqw",
-                    transform: "translate(-50%, -50%)",
-                    background: "radial-gradient(closest-side, rgba(255,246,224,0.9), transparent)",
-                  }}
-                />
                 <svg
                   viewBox="0 0 100 100"
                   className="absolute left-0 top-0"
-                  style={{ width: "8cqw", height: "8cqw", transform: "translate(-50%, -50%) rotate(-18deg)" }}
+                  style={{ width: "5cqw", height: "5cqw", transform: "translate(-50%, -50%) rotate(-18deg)" }}
                 >
                   <path d={MOON_PATH} fill="#FBF1D6" stroke="#2B2A2E" strokeWidth="2.4" strokeLinejoin="round" />
                 </svg>

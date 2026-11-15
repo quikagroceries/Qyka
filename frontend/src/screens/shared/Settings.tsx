@@ -2,17 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import Button from "@/components/Button";
-import Card from "@/components/Card";
-import Input from "@/components/Input";
-import Icon from "@/components/Icon";
-import HeroBanner from "@/components/HeroBanner";
-import AvatarUpload from "@/components/AvatarUpload";
-import { ActiveOrderBanner } from "@/components/ActiveOrderBanner";
-import SectionHeader from "@/components/SectionHeader";
-import SwitchRow from "@/components/Switch";
-import RoleSwitch from "@/components/RoleSwitch";
-import { usePageSearch } from "@/components/PageSearchContext";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
+import Icon from "@/components/ui/Icon";
+import HeroBanner from "@/components/layout/HeroBanner";
+import AvatarUpload from "@/components/ui/AvatarUpload";
+import { ActiveOrderBanner } from "@/components/order/ActiveOrderBanner";
+import SectionHeader from "@/components/ui/SectionHeader";
+import SwitchRow from "@/components/ui/Switch";
+import RoleSwitch from "@/components/layout/RoleSwitch";
+import { usePageSearch } from "@/components/layout/PageSearchContext";
 import settingsArt from "@/assets/illustrations/settings.webp";
 
 // One Settings screen shared by both personas (customer/agent) - the fields

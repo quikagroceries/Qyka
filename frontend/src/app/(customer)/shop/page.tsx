@@ -3,8 +3,8 @@
 import { Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import NewOrderFlow from "@/screens/NewOrderFlow";
-import { useAuth } from "@/components/AuthProvider";
+import NewOrderFlow from "@/screens/customer/NewOrderFlow";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useShop } from "@/components/shop/ShopContext";
 
 function ShopPageInner() {

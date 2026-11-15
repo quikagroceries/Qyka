@@ -1,5 +1,4 @@
 import { Metadata } from "next";
-import Link from "next/link";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
 import AnnouncementBar from "@/components/marketing/AnnouncementBar";
@@ -7,9 +6,14 @@ import StickyCta from "@/components/marketing/StickyCta";
 import HelpWidget from "@/components/marketing/HelpWidget";
 import { Section } from "@/components/marketing/Section";
 import PricingCalculator from "@/components/marketing/PricingCalculator";
+import Eyebrow from "@/components/marketing/Eyebrow";
 import { LANDING } from "@/content/landing";
-import Card from "@/components/Card";
-import Button from "@/components/Button";
+import MarketingCard from "@/components/marketing/MarketingCard";
+import { MarketingLinkButton } from "@/components/marketing/MarketingButton";
+import Image from "next/image";
+import { Float } from "@/components/marketing/anim";
+import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.webp";
+import vendorScale from "@/assets/illustrations/vendor-weighing-scale.webp";
 
 export const metadata: Metadata = {
   title: "Pricing — Transparent Market Fees | Qyka",
@@ -20,15 +24,26 @@ export default function PricingPage() {
   const paymentFaq = LANDING.faq.groups.find(g => g.name === "Payment");
 
   return (
-    <div className="bg-canvas text-ink min-h-screen flex flex-col font-sans selection:bg-brand-orange/20">
+    <div className="grain-overlay bg-canvas text-ink min-h-screen flex flex-col font-sans selection:bg-brand-orange/20">
       <AnnouncementBar />
       <MarketingHeader />
       
       <main className="flex-1">
         {/* Hero */}
-        <Section className="py-16 sm:py-24 lg:py-32 bg-surface">
-          <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
+        <Section className="relative overflow-hidden py-16 sm:py-24 lg:py-32 bg-surface">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-72 w-72 rounded-full bg-brand-orange/15 blur-3xl" aria-hidden />
+          <Image
+            src={squiggle1}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute right-[6%] top-10 hidden w-16 rotate-12 opacity-[0.3] lg:block"
+          />
+          <Float amp={5} dur={5} className="pointer-events-none absolute left-[3%] top-12 hidden w-40 -rotate-6 xl:block">
+            <Image src={vendorScale} alt="" aria-hidden className="w-full" />
+          </Float>
+          <div className="relative max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
+            <Eyebrow className="text-center">Pricing</Eyebrow>
+            <h1 className="mt-3 font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
               Simple, transparent pricing. <br className="hidden sm:block" />
               <span className="text-brand-orange-dark">No surprises.</span>
             </h1>
@@ -82,7 +97,7 @@ export default function PricingPage() {
 
               <div>
                 <h2 className="font-display text-2xl font-bold mb-6">How we compare</h2>
-                <div className="bg-surface rounded-3xl border border-line overflow-hidden">
+                <div className="bg-surface rounded-[2rem] border border-line overflow-hidden">
                   <div className="grid grid-cols-2 border-b border-line bg-canvas-deep">
                     <div className="p-4 font-bold text-muted border-r border-line">Traditional apps</div>
                     <div className="p-4 font-bold text-brand-orange-dark">Qyka</div>
@@ -105,7 +120,7 @@ export default function PricingPage() {
                   </div>
                 </div>
 
-                <div className="mt-8 bg-surface p-6 rounded-3xl border border-line">
+                <div className="mt-8 bg-surface p-6 rounded-[2rem] border border-line">
                   <h3 className="font-bold mb-2">Refund policy</h3>
                   <p className="text-sm text-muted">
                     You only ever pay for what is actually purchased plus delivery and service fee. Unspent deposits are refunded to your wallet within 24 hours.
@@ -157,10 +172,10 @@ export default function PricingPage() {
               <h2 className="font-display text-3xl font-bold mb-8 text-center">Frequently asked questions</h2>
               <div className="space-y-6">
                 {paymentFaq.questions.map((q, i) => (
-                  <Card key={i} className="p-6">
+                  <MarketingCard key={i} className="p-6">
                     <h3 className="font-bold text-lg mb-2">{q.q}</h3>
                     <p className="text-muted">{q.a}</p>
-                  </Card>
+                  </MarketingCard>
                 ))}
               </div>
             </div>
@@ -171,11 +186,7 @@ export default function PricingPage() {
         <Section className="py-16 sm:py-24 bg-surface text-center">
           <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="font-display text-3xl font-bold mb-6">Ready to save time and money?</h2>
-            <Link href="/shop" className="inline-block">
-              <Button className="bg-brand-orange text-white hover:bg-brand-orange-dark min-h-[44px] rounded-2xl px-8 font-semibold active:scale-[0.98] transition-transform">
-                Start your list
-              </Button>
-            </Link>
+            <MarketingLinkButton href="/shop">Start your list</MarketingLinkButton>
           </div>
         </Section>
       </main>

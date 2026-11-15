@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import logo from "@/assets/logo.png";
-import Icon from "./Icon";
-import RoleSwitch from "./RoleSwitch";
+import Icon from "@/components/ui/Icon";
+import RoleSwitch from "@/components/layout/RoleSwitch";
 
 function MobileDrawer({ open, onClose, navItems, activeKey, user, onLogout, roleSwitch, guest = false }: any) {
   useEffect(() => {

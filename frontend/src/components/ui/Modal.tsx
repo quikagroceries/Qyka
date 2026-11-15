@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from "react";
-import Icon from "./Icon";
+import Icon from "@/components/ui/Icon";
 
 // One reusable focused-modal shell: blurred/dimmed backdrop, bottom sheet on
 // mobile, centered card on desktop (matches the app's card look - white,

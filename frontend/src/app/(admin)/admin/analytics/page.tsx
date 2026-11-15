@@ -1,9 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { CardSkeleton } from "@/components/Skeleton";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 
-const AdminAnalytics = dynamic(() => import("@/screens/AdminAnalytics"), {
+const AdminAnalytics = dynamic(() => import("@/screens/admin/AdminAnalytics"), {
   ssr: false,
   loading: () => (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

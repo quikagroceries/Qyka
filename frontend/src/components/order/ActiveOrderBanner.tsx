@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import Icon from "@/components/Icon";
+import Icon from "@/components/ui/Icon";
 import MarketArt from "@/components/shop/MarketArt";
 import { useActiveOrders } from "@/lib/useActiveOrders";
 import { summarizeOrderStatus } from "@/lib/orderStatus";

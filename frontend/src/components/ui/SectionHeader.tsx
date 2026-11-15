@@ -1,6 +1,6 @@
 'use client';
 
-import Icon from "./Icon";
+import Icon from "@/components/ui/Icon";
 
 // Card/section title with the app's icon well: a small peach circle holding
 // an icon, then the title (and optional subtitle / right-side action). This

@@ -1,4 +1,4 @@
-import ForRiders from "@/screens/ForRiders";
+import ForRiders from "@/screens/marketing/ForRiders";
 
 export const metadata = {
   title: "For Riders — Qyka Groceries",

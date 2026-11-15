@@ -4,6 +4,7 @@ import MarketingFooter from "@/components/marketing/MarketingFooter";
 import AnnouncementBar from "@/components/marketing/AnnouncementBar";
 import StickyCta from "@/components/marketing/StickyCta";
 import HelpWidget from "@/components/marketing/HelpWidget";
+import LanguagePrompt from "@/components/marketing/LanguagePrompt";
 import { MarketsDirectory } from "./MarketsDirectory";
 
 export const metadata: Metadata = {
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function MarketsPage() {
   return (
-    <div className="min-h-screen bg-canvas text-ink flex flex-col selection:bg-brand-orange/20">
+    <div className="grain-overlay min-h-screen bg-canvas text-ink flex flex-col selection:bg-brand-orange/20">
       <AnnouncementBar />
       <MarketingHeader />
       <main className="flex-1">
@@ -22,6 +23,7 @@ export default function MarketsPage() {
       <MarketingFooter />
       <StickyCta />
       <HelpWidget />
+      <LanguagePrompt />
     </div>
   );
 }

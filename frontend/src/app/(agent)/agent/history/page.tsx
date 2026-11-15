@@ -3,15 +3,15 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import EmptyState from "@/components/EmptyState";
-import HeroBanner from "@/components/HeroBanner";
-import StatTile from "@/components/StatTile";
+import EmptyState from "@/components/ui/EmptyState";
+import HeroBanner from "@/components/layout/HeroBanner";
+import StatTile from "@/components/ui/StatTile";
 import history from "@/assets/illustrations/history.webp";
-import FilterPills from "@/components/FilterPills";
-import HistoryOrderCard from "@/components/HistoryOrderCard";
-import { CardSkeleton } from "@/components/Skeleton";
+import FilterPills from "@/components/ui/FilterPills";
+import HistoryOrderCard from "@/components/order/HistoryOrderCard";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 import { ORDER_FILTERS, filterOrders } from "@/lib/orderStatus";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 export default function AgentHistoryPage() {
   const router = useRouter();

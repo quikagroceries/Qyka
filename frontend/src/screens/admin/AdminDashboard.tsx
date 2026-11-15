@@ -1,6 +1,6 @@
 'use client';
 
-import StatTile from "@/components/StatTile";
+import StatTile from "@/components/ui/StatTile";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -8,10 +8,10 @@ import {
   ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 import { api } from "@/lib/api";
-import Card from "@/components/Card";
-import Icon from "@/components/Icon";
-import ChartTooltip from "@/components/ChartTooltip";
-import { CardSkeleton } from "@/components/Skeleton";
+import Card from "@/components/ui/Card";
+import Icon from "@/components/ui/Icon";
+import ChartTooltip from "@/components/ui/ChartTooltip";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 import { isStuckOrder, LOW_FLOAT_BALANCE, CHART_CRITICAL_VS_ORANGE, CHART_GRID, CHART_AXIS_TEXT } from "@/lib/adminUtils";
 
 const ORANGE = "#EE9A5A";

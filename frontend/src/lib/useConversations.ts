@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { api } from "@/lib/api";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useSharedQuery } from "@/lib/sharedQuery";
 
 const POLL_MS = 15000;

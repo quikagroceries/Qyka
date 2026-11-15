@@ -1,13 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Chat from "@/screens/Chat";
+import Chat from "@/screens/shared/Chat";
 import { useEffect } from "react";
 import { api } from "@/lib/api";
 import { CHAT_READ_EVENT } from "@/lib/useConversations";
 import { useChat } from "./ChatContext";
 
-const Call = dynamic(() => import("@/screens/Call"), { ssr: false });
+const Call = dynamic(() => import("@/screens/shared/Call"), { ssr: false });
 
 /**
  * The chat's actual panel - mounted once at the shell level (AppShell,

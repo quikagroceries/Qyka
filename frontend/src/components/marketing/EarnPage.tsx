@@ -241,7 +241,7 @@ function Faq({ items }: { items: { q: string; a: string }[] }) {
 
 export default function EarnPage({ cfg }: { cfg: EarnConfig }) {
   return (
-    <div className="min-h-screen bg-canvas text-ink">
+    <div className="grain-overlay min-h-screen bg-canvas text-ink">
       <MarketingHeader />
       <main>
         {/* HERO */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import OrderDetail from "@/screens/OrderDetail";
+import OrderDetail from "@/screens/customer/OrderDetail";
 
 export default function OrderDetailPage() {
   const { id } = useParams();

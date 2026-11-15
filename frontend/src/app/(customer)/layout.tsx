@@ -2,10 +2,10 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import RequireAuth from "@/components/RequireAuth";
-import AppShell from "@/components/AppShell";
-import Notifications from "@/screens/Notifications";
-import { useAuth } from "@/components/AuthProvider";
+import RequireAuth from "@/components/auth/RequireAuth";
+import AppShell from "@/components/layout/AppShell";
+import Notifications from "@/screens/shared/Notifications";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { CUSTOMER_NAV } from "@/lib/nav";
 import { ShopProvider } from "@/components/shop/ShopContext";
 import ShopShell from "@/components/shop/ShopShell";

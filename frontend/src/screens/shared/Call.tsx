@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { LiveKitRoom, VideoConference } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { api } from "@/lib/api";
-import Icon from "@/components/Icon";
+import Icon from "@/components/ui/Icon";
 
 // Voice/video prototype: proves a call connects between the two roles over
 // HTTPS. Not production-hardened (no reconnect UX, no device picker screen,

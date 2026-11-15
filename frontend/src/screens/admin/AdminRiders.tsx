@@ -1,16 +1,16 @@
 'use client';
 
-import StatTile from "@/components/StatTile";
-import SectionHeader from "@/components/SectionHeader";
-import { usePageSearch } from "@/components/PageSearchContext";
+import StatTile from "@/components/ui/StatTile";
+import SectionHeader from "@/components/ui/SectionHeader";
+import { usePageSearch } from "@/components/layout/PageSearchContext";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import ApplicationCard from "@/components/admin/ApplicationCard";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import Button from "@/components/Button";
-import Card from "@/components/Card";
-import EmptyState from "@/components/EmptyState";
-import { CardSkeleton } from "@/components/Skeleton";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 
 const POLL_MS = 20000;
 

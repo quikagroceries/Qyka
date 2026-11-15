@@ -2,9 +2,9 @@
 
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Login from "@/screens/Login";
-import AuthShell from "@/components/AuthShell";
-import { useAuth } from "@/components/AuthProvider";
+import Login from "@/screens/auth/Login";
+import AuthShell from "@/components/auth/AuthShell";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { loadGuestDraft } from "@/lib/guestDraft";
 
 function safeNext(raw: string | null) {
@@ -26,7 +26,7 @@ function LoginPageInner() {
   }, [loading, token, user, homePath, router, next]);
 
   return (
-    <AuthShell>
+    <AuthShell split>
       <Login onLoggedIn={(t) => handleLoggedIn(t)} />
     </AuthShell>
   );

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
-import Button from "@/components/Button";
-import Input from "@/components/Input";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 
 // Mirrors backend/app/admin/schemas.py::_MIN_PASSWORD.
 const MIN_PASSWORD = 8;

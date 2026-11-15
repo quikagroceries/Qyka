@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import Icon from "@/components/Icon";
-import ListBuilder from "@/components/ListBuilder";
+import Icon from "@/components/ui/Icon";
+import ListBuilder from "@/components/order/ListBuilder";
 import { draftFromOrder } from "@/lib/orderToDraft";
-import HeroBanner from "@/components/HeroBanner";
+import HeroBanner from "@/components/layout/HeroBanner";
 import personShoppingList from "@/assets/illustrations/person-shopping-list.webp";
 
 // Edit a saved draft list. Only drafts are editable (the backend enforces

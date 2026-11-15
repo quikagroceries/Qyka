@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { api } from "@/lib/api";
-import Button from "@/components/Button";
-import Icon from "@/components/Icon";
-import Avatar from "@/components/Avatar";
+import Button from "@/components/ui/Button";
+import Icon from "@/components/ui/Icon";
+import Avatar from "@/components/ui/Avatar";
 import { formatDayDivider, formatClockTime } from "@/lib/dateFormat";
 import squiggleLeaf from "@/assets/illustrations/decorative-squiggle-leaf.webp";
 import garlic from "@/assets/illustrations/garlic.webp";

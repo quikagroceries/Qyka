@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import Button from "@/components/Button";
-import Input from "@/components/Input";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 
 const POLL_MS = 10000;
 

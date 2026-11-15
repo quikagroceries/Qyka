@@ -1,10 +1,10 @@
 'use client';
 
 import Image from "next/image";
-import Card from "./Card";
-import Icon from "./Icon";
-import StatusBadge from "./StatusBadge";
-import MarketArt from "./shop/MarketArt";
+import Card from "@/components/ui/Card";
+import Icon from "@/components/ui/Icon";
+import StatusBadge from "@/components/ui/StatusBadge";
+import MarketArt from "@/components/shop/MarketArt";
 import { marketTone } from "@/lib/vendorVisuals";
 import { coverImageForMarket } from "@/lib/marketDirectory";
 import { illustrationForItem } from "@/lib/foodVisuals";

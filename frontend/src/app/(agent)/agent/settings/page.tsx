@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Settings from "@/screens/Settings";
-import Button from "@/components/Button";
-import Card from "@/components/Card";
-import Input from "@/components/Input";
-import SectionHeader from "@/components/SectionHeader";
-import { useAuth } from "@/components/AuthProvider";
+import Settings from "@/screens/shared/Settings";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
+import SectionHeader from "@/components/ui/SectionHeader";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { api } from "@/lib/api";
 
 // Agents approved straight from the public For Agents page have no

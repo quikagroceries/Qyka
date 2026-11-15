@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import PageBackgroundAccents from "@/components/PageBackgroundAccents";
+import PageBackgroundAccents from "@/components/layout/PageBackgroundAccents";
 
 /** Header-first shop chrome — clean product surface, no sidebar. */
 function ShopShell({ children }: { children: ReactNode }) {

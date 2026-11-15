@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import RequireAuth from "@/components/RequireAuth";
-import AuthShell from "@/components/AuthShell";
-import ProfileSetup from "@/screens/ProfileSetup";
-import { useAuth } from "@/components/AuthProvider";
+import RequireAuth from "@/components/auth/RequireAuth";
+import AuthShell from "@/components/auth/AuthShell";
+import ProfileSetup from "@/screens/auth/ProfileSetup";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 export default function SetupPage() {
   const { user, setUser, onDuty } = useAuth();

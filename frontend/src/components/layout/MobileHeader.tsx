@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import logo from "@/assets/logo.png";
-import HeaderLocationPicker from "./header/HeaderLocationPicker";
+import HeaderLocationPicker from "@/components/header/HeaderLocationPicker";
 
 export function MobileHeader({ onMenuClick }: { onMenuClick?: () => void }) {
   return (

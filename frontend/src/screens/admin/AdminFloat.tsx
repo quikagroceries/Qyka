@@ -1,14 +1,14 @@
 'use client';
 
-import StatTile from "@/components/StatTile";
+import StatTile from "@/components/ui/StatTile";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import Button from "@/components/Button";
-import Card from "@/components/Card";
-import Icon from "@/components/Icon";
-import Input from "@/components/Input";
-import { CardSkeleton } from "@/components/Skeleton";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import Icon from "@/components/ui/Icon";
+import Input from "@/components/ui/Input";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 import { LOW_FLOAT_BALANCE } from "@/lib/adminUtils";
 
 function TopUpForm({ market, onSubmit, onCancel, busy, error }: any) {

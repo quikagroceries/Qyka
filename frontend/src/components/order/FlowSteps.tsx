@@ -1,6 +1,6 @@
 "use client";
 
-import Icon from "./Icon";
+import Icon from "@/components/ui/Icon";
 
 // The order flow's progress tracker: List -> Market -> Delivery -> Quote.
 // Completed steps are tappable (jump back), the current one is ringed in

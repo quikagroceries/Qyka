@@ -1,5 +1,3 @@
-"use client";
-
 import type { StaticImageData } from "next/image";
 
 import appleFruit from "@/assets/illustrations/apple-fruit-1.webp";

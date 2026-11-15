@@ -1,16 +1,16 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import StatTile from "@/components/StatTile";
-import { usePageSearch } from "@/components/PageSearchContext";
+import StatTile from "@/components/ui/StatTile";
+import { usePageSearch } from "@/components/layout/PageSearchContext";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { api } from "@/lib/api";
-import Button from "@/components/Button";
-import Card from "@/components/Card";
-import Input from "@/components/Input";
-import SectionHeader from "@/components/SectionHeader";
-import { CardSkeleton } from "@/components/Skeleton";
-import { useAuth } from "@/components/AuthProvider";
+import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
+import SectionHeader from "@/components/ui/SectionHeader";
+import { CardSkeleton } from "@/components/ui/Skeleton";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 // Readable but unguessable: no 0/O/1/l/I so it survives being read out loud.
 function generatePassword() {

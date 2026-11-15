@@ -1,4 +1,4 @@
-import MarketingPage from "@/screens/MarketingPage";
+import MarketingPage from "@/screens/marketing/MarketingPage";
 import AuthRedirect from "@/components/marketing/AuthRedirect";
 
 export const metadata = {

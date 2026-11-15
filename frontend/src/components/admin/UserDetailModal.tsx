@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import Modal from "@/components/Modal";
-import Button from "@/components/Button";
-import { CardSkeleton } from "@/components/Skeleton";
+import Modal from "@/components/ui/Modal";
+import Button from "@/components/ui/Button";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
 
 function fmtDate(iso) {

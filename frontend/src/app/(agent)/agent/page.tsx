@@ -3,16 +3,16 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import Card from "@/components/Card";
-import HeroBanner from "@/components/HeroBanner";
-import SectionHeader from "@/components/SectionHeader";
-import StatTile from "@/components/StatTile";
+import Card from "@/components/ui/Card";
+import HeroBanner from "@/components/layout/HeroBanner";
+import SectionHeader from "@/components/ui/SectionHeader";
+import StatTile from "@/components/ui/StatTile";
 import agentScene from "@/assets/illustrations/scene-agent-laptop-delivery.webp";
 import cartVendor from "@/assets/illustrations/market-cart-vendor.webp";
-import StatusBadge from "@/components/StatusBadge";
-import EmptyState from "@/components/EmptyState";
-import { CardSkeleton } from "@/components/Skeleton";
-import { useAuth } from "@/components/AuthProvider";
+import StatusBadge from "@/components/ui/StatusBadge";
+import EmptyState from "@/components/ui/EmptyState";
+import { CardSkeleton } from "@/components/ui/Skeleton";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 function isReadyToShop(o) {
   return o.status === "agent_assigned";

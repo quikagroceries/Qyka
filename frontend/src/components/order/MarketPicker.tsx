@@ -2,15 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import EmptyState from "./EmptyState";
-import Chip from "./Chip";
-import FilterPills from "./FilterPills";
-import HeroBanner from "./HeroBanner";
-import { ActiveOrderBanner } from "./ActiveOrderBanner";
-import StatTile from "./StatTile";
+import EmptyState from "@/components/ui/EmptyState";
+import Chip from "@/components/ui/Chip";
+import FilterPills from "@/components/ui/FilterPills";
+import HeroBanner from "@/components/layout/HeroBanner";
+import { ActiveOrderBanner } from "@/components/order/ActiveOrderBanner";
+import StatTile from "@/components/ui/StatTile";
 import marketStallArt from "@/assets/illustrations/market-stall-produce.webp";
 import shoppingCartArt from "@/assets/illustrations/shopping-cart.webp";
-import Icon from "./Icon";
+import Icon from "@/components/ui/Icon";
 import MarketArt from "@/components/shop/MarketArt";
 import {
   findDirectoryMarket,

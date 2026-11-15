@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import logo from "@/assets/logo.png";
-import Button from "@/components/Button";
+import Button from "@/components/ui/Button";
 
 function Splash({ onGetStarted }: any) {
   return (

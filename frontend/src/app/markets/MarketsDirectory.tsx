@@ -1,15 +1,20 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, type FormEvent } from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { DIRECTORY_MARKETS, VenueType } from "@/lib/marketDirectory";
+import { DIRECTORY_MARKETS, getMarketCardStatus } from "@/lib/marketDirectory";
+import { useMarketAvailability } from "@/lib/useMarketAvailability";
+import { useT } from "@/lib/locale";
+import { cityRequestMailto } from "@/lib/contact";
 import { Section } from "@/components/marketing/Section";
-import FilterPills from "@/components/FilterPills";
-import Card from "@/components/Card";
-import Button from "@/components/Button";
+import FilterPills from "@/components/ui/FilterPills";
+import MarketCard from "@/components/marketing/MarketCard";
+import { MarketingButton } from "@/components/marketing/MarketingButton";
 import { Stagger, StaggerItem } from "@/components/marketing/motion";
-import WavyDivider from "@/components/WavyDivider";
+import WavyDivider from "@/components/ui/WavyDivider";
+import { Float } from "@/components/marketing/anim";
+import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.webp";
+import marketCart from "@/assets/illustrations/market-cart-vendor.webp";
 
 const VENUE_OPTIONS = [
   { key: "all", label: "All Venues" },
@@ -31,9 +36,20 @@ const STATUS_OPTIONS = [
 ];
 
 export function MarketsDirectory() {
+  const t = useT();
+  const { liveMarkets, hours } = useMarketAvailability();
   const [venueFilter, setVenueFilter] = useState("all");
   const [cityFilter, setCityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [cityRequest, setCityRequest] = useState("");
+  const [citySent, setCitySent] = useState(false);
+
+  function submitCityRequest(e: FormEvent) {
+    e.preventDefault();
+    if (!cityRequest.trim()) return;
+    window.location.href = cityRequestMailto(cityRequest);
+    setCitySent(true);
+  }
 
   const filteredMarkets = useMemo(() => {
     return DIRECTORY_MARKETS.filter((market) => {
@@ -47,10 +63,22 @@ export function MarketsDirectory() {
   return (
     <>
       <Section
+        eyebrow="Markets"
         title="Find your market"
         lede="From bustling open-air stalls to trusted supermarkets, see where Qyka can shop for you."
         bg="canvas"
+        className="relative overflow-hidden"
       >
+        <div className="pointer-events-none absolute -right-16 -top-16 h-80 w-80 rounded-full bg-brand-orange/15 blur-3xl" aria-hidden />
+        <Image
+          src={squiggle1}
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute right-[26%] top-2 hidden w-12 rotate-[8deg] opacity-[0.3] lg:block"
+        />
+        <Float amp={5} dur={5.5} className="pointer-events-none absolute right-2 top-0 hidden w-48 lg:block xl:w-56">
+          <Image src={marketCart} alt="" aria-hidden className="w-full" />
+        </Float>
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between mb-10">
           <div className="flex flex-wrap gap-4">
             <FilterPills
@@ -80,79 +108,36 @@ export function MarketsDirectory() {
         {filteredMarkets.length === 0 ? (
           <div className="py-24 text-center">
             <p className="text-xl text-muted font-medium mb-4">No markets found for this combination.</p>
-            <Button onClick={() => {
+            <MarketingButton onClick={() => {
               setVenueFilter("all");
               setCityFilter("all");
               setStatusFilter("all");
             }}>
               Reset filters
-            </Button>
+            </MarketingButton>
           </div>
         ) : (
           <Stagger className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredMarkets.map((market) => (
-              <StaggerItem key={market.id}>
-                <Card className="flex flex-col h-full overflow-hidden p-0">
-                  <div className="relative h-48 w-full bg-canvas-deep">
-                    <Image
-                      src={market.image}
-                      alt={`Cover image for ${market.name}`}
-                      fill
-                      className="object-cover"
-                    />
-                    <div className="absolute top-4 left-4 flex gap-2">
-                      <span className="bg-surface/90 backdrop-blur-sm text-ink text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
-                        {market.venueType === "supermarket" ? "Supermarket" : "Open-air Market"}
-                      </span>
-                      {market.status === "pilot" ? (
-                        <span className="bg-brand-green/90 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
-                          Live Now
-                        </span>
-                      ) : (
-                        <span className="bg-ink/80 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
-                          Coming Soon
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="p-5 flex flex-col flex-1">
-                    <div className="mb-2">
-                      <h3 className="font-display font-bold text-xl text-ink leading-tight mb-1">{market.name}</h3>
-                      <p className="text-sm text-muted">{market.city}, {market.state}</p>
-                    </div>
-                    
-                    <p className="text-sm text-ink mb-6 line-clamp-2">{market.blurb}</p>
-
-                    <div className="flex flex-wrap gap-2 mb-6">
-                      {market.categories.map((cat) => (
-                        <span key={cat} className="text-xs bg-canvas-deep text-muted px-2 py-1 rounded-md capitalize">
-                          {cat}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="mt-auto flex gap-3">
-                      {market.status === "pilot" ? (
-                        <Link 
-                          href={`/shop?market=${market.id}`}
-                          className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl px-5 min-h-[44px] font-semibold text-base transition-all duration-150 select-none active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 bg-brand-orange text-[#1A1A1A] shadow-sm hover:bg-brand-orange-dark hover:shadow active:bg-brand-orange-dark focus-visible:ring-brand-orange"
-                        >
-                          Shop here
-                        </Link>
-                      ) : (
-                        <Button className="flex-1" variant="neutral">Join waitlist</Button>
-                      )}
-                      <Link 
-                        href={`/markets/${market.id}`}
-                        className="flex items-center justify-center min-h-[44px] rounded-2xl px-5 font-semibold active:scale-[0.98] border border-line hover:bg-canvas-deep transition-colors"
-                      >
-                        Details
-                      </Link>
-                    </div>
-                  </div>
-                </Card>
-              </StaggerItem>
-            ))}
+            {filteredMarkets.map((market) => {
+              const status = getMarketCardStatus(market, liveMarkets, hours.open);
+              return (
+                <StaggerItem key={market.id}>
+                  <MarketCard
+                    market={market}
+                    status={status}
+                    statusLabel={status === "open" ? t.markets.open : status === "closed" ? t.markets.closed : t.markets.soon}
+                    venueLabel={market.venueType === "supermarket" ? t.markets.supermarket : t.markets.local}
+                    timeLabel={
+                      status === "open" ? t.markets.closesAt(hours.closesAtClock)
+                      : status === "closed" ? t.markets.opensAt(hours.opensAtClock)
+                      : undefined
+                    }
+                    actionLabel={status === "open" ? t.markets.startHere : status === "closed" ? t.markets.comeBack : t.markets.notify}
+                    showCategories
+                  />
+                </StaggerItem>
+              );
+            })}
           </Stagger>
         )}
       </Section>
@@ -164,17 +149,25 @@ export function MarketsDirectory() {
         lede="We're expanding fast. Drop your city below and we'll bump it up the list."
         bg="canvas-deep"
         narrow
-        className="text-center"
+        align="center"
       >
-        <form className="max-w-md mx-auto flex gap-2 mt-8" onSubmit={(e) => e.preventDefault()}>
-          <input
-            type="text"
-            placeholder="E.g. Port Harcourt, Kano..."
-            className="flex-1 h-[44px] rounded-2xl px-4 border border-line bg-surface text-ink focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange"
-            required
-          />
-          <Button type="submit">Vote</Button>
-        </form>
+        {citySent ? (
+          <p className="mt-8 text-center text-sm font-semibold text-brand-green">
+            Opening your mail app — thanks for the vote for {cityRequest}.
+          </p>
+        ) : (
+          <form className="max-w-md mx-auto flex gap-2 mt-8" onSubmit={submitCityRequest}>
+            <input
+              type="text"
+              value={cityRequest}
+              onChange={(e) => setCityRequest(e.target.value)}
+              placeholder="E.g. Port Harcourt, Kano..."
+              className="flex-1 h-[48px] rounded-full px-5 border border-line bg-surface text-ink focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange"
+              required
+            />
+            <MarketingButton type="submit">Vote</MarketingButton>
+          </form>
+        )}
       </Section>
     </>
   );

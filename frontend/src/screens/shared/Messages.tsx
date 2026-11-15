@@ -2,13 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import Avatar from "@/components/Avatar";
-import EmptyState from "@/components/EmptyState";
-import HeroBanner from "@/components/HeroBanner";
-import Icon from "@/components/Icon";
-import { Skeleton } from "@/components/Skeleton";
+import Avatar from "@/components/ui/Avatar";
+import EmptyState from "@/components/ui/EmptyState";
+import HeroBanner from "@/components/layout/HeroBanner";
+import Icon from "@/components/ui/Icon";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useChat } from "@/components/chat/ChatContext";
-import { usePageSearch } from "@/components/PageSearchContext";
+import { usePageSearch } from "@/components/layout/PageSearchContext";
 import { useConversations } from "@/lib/useConversations";
 import { formatClockTime, formatDayDivider } from "@/lib/dateFormat";
 import conversationArt from "@/assets/illustrations/agent-customer-conversation.webp";

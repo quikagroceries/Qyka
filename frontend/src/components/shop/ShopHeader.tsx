@@ -8,18 +8,18 @@ import squiggleArrow from "@/assets/illustrations/decorative-squiggle-arrow.webp
 import squiggle2 from "@/assets/illustrations/decorative-squiggle-2.webp";
 import dotArrow from "@/assets/illustrations/decorative-dot-arrow.webp";
 import dottedSquares from "@/assets/illustrations/decorative-dotted-squares.webp";
-import { useAuth } from "@/components/AuthProvider";
-import Icon from "@/components/Icon";
+import { useAuth } from "@/components/auth/AuthProvider";
+import Icon from "@/components/ui/Icon";
 import { ACCOUNT_NAV } from "@/lib/nav";
 import { useShop } from "./ShopContext";
 import { useChatOptional } from "@/components/chat/ChatContext";
 import VenuePopover from "./VenuePopover";
 import BagPeek from "./BagPeek";
 import HeaderLiveOrderPill from "@/components/header/HeaderLiveOrderPill";
-import SearchField from "@/components/SearchField";
-import Avatar from "@/components/Avatar";
+import SearchField from "@/components/ui/SearchField";
+import Avatar from "@/components/ui/Avatar";
 import { usePathname } from "next/navigation";
-import { usePageSearchContext } from "@/components/PageSearchContext";
+import { usePageSearchContext } from "@/components/layout/PageSearchContext";
 import HeaderWalletChip from "@/components/header/HeaderWalletChip";
 
 /** Shared header chrome tokens — keep icon wells + borders on one pattern. */

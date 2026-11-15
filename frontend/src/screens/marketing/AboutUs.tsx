@@ -78,7 +78,7 @@ export default function AboutUs() {
   }
 
   return (
-    <div className="force-light min-h-screen bg-canvas text-ink">
+    <div className="force-light grain-overlay min-h-screen bg-canvas text-ink">
       <AnnouncementBar />
       <MarketingHeader />
 

@@ -1,6 +1,6 @@
 'use client';
 
-import Icon from "./Icon";
+import Icon from "@/components/ui/Icon";
 
 // The app's on/off switch. Two states you can read at a glance: a peach
 // track with a check in the thumb when ON, a clearly-grey (not near-white)

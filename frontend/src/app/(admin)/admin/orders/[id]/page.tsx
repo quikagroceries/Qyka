@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { OrderDetailPanel } from "@/screens/AdminOrders";
-import { CardSkeleton } from "@/components/Skeleton";
+import { OrderDetailPanel } from "@/screens/admin/AdminOrders";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 
 export default function AdminOrderDetailPage() {
   const { id } = useParams();

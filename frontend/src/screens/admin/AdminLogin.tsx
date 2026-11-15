@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
-import Button from "@/components/Button";
-import Input from "@/components/Input";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 
 // Separate from the shared customer/agent Login screen on purpose: admins
 // sign in with email+password, never phone/OTP (see backend/app/admin/routes.py).

@@ -15,7 +15,14 @@ export const LOCALES: { key: Locale; label: string; short: string }[] = [
 ];
 
 export const en = {
-  nav: { how: "How it works", markets: "Markets", earn: "Earn with us", signIn: "Sign in", start: "Start a list" },
+  nav: {
+    how: "How it works",
+    markets: "Markets",
+    earnAgent: "Become an agent",
+    earnRider: "Become a rider",
+    signIn: "Sign in",
+    start: "Start a list",
+  },
   hero: {
     eyebrow: "Your personal shopper at the market",
     titleA: "The market,",
@@ -153,7 +160,14 @@ export const en = {
 export type Dict = typeof en;
 
 export const pcm: Dict = {
-  nav: { how: "How e dey work", markets: "Markets", earn: "Make money with us", signIn: "Sign in", start: "Start list" },
+  nav: {
+    how: "How e dey work",
+    markets: "Markets",
+    earnAgent: "Become an agent",
+    earnRider: "Become a rider",
+    signIn: "Sign in",
+    start: "Start list",
+  },
   hero: {
     eyebrow: "Person wey go shop market for you",
     titleA: "Market dey",

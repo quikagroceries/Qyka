@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import Icon from "./Icon";
+import Icon from "@/components/ui/Icon";
 import { illustrationForItem } from "@/lib/foodVisuals";
 
 // Phase 1: a clean bought/not-bought checklist for the paid order, with each

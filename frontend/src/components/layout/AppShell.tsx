@@ -2,19 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import Sidebar from "./Sidebar";
-import MobileHeader from "./MobileHeader";
-import ShopHeader from "./shop/ShopHeader";
-import { useShopOptional } from "./shop/ShopContext";
-import MobileDrawer from "./MobileDrawer";
-import MobileBottomNav from "./MobileBottomNav";
-import DesktopTopBar from "./DesktopTopBar";
-import PageContainer from "./PageContainer";
-import PageBackgroundAccents from "./PageBackgroundAccents";
-import ShopBag from "./shop/ShopBag";
-import ChatDock from "./chat/ChatDock";
-import { ChatProvider } from "./chat/ChatContext";
-import { PageSearchProvider } from "./PageSearchContext";
+import Sidebar from "@/components/layout/Sidebar";
+import MobileHeader from "@/components/layout/MobileHeader";
+import ShopHeader from "@/components/shop/ShopHeader";
+import { useShopOptional } from "@/components/shop/ShopContext";
+import MobileDrawer from "@/components/layout/MobileDrawer";
+import MobileBottomNav from "@/components/layout/MobileBottomNav";
+import DesktopTopBar from "@/components/layout/DesktopTopBar";
+import PageContainer from "@/components/ui/PageContainer";
+import PageBackgroundAccents from "@/components/layout/PageBackgroundAccents";
+import ShopBag from "@/components/shop/ShopBag";
+import ChatDock from "@/components/chat/ChatDock";
+import { ChatProvider } from "@/components/chat/ChatContext";
+import { PageSearchProvider } from "@/components/layout/PageSearchContext";
 
 /**
  * Account / agent / admin / shop shell — sidebar nav, adaptive:

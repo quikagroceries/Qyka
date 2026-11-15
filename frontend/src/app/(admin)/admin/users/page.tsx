@@ -1,3 +1,3 @@
 "use client";
-import AdminUsers from "@/screens/AdminUsers";
+import AdminUsers from "@/screens/admin/AdminUsers";
 export default function Page() { return <AdminUsers />; }

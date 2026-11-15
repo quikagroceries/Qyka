@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import Card from "./Card";
-import Icon from "./Icon";
-import Button from "./Button";
-import Input from "./Input";
-import Modal from "./Modal";
+import Card from "@/components/ui/Card";
+import Icon from "@/components/ui/Icon";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Modal from "@/components/ui/Modal";
 import { computeSavings, naira } from "@/lib/orderMath";
 import { illustrationForItem } from "@/lib/foodVisuals";
 

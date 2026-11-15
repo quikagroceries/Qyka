@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { LANDING } from "@/content/landing";
-import Chip from "@/components/Chip";
+import Chip from "@/components/ui/Chip";
 import PriceRow from "@/components/marketing/PriceRow";
 
 export default function PricingCalculator({ className = "" }: { className?: string }) {
@@ -14,7 +14,7 @@ export default function PricingCalculator({ className = "" }: { className?: stri
   const total = selectedTier.amount + serviceFee + deliveryFee;
 
   return (
-    <div className={`rounded-3xl border border-line bg-surface p-6 sm:p-8 shadow-sm ${className}`}>
+    <div className={`rounded-[2rem] border border-line bg-surface p-6 sm:p-8 shadow-sm ${className}`}>
       <p className="font-semibold text-ink mb-4">Select basket size</p>
       <div className="flex flex-wrap gap-2 mb-8">
         {LANDING.pricing.tiers.map((tier, idx) => (

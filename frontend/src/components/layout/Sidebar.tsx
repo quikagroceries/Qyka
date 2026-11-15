@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import Icon from "./Icon";
-import Avatar from "./Avatar";
-import UnreadBadge from "./UnreadBadge";
-import RoleSwitch from "./RoleSwitch";
+import Icon from "@/components/ui/Icon";
+import Avatar from "@/components/ui/Avatar";
+import UnreadBadge from "@/components/ui/UnreadBadge";
+import RoleSwitch from "@/components/layout/RoleSwitch";
 import squiggleLeaf from "@/assets/illustrations/decorative-squiggle-leaf.webp";
 import squiggle1 from "@/assets/illustrations/decorative-squiggle-1.webp";
 import garlic from "@/assets/illustrations/garlic.webp";

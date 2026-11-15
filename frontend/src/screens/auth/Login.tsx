@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import Button from "@/components/Button";
-import Input from "@/components/Input";
-import OtpInput from "@/components/OtpInput";
-import OtpResend from "@/components/OtpResend";
-import GoogleSignInButton, { GOOGLE_SIGN_IN_ENABLED } from "@/components/GoogleSignInButton";
-import WavyDivider from "@/components/WavyDivider";
-import Brand from "@/components/Brand";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import OtpInput from "@/components/auth/OtpInput";
+import OtpResend from "@/components/auth/OtpResend";
+import GoogleSignInButton, { GOOGLE_SIGN_IN_ENABLED } from "@/components/auth/GoogleSignInButton";
+import WavyDivider from "@/components/ui/WavyDivider";
+import Brand from "@/components/ui/Brand";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -71,8 +72,35 @@ function looksLikeEmail(v: string) {
   return v.includes("@");
 }
 
+// Nigerian phone display formatting: "+234 801 234 5678" as the person
+// types, whatever form they type it in (local 0801..., bare 801..., or
+// already +234801...). This is purely cosmetic - the backend's
+// normalize_phone (app/core/phone.py) already strips spaces/dashes/parens
+// server-side, so there's no need to keep this in sync with it beyond both
+// treating a leading "0" as the local-format marker.
+function formatNigeriaPhone(raw: string): string {
+  let digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("0")) {
+    digits = "234" + digits.slice(1);
+  } else if (digits && !digits.startsWith("234") && !"234".startsWith(digits)) {
+    // Not already typing (or having typed) "234" - e.g. they went straight
+    // to the subscriber number ("801...") - so assume the country code.
+    digits = "234" + digits;
+  }
+  if (!digits) return "";
+  digits = digits.slice(0, 13); // "234" + up to 10 subscriber digits
+  // Only the country-code digits actually typed so far - never padded ahead,
+  // or the next real keystroke (appended to this formatted display, since
+  // the input is controlled) would double up with the padding.
+  const cc = digits.slice(0, 3);
+  const national = digits.slice(3);
+  const groups = [national.slice(0, 3), national.slice(3, 6), national.slice(6, 10)].filter(Boolean);
+  return "+" + cc + (groups.length ? " " + groups.join(" ") : "");
+}
+
 // onLoggedIn is a function App passes in; we call it with the token on success.
 function Login({ onLoggedIn }: any) {
+  const router = useRouter();
   const [mode, setMode] = useState<"phone" | "email">("phone");
   const [phone, setPhone] = useState("+234");
   const [email, setEmail] = useState("");
@@ -154,6 +182,16 @@ function Login({ onLoggedIn }: any) {
 
   return (
     <div>
+      <button
+        type="button"
+        onClick={() => router.back()}
+        className="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold text-muted transition hover:text-ink"
+      >
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+          <path d="M19 12H5M5 12l6-6M5 12l6 6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Back
+      </button>
       <Brand href={null} className="mb-4" />
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-orange">Welcome back</p>
       {/* `font-display` (Bricolage Grotesque) - this was `font-sans` (DM
@@ -186,7 +224,7 @@ function Login({ onLoggedIn }: any) {
                 type="tel"
                 placeholder="+234..."
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatNigeriaPhone(e.target.value))}
               />
             ) : (
               <Input

@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import Button from "@/components/Button";
-import EmptyState from "@/components/EmptyState";
-import Icon from "@/components/Icon";
+import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
+import Icon from "@/components/ui/Icon";
 import { useShop } from "./ShopContext";
 import { illustrationForItem } from "@/lib/foodVisuals";
 import netBag from "@/assets/illustrations/net-bag.webp";

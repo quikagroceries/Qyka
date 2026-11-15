@@ -1,7 +1,7 @@
 "use client";
 
 import Image, { type StaticImageData } from "next/image";
-import Icon from "./Icon";
+import Icon from "@/components/ui/Icon";
 import groceryBasket from "@/assets/illustrations/grocery-basket.webp";
 
 export interface EmptyStateProps {
