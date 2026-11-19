@@ -30,13 +30,9 @@ import { illustrationForItem } from "@/lib/foodVisuals";
 
 const POLL_MS = 5000;
 
-// Mirrors app/orders/fees.py's flat placeholders (DELIVERY_FEE_FLAT,
-// COMBINED_BASE_FEE) - same constants already duplicated in NewOrderFlow.jsx
-// for the same reason: pre-shopping, the API only returns the single
-// combined estimated_value, not a delivery/fee split, so these let the
-// pre-shopping estimate card below show a believable breakdown.
-const DELIVERY_QUOTE = 3600;
-const COMBINED_FEE_ESTIMATE = 2000;
+// Mirrors app/orders/fees.py's DELIVERY_FEE_FLAT placeholder (also served at
+// GET /pricing), for the pre-shopping estimate card below.
+const DELIVERY_QUOTE = 1500;
 
 // Statuses before finish_shopping has ever run - items_total/combined_fee/
 // delivery_fee/grand_total are all still their unset 0.00 defaults, so the
@@ -438,7 +434,9 @@ function OrderDetail({ orderId, onBack, onTopUpWallet }: any) {
   // "Fees" line for the customer. The full per-transfer breakdown still
   // exists in the database untouched - this just isn't the screen for it.
   const fees = Number(order.combined_fee) + Number(order.emtl_total) + Number(order.transfer_fees_total);
-  const goodsEstimate = Math.max(0, Number(order.estimated_value) - DELIVERY_QUOTE - COMBINED_FEE_ESTIMATE);
+  // The backend's own goods-only estimate - no reverse-engineering it out of
+  // estimated_value with copies of the fee rules.
+  const goodsEstimate = Number(order.goods_estimate);
   // Derived from the REAL order, never hardcoded - a flagged (must_prepay)
   // customer's deposit is 100% of the estimate, not the normal DEPOSIT_RATE,
   // and a fixed percentage string here would just be wrong for them. See

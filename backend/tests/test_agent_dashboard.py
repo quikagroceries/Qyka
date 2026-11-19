@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348050000001"
 PHONE_AGENT = "+2348050000002"
@@ -64,6 +65,7 @@ async def test_agent_summary_counts_tasks_by_bucket(client, db_session_factory):
     })
     assert r.json()["proposed_agent_id"] == str(agent_id)
     oid1_created = r.json()["id"]
+    await pay_deposit(client, cust1_h, oid1_created)
     # Phase 1: only PROPOSED at creation - accept before it counts as a task.
     r = await client.post(f"/orders/{oid1_created}/accept-agent", headers=cust1_h)
     assert r.status_code == 200, r.text
@@ -94,6 +96,7 @@ async def test_agent_summary_counts_tasks_by_bucket(client, db_session_factory):
     deposit = Decimal(r.json()["deposit_amount"])
     assert deposit > 0
     oid2_created = r.json()["id"]
+    await pay_deposit(client, cust2_h, oid2_created)
 
     from app.wallet import service as wallet_service
     from app.auth.models import User
@@ -116,7 +119,7 @@ async def test_agent_summary_counts_tasks_by_bucket(client, db_session_factory):
     oid1 = None
     r2 = await client.get("/orders/mine", headers=agent_h)
     for o in r2.json():
-        if o["status"] == "agent_assigned" and Decimal(o["deposit_amount"]) == 0:
+        if o["status"] == "agent_assigned" and o["deposit_paid_at"]:
             oid1 = o["id"]
     assert oid1 is not None
     r = await client.post(f"/orders/{oid1}/start-shopping", headers=agent_h)
@@ -156,6 +159,7 @@ async def test_agent_earnings_reflect_paid_orders_with_correct_share(client, db_
         "items": [{"description": "pepper", "listed_price": "500.00"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     assert r.json()["proposed_agent_id"] == str(agent_id)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=cust_h)
     assert r.status_code == 200, r.text
@@ -236,6 +240,7 @@ async def test_availability_toggle_and_guard(client, db_session_factory):
         "items": [{"description": "pepper"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=cust_h)
     assert r.status_code == 200, r.text
     await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)

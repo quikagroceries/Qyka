@@ -13,6 +13,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348040000001"
 PHONE_AGENT = "+2348040000002"
@@ -175,6 +176,7 @@ async def test_pinned_vendor_unavailable_reuses_the_same_exception_flow(client, 
         ],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     items = {it["description"]: it["id"] for it in r.json()["items"]}
     await client.post(f"/orders/{oid}/accept-agent", headers=cust_h)
     await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)

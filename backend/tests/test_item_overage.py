@@ -9,6 +9,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348030000001"
 PHONE_AGENT = "+2348030000002"
@@ -51,6 +52,7 @@ async def _order_shopping(client, cust_h, agent_h, market_id, items, listed_item
     })
     assert r.status_code == 201, r.text
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=cust_h)
     assert r.status_code == 200, r.text
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)

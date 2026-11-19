@@ -80,7 +80,7 @@ async def _estimates(
     priced_total = sum(item_prices, start=Decimal("0.00"))
     listed_items_total = priced_total + listed_items_total
     estimated_value = fees.estimate_order_value(listed_items_total)
-    # A customer flagged must_prepay (a below-threshold non-payer) pays 100% up
+    # A customer flagged must_prepay (a past non-payer) pays 100% up
     # front regardless of order size, until they complete a paid order. Read the
     # flag from their record so it can't be bypassed by the caller.
     from app.auth.models import User as _User
@@ -116,8 +116,8 @@ async def create_order(
     total. Pure detailed: every item is priced, so this stays 0.00. Pure
     budget: no item is priced, so this IS the whole goods total (unchanged
     behavior from before mixed lists existed). Either way this figure drives
-    both the deposit threshold (via estimated_value, which adds delivery +
-    fee) and the JIT spending cap (see jit.service.get_or_create_authorization,
+    both the 30% deposit (a must_prepay customer's 100% deposit uses
+    estimated_value, which adds delivery + fee) and the JIT spending cap (see jit.service.get_or_create_authorization,
     which sets cap = order.goods_estimate - goods only, since delivery/fee
     are never paid through the authorization).
     """

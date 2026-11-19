@@ -109,7 +109,7 @@ async def test_authorization_cap_equals_goods_estimate(client, db_session_factor
     # estimated_value is the COMBINED figure (goods + delivery + fee) - and
     # is deliberately larger than the cap, confirming the cap isn't keyed
     # off it.
-    assert Decimal(order["estimated_value"]) == Decimal("7500.00") + Decimal("3600.00") + Decimal("2000.00")
+    assert Decimal(order["estimated_value"]) == Decimal("7500.00") + Decimal("1500.00") + Decimal("562.50")
 
     print("Spending authorization cap correctly equals the goods estimate only.")
 

@@ -62,9 +62,11 @@ function CheckoutHero({
   );
 }
 
-const DELIVERY_QUOTE = 3600;
-const COMBINED_FEE_ESTIMATE = 2000;
-const DEPOSIT_THRESHOLD = 10000;
+// Mirrors backend/app/orders/fees.py (also served at GET /pricing): 7.5%
+// service fee on goods, a flat delivery placeholder, and a 30% deposit on
+// every order (100% for a must_prepay customer).
+const DELIVERY_QUOTE = 1500;
+const SERVICE_FEE_RATE = 0.075;
 const DEPOSIT_RATE = 0.3;
 
 function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
@@ -394,13 +396,10 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
   }
 
   const goodsTotal = Number(stagedList.goodsTotal);
-  const estimatedValue = goodsTotal + DELIVERY_QUOTE + COMBINED_FEE_ESTIMATE;
+  const serviceFee = goodsTotal * SERVICE_FEE_RATE;
+  const estimatedValue = goodsTotal + DELIVERY_QUOTE + serviceFee;
   const mustPrepay = !!user?.must_prepay;
-  const depositAmount = mustPrepay
-    ? estimatedValue
-    : estimatedValue > DEPOSIT_THRESHOLD
-      ? goodsTotal * DEPOSIT_RATE
-      : 0;
+  const depositAmount = mustPrepay ? estimatedValue : goodsTotal * DEPOSIT_RATE;
   const isSuperQuote = (market.venue_type || "") === "supermarket";
 
   return (
@@ -465,7 +464,9 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
               <span className="font-semibold tabular-nums text-ink">₦{DELIVERY_QUOTE.toFixed(2)}</span>
             </div>
           </div>
-          <p className="mt-2 text-xs text-faint">Service fee calculated when shopping finishes.</p>
+          <p className="mt-2 text-xs text-faint">
+            Plus a 7.5% service fee on what&apos;s actually bought (about ₦{serviceFee.toFixed(2)} on this estimate).
+          </p>
 
           {depositAmount > 0 && (
             <div className="mb-3 mt-3 flex items-start gap-2.5 rounded-2xl bg-brand-orange/[0.12] px-3 py-3 text-sm text-ink/80">
@@ -480,8 +481,7 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
                   </>
                 ) : (
                   <>
-                    This estimate is over ₦10,000 — a 30% deposit (₦{depositAmount.toFixed(2)}) will be
-                    required before shopping can start.
+                    A 30% deposit (₦{depositAmount.toFixed(2)}) is required before shopping can start.
                   </>
                 )}
               </span>

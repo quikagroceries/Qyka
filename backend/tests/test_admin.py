@@ -8,6 +8,7 @@ from app.auth.models import User
 from app.core.enums import UserRole, UserStatus
 from app.core.security import hash_password
 from app.markets.models import Agent, Market
+from tests.conftest import pay_deposit
 
 TARGET_PHONE = "+2348040000002"
 _ADMIN_PASSWORD = "test-admin-password"
@@ -45,7 +46,7 @@ async def _login_admin(client, db_session_factory, email):
 async def _drive_order_to_paid(
     client, *, admin_h, agent_h, agent_id, cust_h, market_id, goods_total="2000.00"
 ):
-    """A small order (under the deposit threshold, so no deposit step needed)
+    """A small order (its 30% deposit paid up front)
     driven all the way to PAID - the shared setup for the agents/analytics
     admin tests below, which all need at least one real paid_at + company_share
     + agent_share on record."""
@@ -54,6 +55,7 @@ async def _drive_order_to_paid(
         "items": [{"description": "rice"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     item_id = r.json()["items"][0]["id"]
@@ -241,6 +243,7 @@ async def test_admin_sees_forfeited_deposits_as_losses(client, db_session_factor
         "market_id": str(market_id), "listed_items_total": "78000.00",
         "items": [{"description": "bulk rice bags"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     deposit = Decimal(r.json()["deposit_amount"])
     assert deposit == Decimal("23400.00")
 
@@ -670,6 +673,7 @@ async def test_admin_sees_failed_vendor_transfers_and_can_acknowledge_one(client
         "items": [{"description": "rice"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=admin_h)
     assert r.status_code == 200, r.text
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
@@ -728,6 +732,7 @@ async def test_admin_can_raise_a_customers_spending_cap(client, db_session_facto
         "items": [{"description": "rice"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     # accept-agent then start-shopping is what actually creates the
     # SpendingAuthorization row (get_or_create_authorization, called from
     # pay_vendor) - admin_raise_cap mirrors the customer endpoint exactly and

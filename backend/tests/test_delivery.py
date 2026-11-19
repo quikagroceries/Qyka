@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.config import settings
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348010000001"
 PHONE_AGENT = "+2348020000002"
@@ -70,6 +71,7 @@ async def test_full_delivery_and_payout(client, db_session_factory, monkeypatch)
         "market_id": str(market_id), "listed_items_total": "2000.00",
         "items": [{"description": "500 naira pepper"}, {"description": "1000 naira rice"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     items = r.json()["items"]
@@ -81,10 +83,10 @@ async def test_full_delivery_and_payout(client, db_session_factory, monkeypatch)
         "items": [{"item_id": items[1]["id"], "price": "1000.00"}]})
     r = await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
     final = r.json()
-    grand_total = Decimal(final["grand_total"])   # 7100
+    grand_total = Decimal(final["grand_total"])   # 1500 + 112.50 + 1500 = 3112.50
     agent_share = Decimal(final["agent_share"])   # 1000
-    company_share = Decimal(final["company_share"])  # 1000
-    delivery_fee = Decimal(final["delivery_fee"]) # 3600
+    company_share = Decimal(final["company_share"])  # 112.50 - 1000 = -887.50
+    delivery_fee = Decimal(final["delivery_fee"]) # 1500
 
     # pay via webhook
     r = await client.post(f"/payments/orders/{oid}/checkout", headers=admin_h)
@@ -178,6 +180,7 @@ async def test_cannot_pack_unpaid_order(client, db_session_factory):
     r = await client.post("/orders", headers=admin_h, json={
         "market_id": str(market_id), "items": [{"description": "500 naira pepper"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     # order is in SHOPPING, never paid — packing must fail
@@ -226,6 +229,7 @@ async def test_agent_can_dispatch_own_order_others_cannot(client, db_session_fac
         "market_id": str(market_id), "listed_items_total": "2000.00",
         "items": [{"description": "500 naira pepper"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     item_id = r.json()["items"][0]["id"]
