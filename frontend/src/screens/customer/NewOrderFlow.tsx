@@ -12,6 +12,7 @@ import Input from "@/components/ui/Input";
 import MarketPicker from "@/components/order/MarketPicker";
 import ListBuilder from "@/components/order/ListBuilder";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { getMarketOpenStatus, type MarketOpenStatus } from "@/lib/marketOpenNow";
 import { useShop, type ShopListDraft } from "@/components/shop/ShopContext";
 import HeroBanner from "@/components/layout/HeroBanner";
 import { ActiveOrderBanner } from "@/components/order/ActiveOrderBanner";
@@ -19,7 +20,7 @@ import SectionHeader from "@/components/ui/SectionHeader";
 import DeliveryAddressPicker from "@/components/order/DeliveryAddressPicker";
 import FlowSteps, { type FlowStepKey } from "@/components/order/FlowSteps";
 import { clearGuestDraft, loadGuestDraft, saveGuestDraft } from "@/lib/guestDraft";
-import { matchSlugToApiMarket } from "@/lib/marketDirectory";
+import { findMarketBySlug } from "@/lib/markets";
 import personShoppingList from "@/assets/illustrations/person-shopping-list.webp";
 import { SHOP_CHIPS } from "@/lib/heroChips";
 import { illustrationForItem } from "@/lib/foodVisuals";
@@ -96,6 +97,14 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
 
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // Is the chosen market open right now (its own hours, from the API)? Checked
+  // on load and again on submit. A courtesy only - the backend refuses a
+  // closed-market order regardless (markets/hours.py).
+  const [openStatus, setOpenStatus] = useState<MarketOpenStatus | null>(null);
+  useEffect(() => {
+    setOpenStatus(getMarketOpenStatus(market));
+  }, [market, step]);
+  const marketClosed = openStatus?.open === false;
   const [authOpen, setAuthOpen] = useState(false);
   const pendingPlaceRef = useRef(false);
   const stagedList = listDraft;
@@ -164,7 +173,7 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
       }
     }
     if (marketSlug) {
-      const matched = matchSlugToApiMarket(marketSlug, markets);
+      const matched = findMarketBySlug(markets, marketSlug);
       if (matched) setMarket(matched);
     }
     setHandoffReady(true);
@@ -231,7 +240,10 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
         dropoff_longitude: deliveryCoords?.lng ?? null,
       });
     } catch (e: any) {
-      setError("Could not get quote: " + e.message);
+      // The backend's own closed-market refusal (409) - show its sentence.
+      const closed = /market is closed/i.test(e.message || "");
+      if (closed) setOpenStatus(getMarketOpenStatus(market));
+      setError(closed ? "This market is closed right now, so the order wasn't placed." : "Could not get quote: " + e.message);
       setBusy(false);
       pendingPlaceRef.current = false;
       return;
@@ -246,7 +258,14 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
     onOrderPlaced(created.id);
   }
 
+  function stillOpen() {
+    const status = getMarketOpenStatus(market);
+    setOpenStatus(status);
+    return status?.open !== false;
+  }
+
   async function handleGetQuote() {
+    if (!stillOpen()) return;
     if (!token) {
       pendingPlaceRef.current = true;
       setAuthOpen(true);
@@ -257,7 +276,13 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
 
   async function handleAuthSuccess() {
     setAuthOpen(false);
-    if (pendingPlaceRef.current) await placeOrderNow();
+    if (pendingPlaceRef.current) {
+      if (!stillOpen()) {
+        pendingPlaceRef.current = false;
+        return;
+      }
+      await placeOrderNow();
+    }
   }
 
   const awaitingHandoff = Boolean(marketSlug) && !market && !handoffReady;
@@ -492,7 +517,19 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
             <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
           )}
 
-          <Button onClick={handleGetQuote} busy={busy} fullWidth className="mt-3 text-lg">
+          {marketClosed && (
+            <div className="mt-3 flex items-start gap-2.5 rounded-2xl bg-sunken px-3 py-3 text-sm text-ink/80" role="status">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink/10 text-ink">
+                <Icon name="clock" className="h-3.5 w-3.5" />
+              </span>
+              <span>
+                This market is closed. Opens at {openStatus!.opensAt}. Your list is saved — you can place the
+                order once it opens.
+              </span>
+            </div>
+          )}
+
+          <Button onClick={handleGetQuote} busy={busy} disabled={marketClosed} fullWidth className="mt-3 text-lg">
             Get My Quote
           </Button>
           {!token && (

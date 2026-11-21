@@ -12,7 +12,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import Icon from "@/components/ui/Icon";
 import { isChatAvailable } from "@/lib/orderStatus";
 import { marketTone, TONE_COVER } from "@/lib/vendorVisuals";
-import { coverImageForMarket } from "@/lib/marketDirectory";
+import { coverImageForMarket } from "@/lib/markets";
 
 const POLL_MS = 5000;
 

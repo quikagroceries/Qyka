@@ -25,7 +25,7 @@ import riderScooter from "@/assets/illustrations/rider-scooter-basket-2.webp";
 import orderHandoff from "@/assets/illustrations/order-handoff-vendor-customer.webp";
 import { isChatAvailable, isExceptionOrder, isRateable, summarizeOrderStatus } from "@/lib/orderStatus";
 import { marketTone, TONE_COVER } from "@/lib/vendorVisuals";
-import { coverImageForMarket } from "@/lib/marketDirectory";
+import { coverImageForMarket } from "@/lib/markets";
 import { illustrationForItem } from "@/lib/foodVisuals";
 
 const POLL_MS = 5000;

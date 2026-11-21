@@ -2,7 +2,7 @@
 
 import { MotionConfig } from "framer-motion";
 
-import { DIRECTORY_MARKETS } from "@/lib/marketDirectory";
+import { isOrderable } from "@/lib/markets";
 import { useMarketAvailability } from "@/lib/useMarketAvailability";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
@@ -24,9 +24,8 @@ const HERO_LIST_ID = "hero-list";
 
 export default function MarketingPage() {
   const t = useT();
-  const launchedCount = DIRECTORY_MARKETS.filter((m) => m.status === "pilot").length;
-
   const { liveMarkets, hours } = useMarketAvailability();
+  const launchedCount = (liveMarkets || []).filter(isOrderable).length;
 
   return (
     <MotionConfig reducedMotion="user">

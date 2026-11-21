@@ -16,7 +16,7 @@ import Input from "@/components/ui/Input";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { formatAge, isStuckOrder } from "@/lib/adminUtils";
 import { marketTone, TONE_COVER } from "@/lib/vendorVisuals";
-import { coverImageForMarket } from "@/lib/marketDirectory";
+import { coverImageForMarket } from "@/lib/markets";
 import { summarizeOrderStatus } from "@/lib/orderStatus";
 
 const POLL_MS = 15000;

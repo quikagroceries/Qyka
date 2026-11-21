@@ -6,7 +6,7 @@ import MarketArt from "@/components/shop/MarketArt";
 import { useActiveOrders } from "@/lib/useActiveOrders";
 import { summarizeOrderStatus } from "@/lib/orderStatus";
 import { marketTone } from "@/lib/vendorVisuals";
-import { coverImageForMarket } from "@/lib/marketDirectory";
+import { coverImageForMarket } from "@/lib/markets";
 
 // The five beats of an order, left to right. Where an order is right now maps
 // onto one of them (see stepIndex) so the card can show real progress, not
