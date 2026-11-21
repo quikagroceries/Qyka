@@ -3,16 +3,13 @@
 import { notifyMeMailto } from "@/lib/contact";
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import {
-  DIRECTORY_MARKETS,
-  filterDirectoryMarkets,
-  type DirectoryMarket,
-} from "@/lib/marketDirectory";
+import { coverImageForMarket, filterMarkets, isOrderable, type Market } from "@/lib/markets";
+import { useMarkets } from "@/lib/useMarkets";
 
-function sortMarkets(list: DirectoryMarket[]) {
+function sortMarkets(list: Market[]) {
   return [...list].sort((a, b) => {
-    if (a.status === b.status) return a.name.localeCompare(b.name);
-    return a.status === "pilot" ? -1 : 1;
+    if (isOrderable(a) === isOrderable(b)) return a.name.localeCompare(b.name);
+    return isOrderable(a) ? -1 : 1;
   });
 }
 
@@ -36,12 +33,13 @@ export default function MarketShopPicker({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [notifyMarket, setNotifyMarket] = useState<DirectoryMarket | null>(null);
+  const [notifyMarket, setNotifyMarket] = useState<Market | null>(null);
   const [notifyEmail, setNotifyEmail] = useState("");
   const [notifySent, setNotifySent] = useState(false);
 
-  const results = useMemo(() => sortMarkets(filterDirectoryMarkets(query)), [query]);
-  const defaultList = useMemo(() => sortMarkets(DIRECTORY_MARKETS), []);
+  const markets = useMarkets();
+  const results = useMemo(() => sortMarkets(filterMarkets(markets || [], query)), [markets, query]);
+  const defaultList = useMemo(() => sortMarkets(markets || []), [markets]);
   const options = query.trim() ? results : defaultList;
 
   useEffect(() => {
@@ -57,14 +55,14 @@ export default function MarketShopPicker({
     setActiveIndex(0);
   }, [query, open]);
 
-  function selectMarket(market: DirectoryMarket) {
+  function selectMarket(market: Market) {
     setQuery(market.name);
     setOpen(false);
-    if (market.status === "pilot") {
+    if (isOrderable(market)) {
       setNotifyMarket(null);
       setNotifySent(false);
       // Skip in-app picker — land on list-building for this market
-      router.push(`/shop?market=${encodeURIComponent(market.id)}`);
+      router.push(`/shop?market=${encodeURIComponent(market.slug)}`);
       return;
     }
     setNotifyMarket(market);
@@ -202,7 +200,7 @@ export default function MarketShopPicker({
                   >
                     <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-canvas ring-1 ring-ink/5">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={m.image} alt="" className="h-full w-full object-cover" />
+                      <img src={coverImageForMarket(m)} alt="" className="h-full w-full object-cover" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">
@@ -210,12 +208,12 @@ export default function MarketShopPicker({
                         <span
                           className={
                             "rounded-full px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide " +
-                            (m.status === "pilot"
+                            (isOrderable(m)
                               ? "bg-brand-green/10 text-brand-green"
                               : "bg-ink/5 text-ink/50")
                           }
                         >
-                          {m.status === "pilot" ? "Live" : "Coming soon"}
+                          {isOrderable(m) ? "Live" : "Coming soon"}
                         </span>
                       </span>
                       <span className="mt-0.5 block text-xs text-ink/50">

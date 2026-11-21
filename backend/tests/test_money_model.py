@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348010000001"
 PHONE_AGENT = "+2348020000002"
@@ -57,15 +58,92 @@ async def _pay_deposit(client, db_session_factory, oid, cust_id, headers, deposi
 
 # ---------- Fee policy (pure functions) ----------
 
-def test_combined_fee_time_based():
-    from app.orders.fees import combined_fee, split_fee
-    assert combined_fee(20 * 60) == Decimal("2000.00")   # within 30-min window
-    assert combined_fee(30 * 60) == Decimal("2000.00")   # exactly window
-    assert combined_fee(45 * 60) == Decimal("2750.00")   # +15 min
-    # split: company flat 1000, agent gets the rest incl. overtime
-    sp = split_fee(45 * 60)
-    assert sp["company"] == Decimal("1000.00")
-    assert sp["agent"] == Decimal("1750.00")
+def test_service_fee_is_exactly_7_5_percent_of_goods():
+    from app.orders.fees import service_fee
+    assert service_fee(Decimal("10000.00")) == Decimal("750.00")
+    assert service_fee(Decimal("5000.00")) == Decimal("375.00")
+    assert service_fee(Decimal("450.00")) == Decimal("33.75")
+    assert service_fee(Decimal("0.00")) == Decimal("0.00")
+
+
+def test_customer_bill_does_not_change_with_shopping_time():
+    """10-min and 90-min shops on the same order bill the customer identically -
+    time only moves money between agent and company, never onto the bill."""
+    from app.orders.fees import calculate_fees
+    quick = calculate_fees(Decimal("20000.00"), 10 * 60)
+    slow = calculate_fees(Decimal("20000.00"), 90 * 60)
+    assert quick["combined_fee"] == slow["combined_fee"] == Decimal("1500.00")
+    assert quick["grand_total"] == slow["grand_total"] == Decimal("23000.00")  # 20000 + 1500 + 1500
+    assert slow["agent_share"] > quick["agent_share"]
+
+
+def test_agent_share_rises_with_time_company_takes_the_rest():
+    from app.orders.fees import split_fee
+    goods = Decimal("40000.00")                      # fee 3000
+    within = split_fee(goods, 25 * 60)
+    assert within == {"total": Decimal("3000.00"), "agent": Decimal("1000.00"), "company": Decimal("2000.00")}
+    exact = split_fee(goods, 30 * 60)                # the 30th minute is still included
+    assert exact["agent"] == Decimal("1000.00")
+    over = split_fee(goods, 45 * 60)                 # 15 min over -> +750
+    assert over == {"total": Decimal("3000.00"), "agent": Decimal("1750.00"), "company": Decimal("1250.00")}
+
+
+def test_company_share_goes_negative_and_agent_still_gets_full_time_share():
+    """A long, cheap order: the agent is never capped, the company is never
+    floored at zero - its share simply goes negative."""
+    from app.orders.fees import split_fee
+    sp = split_fee(Decimal("5000.00"), 60 * 60)      # fee 375; agent 1000 + 30*50
+    assert sp["total"] == Decimal("375.00")
+    assert sp["agent"] == Decimal("2500.00")
+    assert sp["company"] == Decimal("-2125.00")
+    # Even a quick cheap order: the agent's base alone exceeds a 7.5% fee under N13,333.
+    quick = split_fee(Decimal("5000.00"), 20 * 60)
+    assert quick["agent"] == Decimal("1000.00") and quick["company"] == Decimal("-625.00")
+
+
+def test_agent_plus_company_always_equals_the_fee_exactly():
+    from app.orders.fees import split_fee
+    for goods in ["0.00", "333.33", "450.00", "5000.00", "13333.33", "78000.00", "1234567.89"]:
+        for minutes in [0, 1, 29, 30, 31, 47, 90, 240]:
+            sp = split_fee(Decimal(goods), minutes * 60)
+            assert sp["agent"] + sp["company"] == sp["total"], (goods, minutes, sp)
+
+
+def test_deposit_is_30_percent_of_goods_on_every_order():
+    from app.orders.fees import estimate_order_value, required_deposit
+
+    def dep(goods, must_prepay=False):
+        g = Decimal(goods)
+        return required_deposit(g, estimate_order_value(g), must_prepay=must_prepay)
+
+    assert dep("5000.00") == Decimal("1500.00")       # small orders pay too now
+    assert dep("2000.00") == Decimal("600.00")
+    assert dep("80000.00") == Decimal("24000.00")
+    assert dep("200000.00") == Decimal("60000.00")
+    # must_prepay: 100% of the whole estimate (goods + delivery + 7.5% fee)
+    assert dep("5000.00", must_prepay=True) == Decimal("6875.00")   # 5000 + 1500 + 375
+
+
+def test_delivery_placeholder_and_add_item_fee():
+    from app.orders.fees import ADD_ITEM_FEE, DELIVERY_FEE_FLAT, calculate_fees
+    assert DELIVERY_FEE_FLAT == Decimal("1500.00")
+    assert calculate_fees(Decimal("1000.00"))["delivery_fee"] == Decimal("1500.00")
+    assert ADD_ITEM_FEE == Decimal("500.00")
+
+
+@pytest.mark.asyncio
+async def test_public_pricing_endpoint_matches_the_fee_rules(client):
+    r = await client.get("/pricing")
+    assert r.status_code == 200
+    assert r.json() == {
+        "service_fee_percent": "7.5",
+        "delivery_fee": "1500.00",
+        "delivery_fee_is_placeholder": True,
+        "deposit_percent": "30",
+        "add_item_fee": "500.00",
+        "emtl_per_transfer": "50.00",
+        "emtl_threshold": "10000.00",
+    }
 
 
 @pytest.mark.asyncio
@@ -76,7 +154,8 @@ async def test_overtime_shopping_raises_fee_and_agent_share(client, db_session_f
     start and finish happen back-to-back in a test. Fakes shopping_started_at
     45 minutes in the past (15 min of billable overtime) and asserts the fee
     - and agent_share specifically, since that's what the agent actually
-    gets paid - rises by exactly 15 * PER_MINUTE.
+    gets paid - rises by exactly 15 * PER_MINUTE, while the customer's fee
+    stays 7.5% of the goods.
     """
     from datetime import datetime, timedelta, timezone
     from app.orders.models import Order
@@ -89,6 +168,7 @@ async def test_overtime_shopping_raises_fee_and_agent_share(client, db_session_f
         "items": [{"description": "500 naira pepper"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     item_id = r.json()["items"][0]["id"]
@@ -111,25 +191,15 @@ async def test_overtime_shopping_raises_fee_and_agent_share(client, db_session_f
     assert r.status_code == 200, r.text
     body = r.json()
 
-    # 2000 base + 15 min * 50/min = 2750; company keeps a flat 1000 regardless,
-    # so the entire 750 of overtime lands on the agent's share.
-    assert Decimal(body["combined_fee"]) == Decimal("2750.00"), body
-    assert Decimal(body["company_share"]) == Decimal("1000.00"), body
+    # The customer's fee is 7.5% of the goods no matter how long it took;
+    # the 15 min of overtime (15 * 50 = 750) goes to the agent on top of the
+    # 1000 base, and the company absorbs it - going negative on this cheap order.
+    assert Decimal(body["combined_fee"]) == Decimal("37.50"), body
     assert Decimal(body["agent_share"]) == Decimal("1750.00"), body
-    assert Decimal(body["grand_total"]) == Decimal("6850.00"), body  # 500 + 2750 + 3600
+    assert Decimal(body["company_share"]) == Decimal("-1712.50"), body
+    assert Decimal(body["grand_total"]) == Decimal("2037.50"), body  # 500 + 37.50 + 1500
 
-    print("Overtime shopping correctly raises the fee and lands on agent_share.")
-
-
-def test_deposit_threshold_and_rate():
-    from app.orders.fees import required_deposit, estimate_order_value
-    def dep(goods):
-        return required_deposit(Decimal(goods), estimate_order_value(Decimal(goods)))
-    assert dep("2000") == Decimal("0.00")     # est 2000+3600+2000=7600, under 10k
-    assert dep("4400") == Decimal("0.00")     # est exactly 10000, at threshold
-    assert dep("80000") == Decimal("24000.00")   # est 85600 > 10k -> 30% of 80000
-    # protection scales with order size
-    assert dep("200000") == Decimal("60000.00")
+    print("Overtime raises only the agent's share, never the customer's bill.")
 
 
 # ---------- Deposit on a large order ----------
@@ -146,21 +216,21 @@ async def test_large_order_requires_deposit(client, db_session_factory):
     })
     assert r.status_code == 201, r.text
     order = r.json()
-    # estimate = 78000 items + 3600 delivery + 2000 combined base
-    assert Decimal(order["estimated_value"]) == Decimal("83600.00")
+    # estimate = 78000 items + 1500 delivery + 5850 service fee (7.5%)
+    assert Decimal(order["estimated_value"]) == Decimal("85350.00")
     assert Decimal(order["deposit_amount"]) == Decimal("23400.00")
     assert order["delivery_address"] == "12 Aba Road, Port Harcourt"
 
 
 @pytest.mark.asyncio
-async def test_small_order_needs_no_deposit(client, db_session_factory):
+async def test_small_order_also_needs_a_30_percent_deposit(client, db_session_factory):
     admin_h, _, _, _, market_id = await _setup(client, db_session_factory)
     r = await client.post("/orders", headers=admin_h, json={
         "market_id": str(market_id),
         "listed_items_total": "3000.00",
         "items": [{"description": "500 naira pepper"}],
     })
-    assert Decimal(r.json()["deposit_amount"]) == Decimal("0.00")
+    assert Decimal(r.json()["deposit_amount"]) == Decimal("900.00")
 
 
 # ---------- Refund case B: nothing found ----------
@@ -391,9 +461,9 @@ async def test_partial_shortfall_credits_wallet(client, db_session_factory, monk
     r = await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
     final = r.json()
 
-    grand = Decimal(final["grand_total"])  # 2000 items + 2000 fee + 3600 delivery = 7600
-    assert grand == Decimal("7600.00")
-    expected_refund = deposit - grand  # 23400 - 7600 = 15800
+    grand = Decimal(final["grand_total"])  # 2000 items + 150 fee + 1500 delivery = 3650
+    assert grand == Decimal("3650.00")
+    expected_refund = deposit - grand  # 23400 - 3650 = 19750
 
     async with db_session_factory() as s:
         balance = await wallet_service.get_balance(s, cust_id)
@@ -416,6 +486,7 @@ async def test_bargained_list_shows_real_prices(client, db_session_factory, monk
         "items": [{"description": "500 naira pepper"}, {"description": "rare spice"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     items = r.json()["items"]
@@ -430,12 +501,12 @@ async def test_bargained_list_shows_real_prices(client, db_session_factory, monk
     assert r.status_code == 200, r.text
     data = r.json()
     assert Decimal(data["items_total"]) == Decimal("450.00")
-    assert Decimal(data["combined_fee"]) == Decimal("2000.00")
+    assert Decimal(data["combined_fee"]) == Decimal("33.75")  # 7.5% of 450
     found = {i["description"]: i["found"] for i in data["items"]}
     assert found["500 naira pepper"] is True
     assert found["rare spice"] is False
-    # no deposit on this small order, so amount due == grand total
-    assert Decimal(data["amount_due"]) == Decimal(data["grand_total"])
+    # the 600 deposit (30% of the 2000 listed) is already paid
+    assert Decimal(data["amount_due"]) == Decimal(data["grand_total"]) - Decimal("600.00")
 
 
 # ---------- Wallet as a payment option ----------
@@ -462,6 +533,7 @@ async def test_pay_from_wallet(client, db_session_factory, monkeypatch):
         "items": [{"description": "500 naira pepper"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     items = r.json()["items"]
@@ -469,7 +541,8 @@ async def test_pay_from_wallet(client, db_session_factory, monkeypatch):
         "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
         "items": [{"item_id": items[0]["id"], "price": "1500.00"}]})
     r = await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
-    grand = Decimal(r.json()["grand_total"])  # 1500 + 2000 + 3600 = 7100
+    grand = Decimal(r.json()["grand_total"])  # 1500 + 112.50 + 1500 = 3112.50
+    deposit = Decimal(r.json()["deposit_amount"])  # 450, already paid
 
     r = await client.post(f"/payments/orders/{oid}/pay-from-wallet", headers=admin_h)
     assert r.status_code == 200, r.text
@@ -478,7 +551,7 @@ async def test_pay_from_wallet(client, db_session_factory, monkeypatch):
         o = (await s.execute(select(Order).where(Order.id == uuid.UUID(oid)))).scalar_one()
         assert o.status is OrderStatus.PAID
         balance = await wallet_service.get_balance(s, cust_id)
-    assert balance == Decimal("10000.00") - grand
+    assert balance == Decimal("10000.00") - (grand - deposit)
 
 
 @pytest.mark.asyncio
@@ -495,6 +568,7 @@ async def test_wallet_insufficient_balance_rejected(client, db_session_factory, 
         "items": [{"description": "500 naira pepper"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     items = r.json()["items"]
@@ -512,7 +586,7 @@ async def test_wallet_insufficient_balance_rejected(client, db_session_factory, 
 
 @pytest.mark.asyncio
 async def test_shopping_blocked_until_deposit_paid(client, db_session_factory):
-    """A large order cannot start shopping until its deposit is collected."""
+    """An order cannot start shopping until its deposit is collected."""
     admin_h, agent_h, agent_id, cust_id, market_id = await _setup(client, db_session_factory)
 
     r = await client.post("/orders", headers=admin_h, json={
@@ -561,16 +635,19 @@ async def test_deposit_credits_float_pool(client, db_session_factory):
 
 
 @pytest.mark.asyncio
-async def test_small_order_shops_without_deposit(client, db_session_factory):
-    """An order below the threshold needs no deposit and shops freely."""
-    admin_h, agent_h, agent_id, _, market_id = await _setup(client, db_session_factory)
+async def test_small_order_also_blocked_until_deposit_paid(client, db_session_factory):
+    """No threshold any more: even a small order shops only after its 30%."""
+    admin_h, agent_h, agent_id, cust_id, market_id = await _setup(client, db_session_factory)
     r = await client.post("/orders", headers=admin_h, json={
         "market_id": str(market_id),
         "listed_items_total": "3000.00",
         "items": [{"description": "pepper"}],
     })
     oid = r.json()["id"]
-    assert Decimal(r.json()["deposit_amount"]) == Decimal("0.00")
+    assert Decimal(r.json()["deposit_amount"]) == Decimal("900.00")
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
-    assert r.status_code == 200, "no-deposit order should shop freely"
+    assert r.status_code == 402, "a small order must not shop before its deposit"
+    await _pay_deposit(client, db_session_factory, oid, cust_id, admin_h, Decimal("900.00"))
+    r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
+    assert r.status_code == 200, r.text

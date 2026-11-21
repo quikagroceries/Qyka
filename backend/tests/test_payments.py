@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.config import settings
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348010000001"
 PHONE_AGENT = "+2348020000002"
@@ -60,6 +61,7 @@ async def _drive_order_to_awaiting_payment(client, db_session_factory, monkeypat
         "items": [{"description": "500 naira pepper"}, {"description": "1000 naira rice"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     items = r.json()["items"]
@@ -242,7 +244,7 @@ async def test_deposit_checkout_verify_on_return(client, db_session_factory, mon
 
     cust_h = {"Authorization": f"Bearer {cust_token}"}
 
-    # Goods total well past the 10,000 deposit threshold.
+    # Goods total 78,000 -> a 23,400 deposit (30%).
     r = await client.post("/orders", headers=cust_h, json={
         "market_id": str(market_id),
         "listed_items_total": "78000.00",

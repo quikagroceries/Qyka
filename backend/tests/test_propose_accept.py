@@ -10,6 +10,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from tests.conftest import pay_deposit
 
 CUST_PHONE = "+2348060000001"
 
@@ -59,6 +60,7 @@ async def test_see_another_excludes_previously_rejected_agents(client, db_sessio
     })
     assert r.status_code == 201, r.text
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     first_proposed = r.json()["proposed_agent_id"]
     assert first_proposed in {str(a_id), str(b_id), str(c_id)}
 
@@ -110,6 +112,7 @@ async def test_see_another_only_option_when_a_single_agent_covers_the_market(cli
         "items": [{"description": "pepper"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     assert r.json()["proposed_agent_id"] == str(agent_id)
 
     r = await client.post(f"/orders/{oid}/see-another-agent", headers=cust_h)
@@ -152,6 +155,7 @@ async def test_agent_has_no_access_until_accepted(client, db_session_factory):
         "items": [{"description": "pepper"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     assert r.json()["status"] == "proposed"
 
     # Not on the agent's list yet.
@@ -198,6 +202,7 @@ async def test_cannot_reassign_once_shopping_started(client, db_session_factory)
         "items": [{"description": "pepper"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     await client.post(f"/orders/{oid}/accept-agent", headers=cust_h)
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     assert r.status_code == 200, r.text
@@ -237,6 +242,7 @@ async def test_proposed_agent_display_info(client, db_session_factory):
         "items": [{"description": "pepper"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
 
     r = await client.get(f"/orders/{oid}/proposed-agent", headers=cust_h)
     assert r.status_code == 200, r.text
@@ -268,6 +274,7 @@ async def test_only_the_order_customer_can_accept_or_see_another(client, db_sess
         "items": [{"description": "pepper"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
 
     r = await client.post(f"/orders/{oid}/accept-agent", headers=stranger_h)
     assert r.status_code == 403

@@ -5,6 +5,7 @@ import pytest
 from app.auth.models import User
 from app.core.enums import UserRole, UserStatus
 from app.core.security import hash_password
+from tests.conftest import pay_deposit
 
 CUSTOMER_PHONE = "+2348090000002"
 _ADMIN_PASSWORD = "test-admin-password"
@@ -194,6 +195,7 @@ async def test_agent_cannot_go_off_duty_with_a_live_order(client, db_session_fac
         "items": [{"description": "pepper"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     assert r.json()["proposed_agent_id"] == str(agent_id)  # proposed - the only agent for this market
     r = await client.post(f"/orders/{oid}/accept-agent", headers=cust_h)
     assert r.status_code == 200, r.text

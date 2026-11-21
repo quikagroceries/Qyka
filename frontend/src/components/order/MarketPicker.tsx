@@ -12,11 +12,7 @@ import marketStallArt from "@/assets/illustrations/market-stall-produce.webp";
 import shoppingCartArt from "@/assets/illustrations/shopping-cart.webp";
 import Icon from "@/components/ui/Icon";
 import MarketArt from "@/components/shop/MarketArt";
-import {
-  findDirectoryMarket,
-  type FoodCategory,
-  type VenueType,
-} from "@/lib/marketDirectory";
+import { coverImageForMarket, isOrderable, type FoodCategory, type VenueType } from "@/lib/markets";
 import { marketTone, stallTone, TONE_COVER } from "@/lib/vendorVisuals";
 import { CAT_PANTRY, CAT_PRODUCE, CAT_PROTEIN, TRUST_BASKET } from "@/lib/cdnImages";
 import { catalogForStall, categoriesForCatalog } from "@/lib/stallCatalog";
@@ -79,27 +75,25 @@ const SORT_OPTIONS: { id: SortMode; label: string }[] = [
   { id: "za", label: "Z–A" },
 ];
 
+// Every field comes straight from the backend market row now (description,
+// categories, status, image) - no name-matching against a bundled list.
 function enrichMarket(m: any) {
-  const dir = findDirectoryMarket(m);
-  const venueType: VenueType =
-    (m.venue_type as VenueType) || dir?.venueType || "local_market";
+  const venueType: VenueType = (m.venue_type as VenueType) || "local_market";
   return {
     ...m,
     venue_type: venueType,
-    blurb: dir?.blurb || (
+    blurb: m.description || (
       venueType === "supermarket"
         ? "Fixed shelf prices — Qyka picks and delivers."
         : "Open-air stalls, live bargaining, real market prices."
     ),
-    categories: dir?.categories || ["provisions"],
+    categories: m.categories?.length ? m.categories : ["provisions"],
     area: [m.city, m.state].filter(Boolean).join(", "),
-    live: m.is_active !== false,
-    isPilot: dir?.status === "pilot",
+    live: isOrderable(m),
+    isPilot: m.status === "pilot",
     tone: marketTone(m.name, m.city),
     featured: venueType === "local_market",
-    image:
-      dir?.image ||
-      (venueType === "supermarket" ? CAT_PANTRY : CAT_PRODUCE),
+    image: coverImageForMarket(m),
   };
 }
 

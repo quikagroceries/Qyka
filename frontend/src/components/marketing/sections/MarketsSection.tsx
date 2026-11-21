@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { DIRECTORY_MARKETS, getMarketCardStatus } from "@/lib/marketDirectory";
+import { getMarketCardStatus, type Market } from "@/lib/markets";
+import MarketCardSkeleton from "@/components/marketing/MarketCardSkeleton";
 import type { MarketHoursStatus } from "@/lib/marketHours";
 import { useT } from "@/lib/locale";
 import { Stagger, StaggerItem } from "@/components/marketing/motion";
@@ -20,7 +21,7 @@ export default function MarketsSection({
 }: {
   caption: string;
   launchedCount: number;
-  liveMarkets: any[] | null;
+  liveMarkets: Market[] | null;
   hours: MarketHoursStatus;
 }) {
   const t = useT();
@@ -34,15 +35,16 @@ export default function MarketsSection({
           </Link>
         </SectionHead>
         <Stagger className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3" stagger={0.09}>
-          {DIRECTORY_MARKETS.slice(0, 6).map((m) => {
-            const status = getMarketCardStatus(m, liveMarkets, hours.open);
+          {liveMarkets === null && [0, 1, 2].map((i) => <MarketCardSkeleton key={i} />)}
+          {(liveMarkets || []).slice(0, 6).map((m) => {
+            const status = getMarketCardStatus(m, hours.open);
             return (
-              <StaggerItem key={m.id} y={32}>
+              <StaggerItem key={m.slug} y={32}>
                 <MarketCard
                   market={m}
                   status={status}
                   statusLabel={status === "open" ? t.markets.open : status === "closed" ? t.markets.closed : t.markets.soon}
-                  venueLabel={m.venueType === "supermarket" ? t.markets.supermarket : t.markets.local}
+                  venueLabel={m.venue_type === "supermarket" ? t.markets.supermarket : t.markets.local}
                   timeLabel={
                     status === "open" ? t.markets.closesAt(hours.closesAtClock)
                     : status === "closed" ? t.markets.opensAt(hours.opensAtClock)

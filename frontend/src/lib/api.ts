@@ -275,6 +275,7 @@ export const api = {
   uploadProfilePhoto: (file) => uploadToCloudinary(file),
   uploadPackingPhoto: (file) => uploadToCloudinary(file),
   uploadPurchasePhoto: (file) => uploadToCloudinary(file),
+  uploadMarketImage: (file) => uploadToCloudinary(file),
   // Guest-friendly (get_current_user_optional backend-side) - `request`
   // already attaches a token when one exists, but works without one too.
   trackLocation: (label: string, latitude?: number, longitude?: number) =>

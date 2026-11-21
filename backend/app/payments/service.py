@@ -201,8 +201,8 @@ async def expire_stale_orders(db: AsyncSession) -> int:
         order.status = OrderStatus.CANCELLED_UNPAID
         # The customer let the window lapse after the agent already shopped —
         # this is the expensive non-payment. Flag them to prepay in full next
-        # time. (Below-threshold orders are the ones that reach here without a
-        # deposit; large orders already paid a deposit up front.)
+        # time. (Every order already paid its 30% deposit up front - see
+        # orders.fees.required_deposit - and that deposit is forfeited here.)
         cust = (
             await db.execute(select(User).where(User.id == order.customer_id))
         ).scalar_one_or_none()

@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348010000001"
 PHONE_AGENT = "+2348020000002"
@@ -131,6 +132,7 @@ async def test_customer_notified_when_shopping_done(client, db_session_factory, 
         "market_id": str(market_id), "listed_items_total": "2000.00",
         "items": [{"description": "pepper"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=admin_h)
     assert r.status_code == 200, r.text
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
@@ -182,6 +184,7 @@ async def test_agent_freed_after_shopping(client, db_session_factory, monkeypatc
         "market_id": str(market_id), "listed_items_total": "2000.00",
         "items": [{"description": "pepper"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=admin_h)
     assert r.status_code == 200, r.text
 

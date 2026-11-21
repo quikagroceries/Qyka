@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.admin import service as admin_service
+from app.orders import fees
 from app.admin.routes import router as admin_router
 from app.agent.routes import router as agent_router
 from app.agent_applications.routes import router as agent_applications_router
@@ -49,6 +50,13 @@ app.add_middleware(
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "app": settings.app_name}
+
+
+@app.get("/pricing")
+async def pricing() -> dict:
+    """Public fee rules (orders/fees.py) - the single source the website's
+    pricing calculator and checkout estimates read from."""
+    return fees.pricing_summary()
 
 
 # Registered in the order they'd actually be hit in a real run of the app:

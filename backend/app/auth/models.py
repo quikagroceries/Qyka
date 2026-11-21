@@ -53,7 +53,7 @@ class User(Base):
     # basket_cap is the max order total (in kobo) this user may place.
     basket_cap_kobo: Mapped[int] = mapped_column(Integer, default=500_000)
     non_payment_count: Mapped[int] = mapped_column(Integer, default=0)
-    # Below-threshold non-payers must pay 100% up front on their next order.
+    # Non-payers must pay 100% up front (instead of the usual 30%) on their next order.
     # Set when a payment window lapses; cleared after they successfully prepay
     # and complete an order.
     must_prepay: Mapped[bool] = mapped_column(Boolean, default=False)
