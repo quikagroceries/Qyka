@@ -44,7 +44,7 @@ export default function ListStarter({ id }: { id: string }) {
     );
   }
 
-  // The "What are you cooking?" strip further down feeds this same list.
+  // The "What do you want to buy?" strip further down feeds this same list.
   useEffect(() => {
     const onAdd = (e: Event) => addItem((e as CustomEvent<{ line: string }>).detail.line);
     window.addEventListener(ADD_ITEM_EVENT, onAdd);

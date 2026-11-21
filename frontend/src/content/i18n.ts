@@ -38,7 +38,7 @@ export const en = {
     pickedFresh: "Picked fresh",
     liveUpdates: "Live updates",
   },
-  strip: { title: "What are you cooking?" },
+  strip: { title: "What do you want to buy?" },
   how: {
     eyebrow: "How it works",
     title: "Three steps. Zero market stress.",
@@ -183,7 +183,7 @@ export const pcm: Dict = {
     pickedFresh: "Fresh from market",
     liveUpdates: "Live update",
   },
-  strip: { title: "Wetin you wan cook?" },
+  strip: { title: "Wetin you wan buy?" },
   how: {
     eyebrow: "How e dey work",
     title: "Three steps. No market wahala.",
