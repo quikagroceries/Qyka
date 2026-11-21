@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { DIRECTORY_MARKETS, DirectoryMarket } from "@/lib/marketDirectory";
+import { coverImageForMarket, fetchMarketBySlug, fetchMarkets, isOrderable, type Market } from "@/lib/markets";
 import { illustrationForCategory } from "@/lib/foodVisuals";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
@@ -25,7 +25,7 @@ import produceCrate from "@/assets/illustrations/produce-crate.webp";
 // shop side, simplified to the categories already on the directory entry -
 // a fish market gets the fish-stall art, otherwise produce or the general
 // cart vendor, rather than every market page reusing one single image.
-function heroIllustrationFor(market: DirectoryMarket) {
+function heroIllustrationFor(market: Market) {
   if (market.categories.includes("fish")) return vendorStallFish;
   if (market.categories.includes("produce")) return marketStallProduce;
   return marketCartVendor;
@@ -35,15 +35,19 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-export function generateStaticParams() {
-  return DIRECTORY_MARKETS.map((m) => ({
-    slug: m.id,
-  }));
+// Pre-render every market the API knows about at build time; markets added
+// later (or all of them, if the API was unreachable during the build) render
+// on first visit and are then cached and refreshed every 5 minutes.
+export const revalidate = 300;
+export const dynamicParams = true;
+
+export async function generateStaticParams() {
+  return (await fetchMarkets()).map((m) => ({ slug: m.slug }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const market = DIRECTORY_MARKETS.find((m) => m.id === slug);
+  const market = await fetchMarketBySlug(slug).catch(() => null);
   if (!market) {
     return {
       title: "Market Not Found — Qyka Groceries",
@@ -52,16 +56,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   return {
     title: `${market.name} — Qyka Groceries`,
-    description: market.blurb,
+    description: market.description || undefined,
     alternates: {
-      canonical: `https://qyka.com/markets/${market.id}`,
+      canonical: `https://qyka.com/markets/${market.slug}`,
     },
   };
 }
 
 export default async function MarketPage({ params }: PageProps) {
   const { slug } = await params;
-  const market = DIRECTORY_MARKETS.find((m) => m.id === slug);
+  const market = await fetchMarketBySlug(slug);
 
   if (!market) {
     notFound();
@@ -69,16 +73,16 @@ export default async function MarketPage({ params }: PageProps) {
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": market.venueType === "supermarket" ? "GroceryStore" : "Market",
+    "@type": market.venue_type === "supermarket" ? "GroceryStore" : "Market",
     name: market.name,
-    description: market.blurb,
+    description: market.description,
     address: {
       "@type": "PostalAddress",
       addressLocality: market.city,
       addressRegion: market.state,
       addressCountry: "NG",
     },
-    image: `https://qyka.com${market.image}`,
+    image: coverImageForMarket(market),
   };
 
   return (
@@ -108,7 +112,7 @@ export default async function MarketPage({ params }: PageProps) {
             <div className="flex flex-col lg:flex-row gap-12 items-start">
               <div className="w-full lg:w-1/2 rounded-[2rem] overflow-hidden aspect-[4/3] relative shadow-sm border border-line bg-canvas-deep">
                 <Image
-                  src={market.image}
+                  src={coverImageForMarket(market)}
                   alt={market.name}
                   fill
                   className="object-cover"
@@ -123,9 +127,9 @@ export default async function MarketPage({ params }: PageProps) {
 
                 <div className="flex flex-wrap gap-2 mb-4">
                   <span className="bg-surface text-ink text-xs font-bold px-3 py-1.5 rounded-full border border-line shadow-sm">
-                    {market.venueType === "supermarket" ? "Supermarket" : "Open-air Market"}
+                    {market.venue_type === "supermarket" ? "Supermarket" : "Open-air Market"}
                   </span>
-                  {market.status === "pilot" ? (
+                  {isOrderable(market) ? (
                     <span className="bg-brand-green/15 text-brand-green text-xs font-bold px-3 py-1.5 rounded-full">
                       Live now
                     </span>
@@ -142,11 +146,11 @@ export default async function MarketPage({ params }: PageProps) {
                 <p className="text-lg text-muted mb-8">{market.city}, {market.state}</p>
 
                 <p className="text-xl text-ink leading-relaxed mb-10 max-w-lg">
-                  {market.blurb}
+                  {market.description}
                 </p>
 
-                {market.status === "pilot" ? (
-                  <MarketingLinkButton href={`/shop?market=${market.id}`} className="max-w-sm w-full">
+                {isOrderable(market) ? (
+                  <MarketingLinkButton href={`/shop?market=${market.slug}`} className="max-w-sm w-full">
                     Shop this market now
                   </MarketingLinkButton>
                 ) : (

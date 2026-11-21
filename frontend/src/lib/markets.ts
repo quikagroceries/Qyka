@@ -84,11 +84,16 @@ export function coverImageForMarket(m: { image_url?: string | null; venue_type?:
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 const REVALIDATE_SECONDS = 300;
 
-/** All public markets, or [] if the API can't be reached (never breaks a build). */
+/** All public markets, or [] if the API can't be reached (never breaks a build).
+ * Markets without a slug are dropped: an older backend (e.g. mid-deploy, when
+ * Vercel builds before Render has finished) returns rows with no slug, and
+ * every page/link here is keyed on it. */
 export async function fetchMarkets(): Promise<Market[]> {
   try {
     const res = await fetch(`${API_BASE}/markets`, { next: { revalidate: REVALIDATE_SECONDS } });
-    return res.ok ? await res.json() : [];
+    if (!res.ok) return [];
+    const list = await res.json();
+    return Array.isArray(list) ? list.filter((m) => typeof m?.slug === "string" && m.slug) : [];
   } catch {
     return [];
   }

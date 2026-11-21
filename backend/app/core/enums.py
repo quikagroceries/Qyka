@@ -67,6 +67,15 @@ class TransactionStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class MarketStatus(str, enum.Enum):
+    """Whether a market takes orders. Only PILOT and LIVE do - COMING_SOON is
+    for markets listed on the site but not set up yet (orders.service.create_order)."""
+
+    COMING_SOON = "coming_soon"
+    PILOT = "pilot"
+    LIVE = "live"
+
+
 class VenueType(str, enum.Enum):
     """Where Qyka shops — drives customer flow branching."""
 

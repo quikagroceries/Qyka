@@ -21,6 +21,7 @@ from app.core.phone import normalize_phone
 from app.core.security import create_access_token
 from app.float import service as float_service
 from app.jit.models import Seller
+from app.markets.directory import DIRECTORY_MARKETS, upsert_directory_markets
 from app.markets.models import Agent, Market
 
 router = APIRouter()
@@ -57,63 +58,8 @@ async def _make_user(
     return user
 
 
-# Directory markets aligned with frontend marketing slugs / names
-SEED_MARKETS = [
-    {
-        "name": "Balogun Market",
-        "city": "Lagos Island",
-        "state": "Lagos",
-        "latitude": 6.4550,
-        "longitude": 3.3841,
-        "is_active": True,
-        "venue_type": "local_market",
-    },
-    {
-        "name": "Mile 12 Market",
-        "city": "Ketu",
-        "state": "Lagos",
-        "latitude": 6.6093,
-        "longitude": 3.3935,
-        "is_active": True,
-        "venue_type": "local_market",
-    },
-    {
-        "name": "Bodija Market",
-        "city": "Ibadan",
-        "state": "Oyo",
-        "latitude": 7.4356,
-        "longitude": 3.9147,
-        "is_active": True,
-        "venue_type": "local_market",
-    },
-    {
-        "name": "Wuse Market",
-        "city": "Abuja",
-        "state": "FCT",
-        "latitude": 9.0645,
-        "longitude": 7.4833,
-        "is_active": True,
-        "venue_type": "local_market",
-    },
-    {
-        "name": "Shoprite Ikeja City Mall",
-        "city": "Ikeja",
-        "state": "Lagos",
-        "latitude": 6.6194,
-        "longitude": 3.3571,
-        "is_active": True,
-        "venue_type": "supermarket",
-    },
-    {
-        "name": "Spar Lekki",
-        "city": "Lekki",
-        "state": "Lagos",
-        "latitude": 6.4474,
-        "longitude": 3.4723,
-        "is_active": True,
-        "venue_type": "supermarket",
-    },
-]
+# The launch markets themselves live in app/markets/directory.py (shared with
+# the slug migration), so the dev seed upserts exactly what production has.
 
 # Stalls per market — customer browse; agent still bargains live prices
 SEED_VENDORS: dict[str, list[dict]] = {
@@ -150,7 +96,9 @@ SEED_VENDORS: dict[str, list[dict]] = {
 
 
 async def _upsert_vendors(db: AsyncSession, market: Market) -> list[dict]:
-    specs = SEED_VENDORS.get(market.name, [])
+    specs = SEED_VENDORS.get(next(
+        (d["name"] for d in DIRECTORY_MARKETS if d["slug"] == market.slug), market.name
+    ), [])
     out = []
     for spec in specs:
         result = await db.execute(
@@ -191,20 +139,7 @@ async def seed(db: AsyncSession = Depends(get_db)):
     markets_out = []
     vendors_out: dict[str, list] = {}
     primary = None
-    for spec in SEED_MARKETS:
-        result = await db.execute(select(Market).where(Market.name == spec["name"]))
-        market = result.scalar_one_or_none()
-        if market is None:
-            market = Market(**spec)
-            db.add(market)
-            await db.flush()
-        else:
-            market.city = spec["city"]
-            market.state = spec["state"]
-            market.latitude = spec["latitude"]
-            market.longitude = spec["longitude"]
-            market.is_active = spec["is_active"]
-            market.venue_type = spec.get("venue_type", "local_market")
+    for market in await upsert_directory_markets(db):
         vendors_out[market.name] = await _upsert_vendors(db, market)
         markets_out.append({"id": str(market.id), "name": market.name})
         if primary is None:
@@ -251,20 +186,7 @@ async def seed_markets(db: AsyncSession = Depends(get_db)):
     """Upsert the marketing directory markets + stall vendors."""
     _guard()
     out = []
-    for spec in SEED_MARKETS:
-        result = await db.execute(select(Market).where(Market.name == spec["name"]))
-        market = result.scalar_one_or_none()
-        if market is None:
-            market = Market(**spec)
-            db.add(market)
-            await db.flush()
-        else:
-            market.city = spec["city"]
-            market.state = spec["state"]
-            market.latitude = spec["latitude"]
-            market.longitude = spec["longitude"]
-            market.is_active = spec["is_active"]
-            market.venue_type = spec.get("venue_type", "local_market")
+    for market in await upsert_directory_markets(db):
         vendors = await _upsert_vendors(db, market)
         out.append({
             "id": str(market.id),

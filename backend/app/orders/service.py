@@ -15,13 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.core.enums import OrderStatus
+from app.core.enums import MarketStatus, OrderStatus
 from app.orders import fees
 from app.orders.models import Order, OrderItem
 from app.wallet import service as wallet_service
 from app.orders import assignment
 from app.notifications import service as notif_service
-from app.markets.models import Agent
+from app.markets import hours as market_hours
+from app.markets.models import Agent, Market
 from app.orders.state_machine import IllegalTransition, assert_can_transition
 
 
@@ -121,6 +122,18 @@ async def create_order(
     which sets cap = order.goods_estimate - goods only, since delivery/fee
     are never paid through the authorization).
     """
+    # Orderable (pilot/live, not coming_soon) and open - before anything is
+    # priced, saved, proposed to an agent or paid. (An unknown market_id has no hours to check; it's left
+    # to behave as it always has.)
+    market = (await db.execute(select(Market).where(Market.id == market_id))).scalar_one_or_none()
+    if market is not None:
+        if market.status is MarketStatus.COMING_SOON:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"{market.name} is coming soon — not available yet.",
+            )
+        market_hours.ensure_open(market)
+
     listed_items_total, estimated_value, deposit = await _estimates(
         db, customer_id, items, listed_items_total, must_prepay
     )

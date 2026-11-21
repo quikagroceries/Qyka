@@ -1,42 +1,90 @@
 import uuid
+from datetime import time
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
 
-from app.core.enums import VenueType
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.enums import MarketStatus, VenueType
+
+FoodCategory = Literal["produce", "provisions", "protein", "spices", "fish", "grains", "household"]
+
+
+def _check_image_url(v: str | None) -> str | None:
+    # "" is kept as-is: on an update it means "remove the image" (None = unchanged).
+    if v is None or v == "":
+        return v
+    if not v.startswith("https://res.cloudinary.com/"):
+        raise ValueError("Market images must be uploaded through Qyka (Cloudinary)")
+    return v
 
 
 class CreateMarketIn(BaseModel):
     name: str = Field(..., examples=["Mile 12 Market"])
+    # Optional: derived from the name when omitted. Fixed for good once set.
+    slug: str | None = Field(default=None, max_length=80, examples=["mile-12"])
+    description: str | None = None
+    # New markets start coming_soon by default - flip to pilot/live to launch.
+    status: MarketStatus = MarketStatus.COMING_SOON
+    categories: list[FoodCategory] = Field(default_factory=list)
+    image_url: str | None = Field(default=None, max_length=500)
     city: str = Field(..., examples=["Lagos"])
     state: str = Field(..., examples=["Lagos"])
     venue_type: VenueType = VenueType.LOCAL_MARKET
     latitude: float | None = None
     longitude: float | None = None
+    # Omitted -> the 08:00-20:00 Africa/Lagos default (markets/hours.py).
+    opening_time: time | None = Field(default=None, examples=["08:00"])
+    closing_time: time | None = Field(default=None, examples=["20:00"])
+    timezone: str | None = Field(default=None, examples=["Africa/Lagos"])
+
+    _image = field_validator("image_url")(classmethod(lambda cls, v: _check_image_url(v)))
 
 
 class UpdateMarketIn(BaseModel):
     # Every field optional and only applied when actually sent - same
     # "omitted means unchanged" convention as auth.UpdateProfileIn.
     name: str | None = None
+    # Accepted only so a client resending the current slug isn't rejected;
+    # any CHANGE is refused (markets.service.update_market) - slugs are immutable.
+    slug: str | None = None
+    description: str | None = None
+    status: MarketStatus | None = None
+    categories: list[FoodCategory] | None = None
+    image_url: str | None = Field(default=None, max_length=500)
     city: str | None = None
     state: str | None = None
     is_active: bool | None = None
     venue_type: VenueType | None = None
     latitude: float | None = None
     longitude: float | None = None
+    opening_time: time | None = None
+    closing_time: time | None = None
+    timezone: str | None = None
+
+    _image = field_validator("image_url")(classmethod(lambda cls, v: _check_image_url(v)))
 
 
 class MarketOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    slug: str
     name: str
+    description: str | None
+    status: MarketStatus
+    categories: list[str]
+    image_url: str | None
     city: str
     state: str
     is_active: bool
     venue_type: str
     latitude: float | None
     longitude: float | None
+    # Local market time; whether it's open is computed against `timezone`.
+    opening_time: time
+    closing_time: time
+    timezone: str
 
 
 class CreateVendorIn(BaseModel):
