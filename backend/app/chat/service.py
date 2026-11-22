@@ -49,6 +49,20 @@ async def list_messages(
     return list(result.scalars().all())
 
 
+async def messages_version(
+    db: AsyncSession, *, order_id: uuid.UUID, user_id: uuid.UUID
+) -> str:
+    """A cheap fingerprint of an order's chat - message count + newest time -
+    for the polling fast path (one aggregate query, no rows loaded). Messages
+    are never edited, so these two only change when a message is added."""
+    await load_order_for_participant(db, order_id, user_id)
+    count, newest = (await db.execute(
+        select(func.count(Message.id), func.max(Message.created_at)).where(Message.order_id == order_id)
+    )).one()
+    stamp = newest.isoformat() if newest else "0"
+    return f'W/"m{count}-{stamp}"'
+
+
 async def mark_read(
     db: AsyncSession, *, order_id: uuid.UUID, user_id: uuid.UUID
 ) -> None:

@@ -18,7 +18,9 @@ import { formatAge, isStuckOrder } from "@/lib/adminUtils";
 import { marketTone, TONE_COVER } from "@/lib/vendorVisuals";
 import { coverImageForMarket } from "@/lib/markets";
 import { summarizeOrderStatus } from "@/lib/orderStatus";
+import { usePolling } from "@/lib/usePolling";
 
+// An overview, not a live feed; paused while the tab is hidden (usePolling).
 const POLL_MS = 15000;
 
 // Mirrors admin/service.py::admin_cancel_order's own guard exactly - a rider
@@ -330,11 +332,7 @@ function AdminOrders() {
     }
   }
 
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
-  }, []);
+  usePolling(refresh, POLL_MS);
 
   const marketName = (id) => markets.find((m) => m.id === id)?.name || id.slice(0, 8) + "…";
 

@@ -6,7 +6,10 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { isHistoryStatus } from "@/lib/orderStatus";
 import { useSharedQuery } from "@/lib/sharedQuery";
 
-const POLL_MS = 10000;
+// The header pill / tab dot / Orders list: order statuses change every few
+// minutes, so 30s is plenty (the order's own page polls faster). The shared
+// poller pauses while the tab is hidden.
+const POLL_MS = 30000;
 
 /** Every order the customer has, kept fresh by ONE shared poll however many
  * components use it (header pill, tab-bar dot, banner, the Orders page...),
