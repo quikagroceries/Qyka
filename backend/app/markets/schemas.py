@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.enums import MarketStatus, VenueType
+from app.core.media import require_our_image_url
 
 FoodCategory = Literal["produce", "provisions", "protein", "spices", "fish", "grains", "household"]
 
@@ -14,9 +15,7 @@ def _check_image_url(v: str | None) -> str | None:
     # "" is kept as-is: on an update it means "remove the image" (None = unchanged).
     if v is None or v == "":
         return v
-    if not v.startswith("https://res.cloudinary.com/"):
-        raise ValueError("Market images must be uploaded through Qyka (Cloudinary)")
-    return v
+    return require_our_image_url(v, "Market images must be uploaded through Qyka")
 
 
 class CreateMarketIn(BaseModel):

@@ -114,7 +114,7 @@ async def test_full_order_lifecycle(client, db_session_factory, seed_float, monk
         f"/jit/orders/{order_id}/pay-vendor",
         headers=agent_headers,
         json={
-            "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+            "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
             "items": [{"item_id": items[0]["id"], "price": "500.00"}],
         },
     )
@@ -123,7 +123,7 @@ async def test_full_order_lifecycle(client, db_session_factory, seed_float, monk
         f"/jit/orders/{order_id}/pay-vendor",
         headers=agent_headers,
         json={
-            "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+            "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
             "items": [{"item_id": items[1]["id"], "price": "1000.00"}],
         },
     )
@@ -411,7 +411,7 @@ async def test_messages_inbox_unread_counts_are_per_person(client, db_session_fa
 
     await client.post(f"/orders/{order_id}/messages", headers=hc, json={"text": "Hello agent"})
     await client.post(f"/orders/{order_id}/messages", headers=ha, json={"text": "On it"})
-    await client.post(f"/orders/{order_id}/messages", headers=ha, json={"image_url": "https://res.cloudinary.com/x/y.jpg"})
+    await client.post(f"/orders/{order_id}/messages", headers=ha, json={"image_url": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/chat/y.jpg"})
 
     # Customer: two unread from the agent. (Which message is "last" isn't
     # asserted: the SQLite test DB stamps whole seconds, so three messages

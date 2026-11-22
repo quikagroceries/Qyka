@@ -1,7 +1,9 @@
 import uuid
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.media import require_our_image_url
 
 
 class ItemPriceIn(BaseModel):
@@ -23,6 +25,11 @@ class PayVendorIn(BaseModel):
     seller_id: uuid.UUID | None = None
     photo_ref: str | None = None
 
+    @field_validator("photo_ref")
+    @classmethod
+    def _receipt_is_ours(cls, v):
+        return None if v in (None, "") else require_our_image_url(v)
+
 
 class VendorTransferOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -40,6 +47,11 @@ class VendorTransferOut(BaseModel):
 
 class AttachPhotoIn(BaseModel):
     photo_ref: str = Field(..., min_length=1)
+
+    @field_validator("photo_ref")
+    @classmethod
+    def _receipt_is_ours(cls, v):
+        return require_our_image_url(v)
 
 
 class RaiseCapIn(BaseModel):
