@@ -60,7 +60,7 @@ async def _drive_order_to_paid(
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     item_id = r.json()["items"][0]["id"]
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": item_id, "price": goods_total}],
     })
     assert r.status_code == 200, r.text
@@ -258,7 +258,7 @@ async def test_admin_sees_forfeited_deposits_as_losses(client, db_session_factor
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     item_id = r.json()["items"][0]["id"]
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": item_id, "price": "78000.00"}]})
     await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
 
@@ -680,7 +680,7 @@ async def test_admin_sees_failed_vendor_transfers_and_can_acknowledge_one(client
     item_id = r.json()["items"][0]["id"]
 
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": item_id, "price": "2000.00"}],
     })
     assert r.status_code == 502  # money never left, per pay_vendor's own contract

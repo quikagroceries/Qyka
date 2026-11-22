@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.enums import UserRole, UserStatus
+from app.core.media import require_our_image_url
 
 OtpChannel = Literal["sms", "whatsapp", "voice", "email"]
 
@@ -74,9 +75,7 @@ class UpdateProfileIn(BaseModel):
     def _avatar_must_be_ours(cls, v):
         if v in (None, ""):
             return None
-        if not v.startswith("https://res.cloudinary.com/"):
-            raise ValueError("Profile photos must be uploaded through Qyka")
-        return v
+        return require_our_image_url(v, "Profile photos must be uploaded through Qyka")
 
 
 class RegisterCustomerIn(BaseModel):

@@ -70,7 +70,7 @@ async def test_nonpayment_sets_must_prepay(client, db_session_factory, monkeypat
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     item_id = r.json()["items"][0]["id"]
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": item_id, "price": "1500.00"}]})
     await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
 
@@ -165,7 +165,7 @@ async def test_payment_clears_must_prepay(client, db_session_factory, monkeypatc
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     item_id = r.json()["items"][0]["id"]
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": item_id, "price": "1500.00"}]})
     await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
     await client.post(f"/payments/orders/{oid}/pay-from-wallet", headers=admin_h)
@@ -228,7 +228,7 @@ async def test_item_unavailable_no_answer_falls_back(client, db_session_factory,
     items = r.json()["items"]
     # buy pepper, flag spice unavailable, customer never answers
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[0]["id"], "price": "500.00"}]})
     await client.post(f"/orders/{oid}/items/{items[1]['id']}/unavailable", headers=agent_h)
 
@@ -254,11 +254,11 @@ async def test_packing_photos_attach(client, db_session_factory):
     assert r.status_code == 200, r.text
 
     r = await client.post(f"/delivery/orders/{oid}/packing-photos", headers=agent_h,
-                          json={"refs": ["photos/pack1.jpg", "photos/pack2.jpg"]})
+                          json={"refs": ["https://res.cloudinary.com/y0vuqbu5/image/upload/v1/packing/pack1.jpg", "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/packing/pack2.jpg"]})
     assert r.status_code == 200, r.text
     assert len(r.json()["packing_photos"]) == 2
 
     # a second batch appends
     r = await client.post(f"/delivery/orders/{oid}/packing-photos", headers=agent_h,
-                          json={"refs": ["photos/pack3.jpg"]})
+                          json={"refs": ["https://res.cloudinary.com/y0vuqbu5/image/upload/v1/packing/pack3.jpg"]})
     assert len(r.json()["packing_photos"]) == 3
