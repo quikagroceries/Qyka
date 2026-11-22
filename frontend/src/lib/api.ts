@@ -70,6 +70,9 @@ export const api = {
   me: () => request("/auth/me"),
   getHealth: () => request("/health"),
   updateProfile: (body) => request("/auth/me", { method: "PATCH", body }),
+  // Settings' notification toggles - stored on the account, not the device.
+  updateNotificationPreferences: (body: Partial<Record<"order_updates" | "agent_messages" | "payment_reminders" | "offers", boolean>>) =>
+    request("/auth/me/notification-preferences", { method: "PATCH", body }),
   // Attaches a verified email to the signed-in account. Caller must have
   // already sent the code via requestOtp(email) - this just confirms it,
   // the same way sign-in/sign-up verification works.

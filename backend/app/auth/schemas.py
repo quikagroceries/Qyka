@@ -94,6 +94,24 @@ class LinkEmailIn(BaseModel):
     code: str = Field(..., min_length=6, max_length=6, examples=["123456"])
 
 
+class NotificationPreferences(BaseModel):
+    """The Settings toggles. payment_due and out_for_delivery always send
+    whatever these say (notifications/policy.py)."""
+
+    order_updates: bool = True
+    agent_messages: bool = True
+    payment_reminders: bool = True
+    offers: bool = True
+
+
+class NotificationPreferencesIn(BaseModel):
+    # Only what's sent changes - same "omitted means unchanged" convention.
+    order_updates: bool | None = None
+    agent_messages: bool | None = None
+    payment_reminders: bool | None = None
+    offers: bool | None = None
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -121,3 +139,6 @@ class UserOut(BaseModel):
     # False only for agent-only accounts (see auth.models.User) - the
     # frontend hides the shopping side and the mode switch until it's True.
     has_customer_side: bool = True
+    # Grouped from the per-toggle columns by User.notification_preferences.
+    notification_preferences: NotificationPreferences = NotificationPreferences()
+
