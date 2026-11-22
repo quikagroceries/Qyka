@@ -9,7 +9,10 @@ import Avatar from "@/components/ui/Avatar";
 import { formatDayDivider, formatClockTime } from "@/lib/dateFormat";
 import squiggleLeaf from "@/assets/illustrations/decorative-squiggle-leaf.webp";
 import garlic from "@/assets/illustrations/garlic.webp";
+import { usePolling } from "@/lib/usePolling";
 
+// Chat should feel live, so it stays fast - but pauses while hidden and an
+// unchanged chat comes back as an empty 304 (backend core/etag.py).
 const POLL_MS = 5000;
 const QUICK_REPLIES = ["Hello", "On it", "Almost done", "Thank you"];
 
@@ -42,12 +45,7 @@ function Chat({ orderId, person, label, onMessages, onCollapse, onVoiceCall, onV
     }
   }
 
-  useEffect(() => {
-    poll();
-    const id = setInterval(poll, POLL_MS);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one interval per orderId, matches Notifications.jsx's poll pattern
-  }, [orderId]);
+  usePolling(poll, POLL_MS, [orderId]);
 
   // Keep the latest message in view - a new message arriving mid-poll
   // shouldn't require a manual scroll to notice.

@@ -13,9 +13,11 @@ import Icon from "@/components/ui/Icon";
 import ChartTooltip from "@/components/ui/ChartTooltip";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { isStuckOrder, LOW_FLOAT_BALANCE, CHART_CRITICAL_VS_ORANGE, CHART_GRID, CHART_AXIS_TEXT } from "@/lib/adminUtils";
+import { usePolling } from "@/lib/usePolling";
 
 const ORANGE = "#EE9A5A";
 
+// An overview, not a live feed; paused while the tab is hidden (usePolling).
 const POLL_MS = 15000;
 
 const NAV_HREF = {
@@ -67,11 +69,7 @@ function AdminDashboard() {
     }
   }
 
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
-  }, []);
+  usePolling(refresh, POLL_MS);
 
   const loading = markets === null;
 

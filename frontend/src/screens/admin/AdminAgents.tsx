@@ -9,7 +9,9 @@ import { api } from "@/lib/api";
 import ApplicationCard from "@/components/admin/ApplicationCard";
 import EmptyState from "@/components/ui/EmptyState";
 import { CardSkeleton } from "@/components/ui/Skeleton";
+import { usePolling } from "@/lib/usePolling";
 
+// The roster changes slowly; paused while the tab is hidden (usePolling).
 const POLL_MS = 20000;
 
 function AdminAgents() {
@@ -36,11 +38,7 @@ function AdminAgents() {
     }
   }
 
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
-  }, []);
+  usePolling(refresh, POLL_MS);
 
   async function handleDecide(applicationId, decision) {
     setError(""); setBusyId(applicationId);

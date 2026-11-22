@@ -1,11 +1,12 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
 from app.core.database import get_db
+from app.core.etag import json_with_etag
 from app.core.enums import UserRole
 from app.core.security import get_current_user, require_role
 from app.jit import service
@@ -13,7 +14,7 @@ from app.jit.models import SpendingAuthorization
 from app.jit.schemas import (
     AttachPhotoIn, AuthorizationOut, PayVendorIn, RaiseCapIn, VendorTransferOut,
 )
-from app.orders.service import _load, load_order_for_participant
+from app.orders.service import _load, load_order_for_participant, load_order_for_viewer
 
 router = APIRouter()
 
@@ -21,13 +22,16 @@ router = APIRouter()
 @router.get("/orders/{order_id}/purchases", response_model=list[VendorTransferOut])
 async def list_purchases(
     order_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
-) -> list[VendorTransferOut]:
+) -> Response:
     """Purchase photos + amounts per stall - proof of goods bought. Same
-    participant gate as chat: the order's customer or assigned agent only."""
+    participant gate as chat: the order's customer or assigned agent only.
+    Polled by the Shopping screen, so an unchanged list is an empty 304."""
     await load_order_for_participant(db, order_id, user.id)
-    return await service.list_purchases(db, order_id=order_id)
+    purchases = await service.list_purchases(db, order_id=order_id)
+    return json_with_etag(request, [VendorTransferOut.model_validate(p) for p in purchases])
 
 
 @router.post("/orders/{order_id}/pay-vendor", response_model=VendorTransferOut)
@@ -71,6 +75,8 @@ async def get_authorization(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> SpendingAuthorization:
+    # The order's customer, its agent, or an admin only.
+    await load_order_for_viewer(db, order_id, user)
     result = await db.execute(
         select(SpendingAuthorization).where(
             SpendingAuthorization.order_id == order_id

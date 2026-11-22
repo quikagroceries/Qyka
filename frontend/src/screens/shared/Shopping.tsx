@@ -13,8 +13,11 @@ import Icon from "@/components/ui/Icon";
 import { isChatAvailable } from "@/lib/orderStatus";
 import { marketTone, TONE_COVER } from "@/lib/vendorVisuals";
 import { coverImageForMarket } from "@/lib/markets";
+import { usePolling } from "@/lib/usePolling";
 
-const POLL_MS = 5000;
+// Active work (customer replies, approvals) - kept quick, but not 5s, and
+// paused while hidden.
+const POLL_MS = 8000;
 
 function Shopping({ orderId, onBack }: any) {
   const [order, setOrder] = useState<any>(null);
@@ -85,12 +88,7 @@ function Shopping({ orderId, onBack }: any) {
     }
   }
 
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one interval per orderId, matches Chat.jsx's poll pattern
-  }, [orderId]);
+  usePolling(refresh, POLL_MS, [orderId]);
 
   useEffect(() => {
     if (!order?.market_id) return;

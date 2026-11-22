@@ -27,8 +27,13 @@ import { isChatAvailable, isExceptionOrder, isRateable, summarizeOrderStatus } f
 import { marketTone, TONE_COVER } from "@/lib/vendorVisuals";
 import { coverImageForMarket } from "@/lib/markets";
 import { illustrationForItem } from "@/lib/foodVisuals";
+import { usePolling } from "@/lib/usePolling";
 
-const POLL_MS = 5000;
+// Order tracking: statuses move every few minutes, so 25s is plenty - except
+// while the order is being shopped, when the agent may be waiting on this
+// customer to approve an item. Paused while hidden either way.
+const POLL_MS = 25000;
+const POLL_MS_WHILE_SHOPPING = 8000;
 
 // Mirrors app/orders/fees.py's DELIVERY_FEE_FLAT placeholder (also served at
 // GET /pricing), for the pre-shopping estimate card below.
@@ -190,12 +195,7 @@ function OrderDetail({ orderId, onBack, onTopUpWallet }: any) {
     }
   }
 
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one interval per orderId, matches Chat.jsx's poll pattern
-  }, [orderId]);
+  usePolling(refresh, order?.status === "shopping" ? POLL_MS_WHILE_SHOPPING : POLL_MS, [orderId]);
 
   useEffect(() => {
     api.getWalletBalance().then((d) => setWalletBalance(d.balance)).catch(() => {});

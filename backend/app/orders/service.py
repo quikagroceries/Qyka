@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.core.enums import MarketStatus, OrderStatus
+from app.core.enums import MarketStatus, OrderStatus, UserRole
 from app.orders import fees
 from app.orders.models import Order, OrderItem
 from app.wallet import service as wallet_service
@@ -54,6 +54,26 @@ async def load_order_for_participant(
             status.HTTP_403_FORBIDDEN, "Not a participant on this order"
         )
     return order
+
+
+async def load_order_for_viewer(
+    db: AsyncSession, order_id: uuid.UUID, user, *, allow_agent: bool = True
+) -> Order:
+    """Load an order for someone allowed to READ it: an admin, the order's
+    customer, or (unless allow_agent=False) its assigned agent. A merely
+    *proposed* agent isn't assigned yet and gets nothing, same as the rest
+    of the agent flow.
+
+    Everyone else gets the same 404 as an order that doesn't exist, so an
+    order ID seen in a link or a URL can't be used to read someone else's
+    order - or even to confirm it exists.
+    """
+    order = await _load(db, order_id)
+    if user.role is UserRole.ADMIN or user.id == order.customer_id:
+        return order
+    if allow_agent and order.agent_id is not None and user.id == order.agent_id:
+        return order
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
 
 
 async def _transition(db: AsyncSession, order: Order, target: OrderStatus) -> None:
