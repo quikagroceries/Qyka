@@ -192,6 +192,20 @@ function ApplyForm({ cfg }: { cfg: EarnConfig["form"] }) {
   );
 }
 
+// Riders go through the full Sections A-E onboarding form (identity,
+// guarantors, license, vehicle docs, banking) on its own page rather than
+// the quick four-field ApplyForm agents use.
+function RiderApplyCta({ heading }: { heading: string }) {
+  return (
+    <Link
+      href="/become-rider"
+      className="inline-flex min-h-[52px] w-full items-center justify-center rounded-2xl bg-brand-orange px-6 font-display text-lg font-bold text-[#1A1A1A] shadow-sm transition hover:bg-brand-orange-dark active:scale-[0.98]"
+    >
+      {heading} →
+    </Link>
+  );
+}
+
 function Faq({ items }: { items: { q: string; a: string }[] }) {
   const [open, setOpen] = useState<number | null>(0);
   return (
@@ -434,7 +448,7 @@ export default function EarnPage({ cfg }: { cfg: EarnConfig }) {
                   </div>
                 </Reveal>
                 <Reveal x={20} y={0} className="rounded-3xl bg-surface p-5 shadow-lg sm:p-7">
-                  <ApplyForm cfg={cfg.form} />
+                  {cfg.form.kind === "rider" ? <RiderApplyCta heading={cfg.form.heading} /> : <ApplyForm cfg={cfg.form} />}
                 </Reveal>
               </div>
             </div>

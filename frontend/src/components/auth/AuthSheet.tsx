@@ -35,12 +35,14 @@ export default function AuthSheet({
   onSuccess,
   title = "Sign in to place your order",
   subtitle = "We only ask for a contact when money is involved — your list stays ready.",
+  closeLabel = "Keep editing list",
 }: {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
   title?: string;
   subtitle?: string;
+  closeLabel?: string;
 }) {
   const { handleLoggedIn, setUser } = useAuth();
   const [mode, setMode] = useState<"phone" | "email">("phone");
@@ -168,13 +170,13 @@ export default function AuthSheet({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-4 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="auth-sheet-title">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/50 p-4 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" aria-labelledby="auth-sheet-title">
       <button type="button" className="absolute inset-0 cursor-default" aria-label="Close" onClick={onClose} />
       <div className="relative z-[1] w-full max-w-md rounded-3xl bg-surface p-6 shadow-xl">
-        <h2 id="auth-sheet-title" className="font-serif text-2xl italic tracking-tight text-ink">
+        <h2 id="auth-sheet-title" className="font-display text-2xl font-extrabold tracking-tight text-ink">
           {title}
         </h2>
-        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+        <p className="mt-1 text-sm text-muted">{subtitle}</p>
 
         <div className="mt-5 space-y-3">
           {step === "identifier" && (
@@ -229,17 +231,17 @@ export default function AuthSheet({
 
           {step === "code" && (
             <>
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted">
                 Enter the code sent via {sentChannel === "whatsapp" ? "WhatsApp" : sentChannel === "email" ? "email" : sentChannel === "voice" ? "phone call" : "SMS"} to{" "}
                 <span className="font-semibold text-ink">{identifier}</span>.
               </p>
               {devOtp && (
-                <p className="text-sm text-slate-500">
-                  Dev code: <b className="text-slate-700">{devOtp}</b>
+                <p className="text-sm text-muted">
+                  Dev code: <b className="text-ink">{devOtp}</b>
                 </p>
               )}
               {remainingMs != null && (
-                <p className={"text-sm font-semibold " + (codeExpired ? "text-red-600" : "text-slate-500")}>
+                <p className={"text-sm font-semibold " + (codeExpired ? "text-red-600" : "text-muted")}>
                   {codeExpired
                     ? "Code expired — request a new one."
                     : `Code expires in ${formatRemaining(remainingMs)}`}
@@ -274,7 +276,7 @@ export default function AuthSheet({
 
           {step === "name" && (
             <>
-              <p className="text-sm text-slate-600">What should we call you?</p>
+              <p className="text-sm text-muted">What should we call you?</p>
               <Input
                 placeholder="Full name"
                 value={fullName}
@@ -293,9 +295,9 @@ export default function AuthSheet({
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2 text-sm font-semibold text-slate-500 hover:text-slate-800"
+            className="w-full py-2 text-sm font-semibold text-muted hover:text-ink"
           >
-            Keep editing list
+            {closeLabel}
           </button>
         </div>
       </div>
