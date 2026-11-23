@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.config import settings
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348010000001"
 PHONE_AGENT = "+2348020000002"
@@ -60,14 +61,15 @@ async def _drive_order_to_awaiting_payment(client, db_session_factory, monkeypat
         "items": [{"description": "500 naira pepper"}, {"description": "1000 naira rice"}],
     })
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     items = r.json()["items"]
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[0]["id"], "price": "500.00"}]})
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[1]["id"], "price": "1000.00"}]})
     r = await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
     return oid, cust_token, r.json(), market_id
@@ -242,7 +244,7 @@ async def test_deposit_checkout_verify_on_return(client, db_session_factory, mon
 
     cust_h = {"Authorization": f"Bearer {cust_token}"}
 
-    # Goods total well past the 10,000 deposit threshold.
+    # Goods total 78,000 -> a 23,400 deposit (30%).
     r = await client.post("/orders", headers=cust_h, json={
         "market_id": str(market_id),
         "listed_items_total": "78000.00",

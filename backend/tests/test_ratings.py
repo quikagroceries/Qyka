@@ -8,6 +8,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348040000001"
 PHONE_AGENT = "+2348040000002"
@@ -60,12 +61,13 @@ async def _completed_order(client, db_session_factory, monkeypatch):
         "market_id": str(market_id), "listed_items_total": "2000.00",
         "items": [{"description": "pepper"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=cust_h)
     assert r.status_code == 200, r.text
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     item_id = r.json()["items"][0]["id"]
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": item_id, "price": "1500.00"}]})
     await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
     r = await client.post(f"/payments/orders/{oid}/pay-from-wallet", headers=cust_h)
@@ -135,6 +137,7 @@ async def test_cannot_rate_before_completion(client, db_session_factory):
         "market_id": str(market_id), "listed_items_total": "2000.00",
         "items": [{"description": "pepper"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     assert r.json()["status"] == "proposed"
 
     r = await client.post(f"/orders/{oid}/rating", headers=cust_h, json={"stars": 3})

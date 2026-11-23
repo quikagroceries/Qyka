@@ -9,6 +9,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348030000001"
 PHONE_AGENT = "+2348030000002"
@@ -51,6 +52,7 @@ async def _order_shopping(client, cust_h, agent_h, market_id, items, listed_item
     })
     assert r.status_code == 201, r.text
     oid = r.json()["id"]
+    await pay_deposit(client, cust_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=cust_h)
     assert r.status_code == 200, r.text
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
@@ -113,7 +115,7 @@ async def test_agent_keeps_shopping_other_items_while_overage_pending(client, db
 
     # Rice is untouched by the pending overage - agent pays for it normally.
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": rice_id, "price": "2000.00"}]})
     assert r.status_code == 200, r.text
 
@@ -143,7 +145,7 @@ async def test_customer_approves_overage_then_agent_pays(client, db_session_fact
 
     # Now the agent can actually pay for it.
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": item_id, "price": "1500.00"}]})
     assert r.status_code == 200, r.text
 
@@ -166,7 +168,7 @@ async def test_customer_declines_overage_item_stays_unbought(client, db_session_
 
     # Buy the other item and finish - pepper stays skipped, not in the total.
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": rice_id, "price": "2000.00"}]})
     r = await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
     assert r.status_code == 200, r.text
@@ -190,7 +192,7 @@ async def test_unanswered_overage_is_skipped_not_bought_at_finish(client, db_ses
     await client.post(f"/orders/{oid}/items/{pepper_id}/request-overage",
                        headers=agent_h, json={"price": "1500.00"})
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": rice_id, "price": "2000.00"}]})
 
     # No customer response at all.

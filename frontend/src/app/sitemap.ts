@@ -1,7 +1,10 @@
 import { MetadataRoute } from "next";
-import { DIRECTORY_MARKETS } from "@/lib/marketDirectory";
+import { fetchMarkets } from "@/lib/markets";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+// Rebuilt at most every hour, so new markets show up without a redeploy.
+export const revalidate = 3600;
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://quika.ng";
 
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -55,8 +58,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 
-  const marketRoutes: MetadataRoute.Sitemap = DIRECTORY_MARKETS.map((market) => ({
-    url: `${baseUrl}/markets/${market.id}`,
+  const marketRoutes: MetadataRoute.Sitemap = (await fetchMarkets()).map((market) => ({
+    url: `${baseUrl}/markets/${market.slug}`,
     lastModified: new Date(),
     changeFrequency: "weekly",
     priority: 0.8,

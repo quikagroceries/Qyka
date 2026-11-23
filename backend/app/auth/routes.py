@@ -7,6 +7,8 @@ from app.auth.schemas import (
     GoogleAuthIn,
     GoogleAuthOut,
     LinkEmailIn,
+    NotificationPreferences,
+    NotificationPreferencesIn,
     RegisterCustomerIn,
     RequestOtpIn,
     RequestOtpOut,
@@ -19,6 +21,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.enums import UserRole, UserStatus
 from app.core.security import create_access_token, get_current_user
+from app.notifications.policy import PREFERENCE_FIELDS
 
 router = APIRouter()
 
@@ -152,6 +155,25 @@ async def update_me(
         avatar_url=body.avatar_url,
         clear_avatar="avatar_url" in body.model_fields_set and body.avatar_url is None,
     )
+
+
+@router.get("/me/notification-preferences", response_model=NotificationPreferences)
+async def get_notification_preferences(current_user: User = Depends(get_current_user)) -> NotificationPreferences:
+    return NotificationPreferences(**current_user.notification_preferences)
+
+
+@router.patch("/me/notification-preferences", response_model=NotificationPreferences)
+async def update_notification_preferences(
+    body: NotificationPreferencesIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> NotificationPreferences:
+    """Settings' notification toggles. Critical kinds (payment due, out for
+    delivery) still send whatever these say - see notifications/policy.py."""
+    for cat, value in body.model_dump(exclude_none=True).items():
+        setattr(current_user, PREFERENCE_FIELDS[cat], value)
+    await db.flush()
+    return await get_notification_preferences(current_user)
 
 
 @router.post("/me/register-customer", response_model=UserOut)

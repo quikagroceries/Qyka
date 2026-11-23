@@ -1,16 +1,23 @@
-"""Notification service — persist an in-app notice and (later) send SMS.
+"""Notification service - the single entry point the rest of the app calls at
+trigger points (payment due, out for delivery, item unavailable...).
 
-send() is the single entry point the rest of the app calls at trigger points
-(shopping done, packaging running long, out for delivery). It always records
-an in-app notification; SMS is a clearly-marked hook that switches on when an
-SMS provider (Termii / Africa's Talking) key is configured.
+Tiered delivery (rules in notifications/policy.py):
+  - in-app: every notification the user wants becomes a row in their feed
+    (the bell) - free, and covers them anywhere in the app while it's open.
+  - off-app: the critical kinds (payment_due, out_for_delivery) also go out
+    by email and SMS (notifications/delivery.py), so they reach a user whose
+    app is closed.
+A user's Settings toggles silence non-critical kinds entirely; critical kinds
+ignore them - you can mute offers and chatter, never "your payment is due".
 """
 
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
+from app.auth.models import User
+from app.notifications import delivery, policy
 from app.notifications.models import Notification
 
 
@@ -21,19 +28,18 @@ async def send(
     kind: str,
     message: str,
     order_id: uuid.UUID | None = None,
-    phone: str | None = None,
-) -> Notification:
-    note = Notification(
-        user_id=user_id, order_id=order_id, kind=kind, message=message
-    )
+) -> Notification | None:
+    """Returns the in-app notification, or None when the user has turned this
+    kind's category off (then nothing is sent on any channel)."""
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if user is not None and not policy.wants(user, kind):
+        return None
+
+    note = Notification(user_id=user_id, order_id=order_id, kind=kind, message=message)
     db.add(note)
     await db.flush()
 
-    # --- SMS hook ---
-    # When settings.sms_api_key is set, dispatch `message` to `phone` via the
-    # provider here. Left as a no-op until the account exists so the flow works
-    # end to end without SMS in development.
-    if settings.sms_api_key and phone:
-        pass  # await _send_sms(phone, message)
+    if user is not None and policy.is_critical(kind):
+        await delivery.send_off_app(user, kind, message)
 
     return note

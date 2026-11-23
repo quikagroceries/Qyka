@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { usePolling } from "@/lib/usePolling";
 
-const POLL_MS = 10000;
+// Toasts for new notifications; paused while hidden.
+const POLL_MS = 15000;
 
 // Real kinds emitted today: payment_due, item_unavailable, order_cancelled,
 // item_decided (see notif_service.send() callers across app/orders/). This
@@ -39,11 +41,7 @@ function Notifications() {
     }
   }
 
-  useEffect(() => {
-    poll();
-    const id = setInterval(poll, POLL_MS);
-    return () => clearInterval(id);
-  }, []);
+  usePolling(poll, POLL_MS);
 
   async function handleDismiss(noteId) {
     setBusy(true);

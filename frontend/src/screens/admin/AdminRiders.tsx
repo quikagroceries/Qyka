@@ -11,7 +11,9 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import { CardSkeleton } from "@/components/ui/Skeleton";
+import { usePolling } from "@/lib/usePolling";
 
+// The roster changes slowly; paused while the tab is hidden (usePolling).
 const POLL_MS = 20000;
 
 function StatusPill({ status }) {
@@ -53,11 +55,7 @@ function AdminRiders() {
     }
   }
 
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
-  }, []);
+  usePolling(refresh, POLL_MS);
 
   async function handleDecide(applicationId, decision) {
     setError(""); setBusyId(applicationId);

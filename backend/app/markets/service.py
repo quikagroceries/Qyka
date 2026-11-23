@@ -1,12 +1,15 @@
 import uuid
+from datetime import time
 
 from fastapi import HTTPException, status
+from fastapi import status as http_status  # `status` is also a market field below
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
-from app.core.enums import VenueType
+from app.core.enums import MarketStatus, VenueType
 from app.jit.models import Seller
+from app.markets import directory, hours
 from app.markets.models import Agent, Market
 
 
@@ -16,18 +19,45 @@ async def create_market(
     name: str,
     city: str,
     state: str,
+    slug: str | None = None,
+    description: str | None = None,
+    status: MarketStatus = MarketStatus.COMING_SOON,
+    categories: list[str] | None = None,
+    image_url: str | None = None,
     venue_type: VenueType | str = VenueType.LOCAL_MARKET,
     latitude: float | None = None,
     longitude: float | None = None,
+    opening_time: time | None = None,
+    closing_time: time | None = None,
+    timezone: str | None = None,
 ) -> Market:
     vt = venue_type.value if isinstance(venue_type, VenueType) else venue_type
+    if slug is not None:
+        slug = slug.strip().lower()
+        if not directory.SLUG_RE.match(slug):
+            raise HTTPException(
+                http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Slug must be lowercase letters, numbers and single hyphens (e.g. mile-12)",
+            )
+        if (await db.execute(select(Market.id).where(Market.slug == slug))).first() is not None:
+            raise HTTPException(http_status.HTTP_409_CONFLICT, f"The slug '{slug}' is already used by another market")
+    else:
+        slug = await directory.unique_slug(db, directory.slugify(name))
     market = Market(
+        slug=slug,
+        description=description,
+        status=status,
+        categories=list(categories or []),
+        image_url=image_url or None,
         name=name,
         city=city,
         state=state,
         venue_type=vt or VenueType.LOCAL_MARKET.value,
         latitude=latitude,
         longitude=longitude,
+        opening_time=opening_time or hours.DEFAULT_OPENING_TIME,
+        closing_time=closing_time or hours.DEFAULT_CLOSING_TIME,
+        timezone=hours.validate_timezone(timezone or hours.DEFAULT_TIMEZONE),
     )
     db.add(market)
     await db.flush()
@@ -47,6 +77,13 @@ async def list_markets(
         stmt = stmt.where(Market.venue_type == venue_type)
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+async def get_market_by_slug(db: AsyncSession, *, slug: str) -> Market:
+    market = (await db.execute(select(Market).where(Market.slug == slug))).scalar_one_or_none()
+    if market is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Market not found")
+    return market
 
 
 async def get_market(db: AsyncSession, *, market_id: uuid.UUID) -> Market:
@@ -131,19 +168,40 @@ async def update_market(
     *,
     market_id: uuid.UUID,
     name: str | None = None,
+    slug: str | None = None,
+    description: str | None = None,
+    status: MarketStatus | None = None,
+    categories: list[str] | None = None,
+    image_url: str | None = None,
     city: str | None = None,
     state: str | None = None,
     is_active: bool | None = None,
     venue_type: VenueType | str | None = None,
     latitude: float | None = None,
     longitude: float | None = None,
+    opening_time: time | None = None,
+    closing_time: time | None = None,
+    timezone: str | None = None,
 ) -> Market:
     result = await db.execute(select(Market).where(Market.id == market_id))
     market = result.scalar_one_or_none()
     if market is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Market not found")
+        raise HTTPException(http_status.HTTP_404_NOT_FOUND, "Market not found")
+    if slug is not None and slug.strip().lower() != market.slug:
+        raise HTTPException(
+            http_status.HTTP_400_BAD_REQUEST,
+            "A market's slug can't be changed after it's created - links and the website depend on it",
+        )
     if name is not None:
         market.name = name
+    if description is not None:
+        market.description = description.strip() or None
+    if status is not None:
+        market.status = status
+    if categories is not None:
+        market.categories = list(categories)
+    if image_url is not None:
+        market.image_url = image_url or None
     if city is not None:
         market.city = city
     if state is not None:
@@ -158,6 +216,12 @@ async def update_market(
         market.latitude = latitude
     if longitude is not None:
         market.longitude = longitude
+    if opening_time is not None:
+        market.opening_time = opening_time
+    if closing_time is not None:
+        market.closing_time = closing_time
+    if timezone is not None:
+        market.timezone = hours.validate_timezone(timezone)
     await db.flush()
     return market
 

@@ -70,7 +70,9 @@ class Order(Base):
     items_total: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0.00")
     )
-    # Combined agent/commission fee (single customer-facing line) and its split.
+    # The service fee - 7.5% of goods, the single customer-facing fee line -
+    # and its internal split (orders/fees.py). Named `combined_fee` from the
+    # old model; company_share may be NEGATIVE (agent overtime on a cheap order).
     combined_fee: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0.00")
     )
@@ -113,7 +115,7 @@ class Order(Base):
     )
 
     # Pre-shopping estimate: the only total that exists before bargaining.
-    # Drives the deposit threshold check. Combined (goods + delivery + fee) -
+    # A must_prepay customer's 100% deposit. Combined (goods + delivery + fee) -
     # NOT what the spending authorization cap should be (see goods_estimate).
     estimated_value: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0.00")

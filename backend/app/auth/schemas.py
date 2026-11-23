@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.enums import UserRole, UserStatus
+from app.core.media import require_our_image_url
 
 OtpChannel = Literal["sms", "whatsapp", "voice", "email"]
 
@@ -74,9 +75,7 @@ class UpdateProfileIn(BaseModel):
     def _avatar_must_be_ours(cls, v):
         if v in (None, ""):
             return None
-        if not v.startswith("https://res.cloudinary.com/"):
-            raise ValueError("Profile photos must be uploaded through Qyka")
-        return v
+        return require_our_image_url(v, "Profile photos must be uploaded through Qyka")
 
 
 class RegisterCustomerIn(BaseModel):
@@ -92,6 +91,24 @@ class LinkEmailIn(BaseModel):
     # POST /auth/request-otp (identifier=email) before calling this.
     email: str = Field(..., examples=["ada@example.com"])
     code: str = Field(..., min_length=6, max_length=6, examples=["123456"])
+
+
+class NotificationPreferences(BaseModel):
+    """The Settings toggles. payment_due and out_for_delivery always send
+    whatever these say (notifications/policy.py)."""
+
+    order_updates: bool = True
+    agent_messages: bool = True
+    payment_reminders: bool = True
+    offers: bool = True
+
+
+class NotificationPreferencesIn(BaseModel):
+    # Only what's sent changes - same "omitted means unchanged" convention.
+    order_updates: bool | None = None
+    agent_messages: bool | None = None
+    payment_reminders: bool | None = None
+    offers: bool | None = None
 
 
 class UserOut(BaseModel):
@@ -121,3 +138,6 @@ class UserOut(BaseModel):
     # False only for agent-only accounts (see auth.models.User) - the
     # frontend hides the shopping side and the mode switch until it's True.
     has_customer_side: bool = True
+    # Grouped from the per-toggle columns by User.notification_preferences.
+    notification_preferences: NotificationPreferences = NotificationPreferences()
+

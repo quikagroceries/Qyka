@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 from app.core.enums import UserRole, UserStatus
+from app.notifications.policy import PREFERENCE_FIELDS
 
 
 class User(Base):
@@ -53,7 +54,7 @@ class User(Base):
     # basket_cap is the max order total (in kobo) this user may place.
     basket_cap_kobo: Mapped[int] = mapped_column(Integer, default=500_000)
     non_payment_count: Mapped[int] = mapped_column(Integer, default=0)
-    # Below-threshold non-payers must pay 100% up front on their next order.
+    # Non-payers must pay 100% up front (instead of the usual 30%) on their next order.
     # Set when a payment window lapses; cleared after they successfully prepay
     # and complete an order.
     must_prepay: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -65,6 +66,19 @@ class User(Base):
     # themselves (POST /auth/me/register-customer). See
     # core/security.py::get_customer_user.
     has_customer_side: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+
+    # Notification preferences (Settings toggles), one per category - see
+    # notifications/policy.py for which kinds fall under which. All on by
+    # default. Critical kinds (payment_due, out_for_delivery) ignore these.
+    notify_order_updates: Mapped[bool] = mapped_column(Boolean, default=True)
+    notify_agent_messages: Mapped[bool] = mapped_column(Boolean, default=True)
+    notify_payment_reminders: Mapped[bool] = mapped_column(Boolean, default=True)
+    notify_offers: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    @property
+    def notification_preferences(self) -> dict[str, bool]:
+        """The toggles grouped by category, as the API (UserOut) shows them."""
+        return {cat: getattr(self, field) for cat, field in PREFERENCE_FIELDS.items()}
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

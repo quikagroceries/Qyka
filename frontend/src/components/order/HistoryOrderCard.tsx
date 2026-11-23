@@ -6,7 +6,7 @@ import Icon from "@/components/ui/Icon";
 import StatusBadge from "@/components/ui/StatusBadge";
 import MarketArt from "@/components/shop/MarketArt";
 import { marketTone } from "@/lib/vendorVisuals";
-import { coverImageForMarket } from "@/lib/marketDirectory";
+import { coverImageForMarket } from "@/lib/markets";
 import { illustrationForItem } from "@/lib/foodVisuals";
 
 import { isHistoryStatus } from "@/lib/orderStatus";

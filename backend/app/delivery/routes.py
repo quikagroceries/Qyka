@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.models import User
 from app.core.database import get_db
 from app.core.enums import UserRole
+from app.core.media import is_our_cloudinary_url
 from app.core.security import get_current_user, require_role
 from app.delivery import service
 from app.delivery.schemas import PayoutOut
@@ -73,15 +74,19 @@ async def add_packing_photos(
 
     Best-effort: photos attach to the order but NEVER gate packing or dispatch,
     so a slow upload in a weak-signal market can't stall the handover. `refs`
-    is a list of storage references (URLs/keys), never image bytes.
+    is a list of image URLs on our Cloudinary account (core/media.py) - never
+    image bytes, and never an outside link.
     """
     from app.orders.service import _load
     order = await _load(db, order_id)
     if order.agent_id != agent.id:
         from fastapi import HTTPException, status
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the assigned agent")
-    refs = body.get("refs", [])
+    refs = [r for r in (body.get("refs") or []) if r]
+    if not all(isinstance(r, str) and is_our_cloudinary_url(r) for r in refs):
+        from fastapi import HTTPException, status
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Image must be uploaded through Qyka")
     existing = list(order.packing_photos or [])
-    order.packing_photos = existing + [r for r in refs if r]
+    order.packing_photos = existing + refs
     await db.flush()
     return {"order_id": str(order.id), "packing_photos": order.packing_photos}

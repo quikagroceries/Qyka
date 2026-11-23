@@ -23,6 +23,7 @@ from app.auth.models import User
 from app.core.enums import LedgerDirection, OrderStatus, UserRole
 from app.delivery import payouts
 from app.float import service as float_service
+from app.notifications import service as notif_service
 from app.orders.models import Order
 from app.orders.state_machine import IllegalTransition, assert_can_transition
 from app.payments.models import Transaction
@@ -94,6 +95,15 @@ async def dispatch_to_courier(
     order.handover_code = f"{secrets.randbelow(10_000):04d}"
     order.dispatched_at = datetime.now(timezone.utc)
     await _transition(db, order, OrderStatus.OUT_FOR_DELIVERY)
+    # Critical: in-app AND email/SMS, whatever the customer's toggles - this
+    # is the one message they need even with the app closed.
+    await notif_service.send(
+        db, user_id=order.customer_id, order_id=order.id, kind="out_for_delivery",
+        message=(
+            f"Your order is on its way (tracking {order.courier_reference}). "
+            f"Give the rider this code at handover: {order.handover_code}."
+        ),
+    )
     return order
 
 

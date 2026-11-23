@@ -15,13 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.core.enums import OrderStatus
+from app.core.enums import MarketStatus, OrderStatus, UserRole
 from app.orders import fees
 from app.orders.models import Order, OrderItem
 from app.wallet import service as wallet_service
 from app.orders import assignment
 from app.notifications import service as notif_service
-from app.markets.models import Agent
+from app.markets import hours as market_hours
+from app.markets.models import Agent, Market
 from app.orders.state_machine import IllegalTransition, assert_can_transition
 
 
@@ -55,6 +56,26 @@ async def load_order_for_participant(
     return order
 
 
+async def load_order_for_viewer(
+    db: AsyncSession, order_id: uuid.UUID, user, *, allow_agent: bool = True
+) -> Order:
+    """Load an order for someone allowed to READ it: an admin, the order's
+    customer, or (unless allow_agent=False) its assigned agent. A merely
+    *proposed* agent isn't assigned yet and gets nothing, same as the rest
+    of the agent flow.
+
+    Everyone else gets the same 404 as an order that doesn't exist, so an
+    order ID seen in a link or a URL can't be used to read someone else's
+    order - or even to confirm it exists.
+    """
+    order = await _load(db, order_id)
+    if user.role is UserRole.ADMIN or user.id == order.customer_id:
+        return order
+    if allow_agent and order.agent_id is not None and user.id == order.agent_id:
+        return order
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
+
+
 async def _transition(db: AsyncSession, order: Order, target: OrderStatus) -> None:
     try:
         assert_can_transition(order.status, target)
@@ -80,7 +101,7 @@ async def _estimates(
     priced_total = sum(item_prices, start=Decimal("0.00"))
     listed_items_total = priced_total + listed_items_total
     estimated_value = fees.estimate_order_value(listed_items_total)
-    # A customer flagged must_prepay (a below-threshold non-payer) pays 100% up
+    # A customer flagged must_prepay (a past non-payer) pays 100% up
     # front regardless of order size, until they complete a paid order. Read the
     # flag from their record so it can't be bypassed by the caller.
     from app.auth.models import User as _User
@@ -116,11 +137,23 @@ async def create_order(
     total. Pure detailed: every item is priced, so this stays 0.00. Pure
     budget: no item is priced, so this IS the whole goods total (unchanged
     behavior from before mixed lists existed). Either way this figure drives
-    both the deposit threshold (via estimated_value, which adds delivery +
-    fee) and the JIT spending cap (see jit.service.get_or_create_authorization,
+    both the 30% deposit (a must_prepay customer's 100% deposit uses
+    estimated_value, which adds delivery + fee) and the JIT spending cap (see jit.service.get_or_create_authorization,
     which sets cap = order.goods_estimate - goods only, since delivery/fee
     are never paid through the authorization).
     """
+    # Orderable (pilot/live, not coming_soon) and open - before anything is
+    # priced, saved, proposed to an agent or paid. (An unknown market_id has no hours to check; it's left
+    # to behave as it always has.)
+    market = (await db.execute(select(Market).where(Market.id == market_id))).scalar_one_or_none()
+    if market is not None:
+        if market.status is MarketStatus.COMING_SOON:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"{market.name} is coming soon — not available yet.",
+            )
+        market_hours.ensure_open(market)
+
     listed_items_total, estimated_value, deposit = await _estimates(
         db, customer_id, items, listed_items_total, must_prepay
     )

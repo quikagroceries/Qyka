@@ -32,8 +32,12 @@ async def create_market(
 ) -> Market:
     return await service.create_market(
         db, name=body.name, city=body.city, state=body.state,
+        slug=body.slug, description=body.description, status=body.status,
+        categories=body.categories, image_url=body.image_url,
         venue_type=body.venue_type,
         latitude=body.latitude, longitude=body.longitude,
+        opening_time=body.opening_time, closing_time=body.closing_time,
+        timezone=body.timezone,
     )
 
 
@@ -61,6 +65,13 @@ async def list_markets(
         if user is None or user.role != UserRole.ADMIN:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     return await service.list_markets(db, active_only=active_only, venue_type=venue_type)
+
+
+@router.get("/slug/{slug}", response_model=MarketOut)
+async def get_market_by_slug(slug: str, db: AsyncSession = Depends(get_db)) -> Market:
+    """One market by its stable slug - what the website's /markets/<slug>
+    pages fetch. Public, like the market list."""
+    return await service.get_market_by_slug(db, slug=slug)
 
 
 @router.get("/activity", response_model=ShopActivityOut)

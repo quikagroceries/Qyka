@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 
-import type { DirectoryMarket, MarketCardStatus } from "@/lib/marketDirectory";
+import { coverImageForMarket, type Market, type MarketCardStatus } from "@/lib/markets";
 
 const STATUS_PILL: Record<MarketCardStatus, string> = {
   open: "bg-brand-green/15 text-brand-green",
@@ -22,7 +22,7 @@ export default function MarketCard({
   actionLabel,
   showCategories = false,
 }: {
-  market: DirectoryMarket;
+  market: Market;
   status: MarketCardStatus;
   statusLabel: string;
   venueLabel: string;
@@ -30,7 +30,7 @@ export default function MarketCard({
   actionLabel: string;
   showCategories?: boolean;
 }) {
-  const href = status === "open" ? `/shop?market=${market.id}` : `/markets/${market.id}`;
+  const href = status === "open" ? `/shop?market=${market.slug}` : `/markets/${market.slug}`;
 
   return (
     <Link
@@ -39,7 +39,7 @@ export default function MarketCard({
     >
       <div className="relative h-48 overflow-hidden">
         <Image
-          src={market.image}
+          src={coverImageForMarket(market)}
           alt=""
           aria-hidden
           fill
@@ -60,7 +60,7 @@ export default function MarketCard({
           {market.city} · {venueLabel}
           {timeLabel && <> · {timeLabel}</>}
         </p>
-        <p className="mt-2 line-clamp-2 text-muted">{market.blurb}</p>
+        <p className="mt-2 line-clamp-2 text-muted">{market.description}</p>
         {showCategories && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {market.categories.map((cat) => (

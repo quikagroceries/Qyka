@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348010000001"
 PHONE_AGENT = "+2348020000002"
@@ -131,12 +132,13 @@ async def test_customer_notified_when_shopping_done(client, db_session_factory, 
         "market_id": str(market_id), "listed_items_total": "2000.00",
         "items": [{"description": "pepper"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=admin_h)
     assert r.status_code == 200, r.text
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     items = r.json()["items"]
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[0]["id"], "price": "500.00"}]})
     await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
 
@@ -182,6 +184,7 @@ async def test_agent_freed_after_shopping(client, db_session_factory, monkeypatc
         "market_id": str(market_id), "listed_items_total": "2000.00",
         "items": [{"description": "pepper"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=admin_h)
     assert r.status_code == 200, r.text
 
@@ -196,7 +199,7 @@ async def test_agent_freed_after_shopping(client, db_session_factory, monkeypatc
     r = await client.get(f"/orders/{oid}", headers=admin_h)
     item_id = r.json()["items"][0]["id"]
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": item_id, "price": "500.00"}]})
     await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
 

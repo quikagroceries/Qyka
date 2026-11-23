@@ -21,6 +21,36 @@ type Entry = {
 
 const store = new Map<string, Entry>();
 
+// Polling only while someone can see it: every shared timer stops when the
+// tab/app is hidden, and on return each watched key refetches once and its
+// timer restarts. One listener for the whole store.
+const isVisible = () => typeof document === "undefined" || document.visibilityState === "visible";
+
+function startTimer(e: Entry) {
+  if (!e.timer && e.interval > 0 && e.subs.size > 0 && isVisible()) {
+    e.timer = setInterval(() => run(e), e.interval);
+  }
+}
+
+function stopTimer(e: Entry) {
+  if (e.timer) clearInterval(e.timer);
+  e.timer = null;
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    store.forEach((e) => {
+      if (e.subs.size === 0 || e.interval <= 0) return;
+      if (isVisible()) {
+        run(e);
+        startTimer(e);
+      } else {
+        stopTimer(e);
+      }
+    });
+  });
+}
+
 function entryFor(key: string, fetcher: () => Promise<any>, interval: number): Entry {
   let e = store.get(key);
   if (!e) {
@@ -58,7 +88,7 @@ export function refreshShared(key: string): Promise<void> {
 
 /** Forget everything cached - on logout, so nobody sees the last user's data. */
 export function clearShared() {
-  store.forEach((e) => e.timer && clearInterval(e.timer));
+  store.forEach(stopTimer);
   store.clear();
 }
 
@@ -75,13 +105,10 @@ export function useSharedQuery<T>(key: string | null, fetcher: () => Promise<T>,
     // the market list): good for 5 minutes, then quietly refreshed.
     const maxAge = interval > 0 ? Math.min(interval, 5000) : 5 * 60 * 1000;
     if (Date.now() - e.fetchedAt > maxAge) run(e);
-    if (e.subs.size === 1 && interval > 0) e.timer = setInterval(() => run(e), interval);
+    startTimer(e); // one timer per key, only while visible
     return () => {
       e.subs.delete(notify);
-      if (e.subs.size === 0 && e.timer) {
-        clearInterval(e.timer);
-        e.timer = null;
-      }
+      if (e.subs.size === 0) stopTimer(e);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by `key`; the fetcher is refreshed on every render via entryFor
   }, [key]);

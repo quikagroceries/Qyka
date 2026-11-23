@@ -1,12 +1,13 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
 from app.chat import service
 from app.chat.schemas import ConversationOut, MessageIn, MessageOut
 from app.core.database import get_db
+from app.core.etag import json_with_etag, not_modified
 from app.core.security import get_current_user
 
 router = APIRouter()
@@ -30,10 +31,19 @@ async def post_message(
 @router.get("/{order_id}/messages", response_model=list[MessageOut])
 async def get_messages(
     order_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
-) -> list[MessageOut]:
-    return await service.list_messages(db, order_id=order_id, user_id=user.id)
+) -> Response:
+    """Polled every few seconds by an open chat. When nothing new has been
+    sent, answers 304 from a one-line count query - no messages loaded or
+    serialized (core/etag.py)."""
+    version = await service.messages_version(db, order_id=order_id, user_id=user.id)
+    unchanged = not_modified(request, version)
+    if unchanged is not None:
+        return unchanged
+    messages = await service.list_messages(db, order_id=order_id, user_id=user.id)
+    return json_with_etag(request, [MessageOut.model_validate(m) for m in messages], etag=version)
 
 
 @router.post("/{order_id}/messages/read", status_code=204)

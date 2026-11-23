@@ -25,18 +25,19 @@ import riderScooter from "@/assets/illustrations/rider-scooter-basket-2.webp";
 import orderHandoff from "@/assets/illustrations/order-handoff-vendor-customer.webp";
 import { isChatAvailable, isExceptionOrder, isRateable, summarizeOrderStatus } from "@/lib/orderStatus";
 import { marketTone, TONE_COVER } from "@/lib/vendorVisuals";
-import { coverImageForMarket } from "@/lib/marketDirectory";
+import { coverImageForMarket } from "@/lib/markets";
 import { illustrationForItem } from "@/lib/foodVisuals";
+import { usePolling } from "@/lib/usePolling";
 
-const POLL_MS = 5000;
+// Order tracking: statuses move every few minutes, so 25s is plenty - except
+// while the order is being shopped, when the agent may be waiting on this
+// customer to approve an item. Paused while hidden either way.
+const POLL_MS = 25000;
+const POLL_MS_WHILE_SHOPPING = 8000;
 
-// Mirrors app/orders/fees.py's flat placeholders (DELIVERY_FEE_FLAT,
-// COMBINED_BASE_FEE) - same constants already duplicated in NewOrderFlow.jsx
-// for the same reason: pre-shopping, the API only returns the single
-// combined estimated_value, not a delivery/fee split, so these let the
-// pre-shopping estimate card below show a believable breakdown.
-const DELIVERY_QUOTE = 3600;
-const COMBINED_FEE_ESTIMATE = 2000;
+// Mirrors app/orders/fees.py's DELIVERY_FEE_FLAT placeholder (also served at
+// GET /pricing), for the pre-shopping estimate card below.
+const DELIVERY_QUOTE = 1500;
 
 // Statuses before finish_shopping has ever run - items_total/combined_fee/
 // delivery_fee/grand_total are all still their unset 0.00 defaults, so the
@@ -194,12 +195,7 @@ function OrderDetail({ orderId, onBack, onTopUpWallet }: any) {
     }
   }
 
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one interval per orderId, matches Chat.jsx's poll pattern
-  }, [orderId]);
+  usePolling(refresh, order?.status === "shopping" ? POLL_MS_WHILE_SHOPPING : POLL_MS, [orderId]);
 
   useEffect(() => {
     api.getWalletBalance().then((d) => setWalletBalance(d.balance)).catch(() => {});
@@ -438,7 +434,9 @@ function OrderDetail({ orderId, onBack, onTopUpWallet }: any) {
   // "Fees" line for the customer. The full per-transfer breakdown still
   // exists in the database untouched - this just isn't the screen for it.
   const fees = Number(order.combined_fee) + Number(order.emtl_total) + Number(order.transfer_fees_total);
-  const goodsEstimate = Math.max(0, Number(order.estimated_value) - DELIVERY_QUOTE - COMBINED_FEE_ESTIMATE);
+  // The backend's own goods-only estimate - no reverse-engineering it out of
+  // estimated_value with copies of the fee rules.
+  const goodsEstimate = Number(order.goods_estimate);
   // Derived from the REAL order, never hardcoded - a flagged (must_prepay)
   // customer's deposit is 100% of the estimate, not the normal DEPOSIT_RATE,
   // and a fixed percentage string here would just be wrong for them. See

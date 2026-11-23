@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348010000001"
 PHONE_AGENT = "+2348020000002"
@@ -63,12 +64,13 @@ async def test_nonpayment_sets_must_prepay(client, db_session_factory, monkeypat
         "market_id": str(market_id), "listed_items_total": "2000.00",
         "items": [{"description": "pepper"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=admin_h)
     assert r.status_code == 200, r.text
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     item_id = r.json()["items"][0]["id"]
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": item_id, "price": "1500.00"}]})
     await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
 
@@ -98,12 +100,12 @@ async def test_must_prepay_forces_full_deposit(client, db_session_factory):
         cust.must_prepay = True
         await s.commit()
 
-    # a small order that would NORMALLY need no deposit now needs 100%
+    # a small order that would normally need 30% now needs 100%
     r = await client.post("/orders", headers=admin_h, json={
         "market_id": str(market_id), "listed_items_total": "5000.00",
         "items": [{"description": "pepper"}]})
-    # estimate = 5000 + 3600 + 2000 = 10600; must_prepay -> deposit = full estimate
-    assert Decimal(r.json()["deposit_amount"]) == Decimal("10600.00")
+    # estimate = 5000 + 1500 delivery + 375 fee = 6875; must_prepay -> deposit = full estimate
+    assert Decimal(r.json()["deposit_amount"]) == Decimal("6875.00")
 
 
 @pytest.mark.asyncio
@@ -152,6 +154,7 @@ async def test_payment_clears_must_prepay(client, db_session_factory, monkeypatc
         "market_id": str(market_id), "listed_items_total": "5000.00",
         "items": [{"description": "pepper"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     deposit = Decimal(r.json()["deposit_amount"])
     # Pay the (full) deposit BEFORE accepting - the deposit-before-assignment
     # gate (orders.service.accept_proposal) refuses acceptance otherwise.
@@ -162,7 +165,7 @@ async def test_payment_clears_must_prepay(client, db_session_factory, monkeypatc
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     item_id = r.json()["items"][0]["id"]
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": item_id, "price": "1500.00"}]})
     await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
     await client.post(f"/payments/orders/{oid}/pay-from-wallet", headers=admin_h)
@@ -182,6 +185,7 @@ async def test_item_unavailable_customer_drops(client, db_session_factory):
         "market_id": str(market_id), "listed_items_total": "3000.00",
         "items": [{"description": "pepper"}, {"description": "rare spice"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=admin_h)
     assert r.status_code == 200, r.text
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
@@ -217,13 +221,14 @@ async def test_item_unavailable_no_answer_falls_back(client, db_session_factory,
         "market_id": str(market_id), "listed_items_total": "3000.00",
         "items": [{"description": "pepper"}, {"description": "rare spice"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=admin_h)
     assert r.status_code == 200, r.text
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     items = r.json()["items"]
     # buy pepper, flag spice unavailable, customer never answers
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[0]["id"], "price": "500.00"}]})
     await client.post(f"/orders/{oid}/items/{items[1]['id']}/unavailable", headers=agent_h)
 
@@ -244,15 +249,16 @@ async def test_packing_photos_attach(client, db_session_factory):
         "market_id": str(market_id), "listed_items_total": "2000.00",
         "items": [{"description": "pepper"}]})
     oid = r.json()["id"]
+    await pay_deposit(client, admin_h, oid)
     r = await client.post(f"/orders/{oid}/accept-agent", headers=admin_h)
     assert r.status_code == 200, r.text
 
     r = await client.post(f"/delivery/orders/{oid}/packing-photos", headers=agent_h,
-                          json={"refs": ["photos/pack1.jpg", "photos/pack2.jpg"]})
+                          json={"refs": ["https://res.cloudinary.com/y0vuqbu5/image/upload/v1/packing/pack1.jpg", "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/packing/pack2.jpg"]})
     assert r.status_code == 200, r.text
     assert len(r.json()["packing_photos"]) == 2
 
     # a second batch appends
     r = await client.post(f"/delivery/orders/{oid}/packing-photos", headers=agent_h,
-                          json={"refs": ["photos/pack3.jpg"]})
+                          json={"refs": ["https://res.cloudinary.com/y0vuqbu5/image/upload/v1/packing/pack3.jpg"]})
     assert len(r.json()["packing_photos"]) == 3

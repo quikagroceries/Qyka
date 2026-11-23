@@ -146,7 +146,7 @@ async def _auth_headers(client, phone=PHONE):
 @pytest.mark.asyncio
 async def test_profile_photo_set_keep_reject_and_clear(client):
     h = await _auth_headers(client)
-    url = "https://res.cloudinary.com/demo/image/upload/v1/me.jpg"
+    url = "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/me.jpg"
 
     r = await client.patch("/auth/me", headers=h, json={"avatar_url": url})
     assert r.status_code == 200 and r.json()["avatar_url"] == url
@@ -159,6 +159,9 @@ async def test_profile_photo_set_keep_reject_and_clear(client):
     r = await client.patch("/auth/me", headers=h, json={"avatar_url": "http://evil.example/x.png"})
     assert r.status_code == 422
     r = await client.patch("/auth/me", headers=h, json={"avatar_url": "javascript:alert(1)"})
+    assert r.status_code == 422
+    # ...and only from OUR Cloudinary account, not anyone else's.
+    r = await client.patch("/auth/me", headers=h, json={"avatar_url": "https://res.cloudinary.com/demo/image/upload/v1/me.jpg"})
     assert r.status_code == 422
 
     # An explicit null removes it.

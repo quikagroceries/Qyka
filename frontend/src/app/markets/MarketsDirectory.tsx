@@ -2,7 +2,8 @@
 
 import { useState, useMemo, type FormEvent } from "react";
 import Image from "next/image";
-import { DIRECTORY_MARKETS, getMarketCardStatus } from "@/lib/marketDirectory";
+import { getMarketCardStatus, isOrderable } from "@/lib/markets";
+import MarketCardSkeleton from "@/components/marketing/MarketCardSkeleton";
 import { useMarketAvailability } from "@/lib/useMarketAvailability";
 import { useT } from "@/lib/locale";
 import { cityRequestMailto } from "@/lib/contact";
@@ -31,7 +32,7 @@ const CITY_OPTIONS = [
 
 const STATUS_OPTIONS = [
   { key: "all", label: "All Status" },
-  { key: "pilot", label: "Live" },
+  { key: "open", label: "Live" },
   { key: "coming_soon", label: "Coming soon" },
 ];
 
@@ -52,13 +53,14 @@ export function MarketsDirectory() {
   }
 
   const filteredMarkets = useMemo(() => {
-    return DIRECTORY_MARKETS.filter((market) => {
-      const matchVenue = venueFilter === "all" || market.venueType === venueFilter;
+    return (liveMarkets || []).filter((market) => {
+      const matchVenue = venueFilter === "all" || market.venue_type === venueFilter;
       const matchCity = cityFilter === "all" || market.city.includes(cityFilter) || market.state.includes(cityFilter);
-      const matchStatus = statusFilter === "all" || market.status === statusFilter;
+      const matchStatus =
+        statusFilter === "all" || (statusFilter === "open" ? isOrderable(market) : !isOrderable(market));
       return matchVenue && matchCity && matchStatus;
     });
-  }, [venueFilter, cityFilter, statusFilter]);
+  }, [liveMarkets, venueFilter, cityFilter, statusFilter]);
 
   return (
     <>
@@ -105,7 +107,11 @@ export function MarketsDirectory() {
           </div>
         </div>
 
-        {filteredMarkets.length === 0 ? (
+        {liveMarkets === null ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[0, 1, 2].map((i) => <MarketCardSkeleton key={i} />)}
+          </div>
+        ) : filteredMarkets.length === 0 ? (
           <div className="py-24 text-center">
             <p className="text-xl text-muted font-medium mb-4">No markets found for this combination.</p>
             <MarketingButton onClick={() => {
@@ -119,14 +125,14 @@ export function MarketsDirectory() {
         ) : (
           <Stagger className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredMarkets.map((market) => {
-              const status = getMarketCardStatus(market, liveMarkets, hours.open);
+              const status = getMarketCardStatus(market, hours.open);
               return (
-                <StaggerItem key={market.id}>
+                <StaggerItem key={market.slug}>
                   <MarketCard
                     market={market}
                     status={status}
                     statusLabel={status === "open" ? t.markets.open : status === "closed" ? t.markets.closed : t.markets.soon}
-                    venueLabel={market.venueType === "supermarket" ? t.markets.supermarket : t.markets.local}
+                    venueLabel={market.venue_type === "supermarket" ? t.markets.supermarket : t.markets.local}
                     timeLabel={
                       status === "open" ? t.markets.closesAt(hours.closesAtClock)
                       : status === "closed" ? t.markets.opensAt(hours.opensAtClock)

@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from tests.conftest import pay_deposit
 
 PHONE_CUST = "+2348010000001"
 PHONE_AGENT = "+2348020000002"
@@ -86,6 +87,7 @@ async def test_full_order_lifecycle(client, db_session_factory, seed_float, monk
     order_id = order["id"]
     assert order["status"] == "draft"
     assert len(order["items"]) == 2
+    await pay_deposit(client, admin_headers, order_id)
 
     # --- admin assigns the agent ---
     r = await client.post(
@@ -112,7 +114,7 @@ async def test_full_order_lifecycle(client, db_session_factory, seed_float, monk
         f"/jit/orders/{order_id}/pay-vendor",
         headers=agent_headers,
         json={
-            "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+            "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
             "items": [{"item_id": items[0]["id"], "price": "500.00"}],
         },
     )
@@ -121,7 +123,7 @@ async def test_full_order_lifecycle(client, db_session_factory, seed_float, monk
         f"/jit/orders/{order_id}/pay-vendor",
         headers=agent_headers,
         json={
-            "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+            "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
             "items": [{"item_id": items[1]["id"], "price": "1000.00"}],
         },
     )
@@ -139,8 +141,9 @@ async def test_full_order_lifecycle(client, db_session_factory, seed_float, monk
     final = r.json()
     assert final["status"] == "awaiting_payment"
     assert Decimal(final["items_total"]) == Decimal("1500.00")
-    # fees: items 1500 + combined fee 2000 (<30min) + delivery 3600 + emtl 0 = 7100
-    assert Decimal(final["grand_total"]) == Decimal("7100.00"), final
+    # items 1500 + service fee 112.50 (7.5%) + delivery 1500 + emtl 0 = 3112.50
+    assert Decimal(final["combined_fee"]) == Decimal("112.50"), final
+    assert Decimal(final["grand_total"]) == Decimal("3112.50"), final
     assert final["payment_window_expires_at"] is not None
 
     # --- agent can list their own assigned orders ---
@@ -228,7 +231,7 @@ async def test_itemized_prices_drive_estimate_deposit_and_cap(client, db_session
     admin_headers = {"Authorization": f"Bearer {cust_token}"}
     agent_headers = {"Authorization": f"Bearer {agent_token}"}
 
-    # Goods total 40,000 -> well past the 10,000 deposit threshold.
+    # Goods total 40,000.
     r = await client.post(
         "/orders",
         headers=admin_headers,
@@ -244,8 +247,8 @@ async def test_itemized_prices_drive_estimate_deposit_and_cap(client, db_session
     order = r.json()
     order_id = order["id"]
 
-    # estimate = 40000 (goods) + 3600 (delivery) + 2000 (combined fee) = 45600
-    assert Decimal(order["estimated_value"]) == Decimal("45600.00"), order
+    # estimate = 40000 (goods) + 1500 (delivery) + 3000 (7.5% fee) = 44500
+    assert Decimal(order["estimated_value"]) == Decimal("44500.00"), order
     # deposit = 30% of the GOODS total (40000), not the grand estimate.
     assert Decimal(order["deposit_amount"]) == Decimal("12000.00"), order
 
@@ -273,7 +276,7 @@ async def test_itemized_prices_drive_estimate_deposit_and_cap(client, db_session
     assert r.status_code == 200, r.text
 
     # The whole point: the JIT cap is sourced from the real GOODS estimate
-    # (40000 = 25000 + 15000) - never the combined estimated_value (45600),
+    # (40000 = 25000 + 15000) - never the combined estimated_value (44500),
     # which also includes delivery + fee that are never paid through this
     # authorization at all.
     r = await client.get(f"/jit/orders/{order_id}/authorization", headers=admin_headers)
@@ -314,7 +317,7 @@ async def test_draft_list_can_be_edited_and_is_repriced(client):
     assert [i["description"] for i in edited["items"]] == ["Rice", "Ugu leaves"]
     # 6000 priced + 1500 budget, same pricing rules as order creation.
     assert Decimal(edited["goods_estimate"]) == Decimal("7500.00")
-    assert Decimal(edited["estimated_value"]) == Decimal("13100.00")
+    assert Decimal(edited["estimated_value"]) == Decimal("9562.50")  # 7500 + 1500 + 562.50
 
 
 @pytest.mark.asyncio
@@ -408,7 +411,7 @@ async def test_messages_inbox_unread_counts_are_per_person(client, db_session_fa
 
     await client.post(f"/orders/{order_id}/messages", headers=hc, json={"text": "Hello agent"})
     await client.post(f"/orders/{order_id}/messages", headers=ha, json={"text": "On it"})
-    await client.post(f"/orders/{order_id}/messages", headers=ha, json={"image_url": "https://res.cloudinary.com/x/y.jpg"})
+    await client.post(f"/orders/{order_id}/messages", headers=ha, json={"image_url": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/chat/y.jpg"})
 
     # Customer: two unread from the agent. (Which message is "last" isn't
     # asserted: the SQLite test DB stamps whole seconds, so three messages

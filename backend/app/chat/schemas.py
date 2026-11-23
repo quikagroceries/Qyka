@@ -1,12 +1,19 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+from app.core.media import require_our_image_url
 
 
 class MessageIn(BaseModel):
     text: str | None = None
     image_url: str | None = None
+
+    @field_validator("image_url")
+    @classmethod
+    def _image_is_ours(cls, v):
+        return None if v in (None, "") else require_our_image_url(v)
 
     @model_validator(mode="after")
     def _require_something(self) -> "MessageIn":

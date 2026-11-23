@@ -25,12 +25,12 @@ const STATUS_TONE = {
   locked: "bg-red-100 text-red-700",
 };
 
-// Device-local preferences — Qyka has no per-user prefs endpoint yet, so
-// these persist to localStorage (standard for notification / appearance
-// settings, which are per-device anyway).
+// Device-local preference (appearance is per-device by nature). Notification
+// toggles are NOT stored here - they live on the backend (see
+// NOTIF_KEYS / user.notification_preferences below), so they follow the
+// account to every device and the server actually respects them.
 const PREFS_KEY = "qyka_prefs";
 const DEFAULT_PREFS = {
-  notif: { orders: true, messages: true, payments: true, promos: false },
   reduceMotion: false,
 };
 type Prefs = typeof DEFAULT_PREFS;
@@ -39,11 +39,7 @@ function loadPrefs(): Prefs {
   if (typeof window === "undefined") return DEFAULT_PREFS;
   try {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
-    return {
-      ...DEFAULT_PREFS,
-      ...raw,
-      notif: { ...DEFAULT_PREFS.notif, ...(raw.notif || {}) },
-    };
+    return { ...DEFAULT_PREFS, reduceMotion: !!raw.reduceMotion };
   } catch {
     return DEFAULT_PREFS;
   }
@@ -55,6 +51,16 @@ function applyPrefs(p: Prefs) {
 }
 
 const Toggle = SwitchRow;
+
+// The four Settings toggles -> the backend's notification categories
+// (backend app/notifications/policy.py). All on unless the user turned one off.
+const NOTIF_KEYS = {
+  orders: "order_updates",
+  messages: "agent_messages",
+  payments: "payment_reminders",
+  promos: "offers",
+} as const;
+type NotifToggle = keyof typeof NOTIF_KEYS;
 
 // `extra` is an optional slot for a persona-specific card (e.g. Admin's own
 // system-status card) rendered after Account, in the same column - keeps
@@ -93,19 +99,34 @@ function Settings({ user, onUserUpdated, onLogout, extra, roleSwitch }: any) {
     setPrefs(p);
     applyPrefs(p);
   }, []);
-  function updatePrefs(
-    patch: Partial<Omit<Prefs, "notif">> & { notif?: Partial<Prefs["notif"]> }
-  ) {
+  function updatePrefs(patch: Partial<Prefs>) {
     setPrefs((cur) => {
-      const next: Prefs = {
-        ...cur,
-        ...patch,
-        notif: { ...cur.notif, ...(patch.notif || {}) },
-      };
-      localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+      const next: Prefs = { ...cur, ...patch };
+      try {
+        localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+      } catch {}
       applyPrefs(next);
       return next;
     });
+  }
+
+  // Notification toggles: read from the account, saved straight to the
+  // backend. Optimistic - the switch flips at once and flips back if saving fails.
+  const notifPrefs = user.notification_preferences || {};
+  const notifOn = (k: NotifToggle) => notifPrefs[NOTIF_KEYS[k]] !== false;
+  const [notifError, setNotifError] = useState("");
+  async function setNotif(k: NotifToggle, value: boolean) {
+    setNotifError("");
+    const field = NOTIF_KEYS[k];
+    const previous = notifPrefs;
+    onUserUpdated({ ...user, notification_preferences: { ...previous, [field]: value } });
+    try {
+      const saved = await api.updateNotificationPreferences({ [field]: value });
+      onUserUpdated({ ...user, notification_preferences: saved });
+    } catch (e: any) {
+      onUserUpdated({ ...user, notification_preferences: previous });
+      setNotifError("Couldn't save that setting. Check your connection and try again.");
+    }
   }
 
   const [applications, setApplications] = useState<any>(null); // null = loading
@@ -279,33 +300,38 @@ function Settings({ user, onUserUpdated, onLogout, extra, roleSwitch }: any) {
           )}
 
           <Card className={hide("notifications")}>
-            <SectionHeader icon="chat" title="Notifications" subtitle="How Qyka reaches you on this device." className="mb-2" />
+            <SectionHeader icon="chat" title="Notifications" subtitle="How Qyka reaches you, on every device you use." className="mb-2" />
             <div className="divide-y divide-dashed divide-line-strong">
               <Toggle
                 label="Order updates"
                 hint="Agent assigned, shopping started, out for delivery"
-                checked={prefs.notif.orders}
-                onChange={(v) => updatePrefs({ notif: { orders: v } })}
+                checked={notifOn("orders")}
+                onChange={(v) => setNotif("orders", v)}
               />
               <Toggle
                 label="Agent messages"
                 hint="Replies in the order chat"
-                checked={prefs.notif.messages}
-                onChange={(v) => updatePrefs({ notif: { messages: v } })}
+                checked={notifOn("messages")}
+                onChange={(v) => setNotif("messages", v)}
               />
               <Toggle
                 label="Payment reminders"
                 hint="Deposits owed and balances due"
-                checked={prefs.notif.payments}
-                onChange={(v) => updatePrefs({ notif: { payments: v } })}
+                checked={notifOn("payments")}
+                onChange={(v) => setNotif("payments", v)}
               />
               <Toggle
                 label="Offers & updates"
                 hint="New markets, occasional product news"
-                checked={prefs.notif.promos}
-                onChange={(v) => updatePrefs({ notif: { promos: v } })}
+                checked={notifOn("promos")}
+                onChange={(v) => setNotif("promos", v)}
               />
             </div>
+            {notifError && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{notifError}</p>}
+            <p className="mt-3 text-xs text-faint">
+              &ldquo;Payment due&rdquo; and &ldquo;out for delivery&rdquo; always reach you — in the app and by
+              email or SMS — even with these off, so you never miss paying for or receiving an order.
+            </p>
           </Card>
 
           <Card className={hide("appearance")}>

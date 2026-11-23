@@ -22,6 +22,26 @@ def _no_otp_resend_cooldown(monkeypatch):
     monkeypatch.setattr(settings, "email_api_key", "")
 
 
+@pytest.fixture(autouse=True)
+def _market_clock_mid_morning(monkeypatch):
+    """Orders are refused outside a market's opening hours (markets/hours.py),
+    so pin the clock to 10:00 Lagos (09:00 UTC) today - otherwise the whole
+    suite would fail whenever it happened to run at night. Tests of the hours
+    rule itself re-pin it with set_clock_utc."""
+    from datetime import datetime, timezone
+
+    pinned = datetime.now(timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0)
+    monkeypatch.setattr("app.markets.hours.utc_now", lambda: pinned)
+
+
+def set_clock_utc(monkeypatch, hour: int, minute: int = 0):
+    """Pin the market-hours clock to HH:MM UTC today (Lagos is UTC+1)."""
+    from datetime import datetime, timezone
+
+    pinned = datetime.now(timezone.utc).replace(hour=hour, minute=minute, second=0, microsecond=0)
+    monkeypatch.setattr("app.markets.hours.utc_now", lambda: pinned)
+
+
 @pytest_asyncio.fixture
 async def _engine():
     engine = create_async_engine(
@@ -63,3 +83,21 @@ async def client(_engine, db_session_factory):
 async def seed_float():
     """Placeholder hook; float is seeded inline in tests that need it."""
     return None
+
+
+async def pay_deposit(client, headers, order_id):
+    """Every order now takes a deposit before an agent can be accepted or
+    shopping can start (orders.fees.required_deposit). Fund the customer's
+    wallet with exactly the deposit and pay it, the way a real customer
+    would - for tests whose subject is something later in the flow."""
+    from decimal import Decimal
+
+    r = await client.get(f"/orders/{order_id}", headers=headers)
+    assert r.status_code == 200, r.text
+    deposit = Decimal(r.json()["deposit_amount"])
+    if deposit <= 0 or r.json().get("deposit_paid_at"):
+        return
+    r = await client.post("/wallet/fund", headers=headers, json={"amount": str(deposit)})
+    assert r.status_code == 200, r.text
+    r = await client.post(f"/payments/orders/{order_id}/deposit/pay-from-wallet", headers=headers)
+    assert r.status_code == 200, r.text

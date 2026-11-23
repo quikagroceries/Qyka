@@ -100,6 +100,11 @@ class Settings(BaseSettings):
     # required primary ID (see auth/service.py::get_or_create_user).
     google_client_id: str = ""
 
+    # Cloudinary cloud the browser uploads images to (same as the frontend's
+    # NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME). Image links users send must be on
+    # this account - see core/media.py.
+    cloudinary_cloud_name: str = "y0vuqbu5"
+
     # LiveKit (voice/video call prototype) — get these from your LiveKit
     # Cloud project. Token generation is local (HMAC-signed JWT); nothing
     # calls out to LiveKit until the frontend connects with the token.

@@ -79,7 +79,7 @@ async def test_transfer_becomes_the_price(client, db_session_factory, monkeypatc
 
     # Agent pays a vendor 3000 for the pepper. The item price BECOMES 3000.
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[0]["id"], "price": "3000.00"}],
     })
     assert r.status_code == 200, r.text
@@ -109,7 +109,7 @@ async def test_authorization_cap_equals_goods_estimate(client, db_session_factor
     # estimated_value is the COMBINED figure (goods + delivery + fee) - and
     # is deliberately larger than the cap, confirming the cap isn't keyed
     # off it.
-    assert Decimal(order["estimated_value"]) == Decimal("7500.00") + Decimal("3600.00") + Decimal("2000.00")
+    assert Decimal(order["estimated_value"]) == Decimal("7500.00") + Decimal("1500.00") + Decimal("562.50")
 
     print("Spending authorization cap correctly equals the goods estimate only.")
 
@@ -122,7 +122,7 @@ async def test_authorization_cap_blocks_overspend(client, db_session_factory, mo
 
     # Try to pay more than the cap in one go
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[0]["id"], "price": "20000.00"}],
     })
     assert r.status_code == 402, "over-cap transfer must be rejected"
@@ -145,13 +145,13 @@ async def test_customer_raises_cap_then_transfer_allowed(client, db_session_fact
 
     # spend most of the cap
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[0]["id"], "price": "3000.00"}]})
     assert r.status_code == 200, r.text
 
     # next transfer would exceed the 5000 cap (3000 + 3000 = 6000)
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[1]["id"], "price": "3000.00"}]})
     assert r.status_code == 402
 
@@ -163,7 +163,7 @@ async def test_customer_raises_cap_then_transfer_allowed(client, db_session_fact
 
     # now the transfer goes through
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[1]["id"], "price": "3000.00"}]})
     assert r.status_code == 200, r.text
 
@@ -180,7 +180,7 @@ async def test_per_transfer_safety_cap(client, db_session_factory, monkeypatch):
     await client.post(f"/jit/orders/{oid}/authorization/raise", headers=admin_h,
                       json={"extra": "1000000.00"})
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[0]["id"], "price": "150000.00"}]})
     assert r.status_code == 400, "over the per-transfer safety cap"
 
@@ -196,7 +196,7 @@ async def test_emtl_debits_pool_on_large_transfer(client, db_session_factory, mo
 
     # 15000 transfer -> pool drops by 15000 + 50 EMTL
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[0]["id"], "price": "15000.00"}]})
     assert r.status_code == 200, r.text
 
@@ -214,9 +214,9 @@ async def test_purchase_photos_exposed_to_participants_only(client, db_session_f
     oid, items = await _order_shopping(client, admin_h, agent_h, market_id, listed="5000.00")
 
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[0]["id"], "price": "3000.00"}],
-        "photo_ref": "https://cdn.example.com/receipts/stall1.jpg"})
+        "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/stall1.jpg"})
     assert r.status_code == 200, r.text
 
     # Customer sees the receipt, with its photo.
@@ -225,13 +225,13 @@ async def test_purchase_photos_exposed_to_participants_only(client, db_session_f
     purchases = r.json()
     assert len(purchases) == 1
     assert purchases[0]["amount"] == "3000.00"
-    assert purchases[0]["photo_ref"] == "https://cdn.example.com/receipts/stall1.jpg"
+    assert purchases[0]["photo_ref"] == "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/stall1.jpg"
     assert purchases[0]["status"] == "success"
 
     # The assigned agent sees the same thing.
     r = await client.get(f"/jit/orders/{oid}/purchases", headers=agent_h)
     assert r.status_code == 200, r.text
-    assert r.json()[0]["photo_ref"] == "https://cdn.example.com/receipts/stall1.jpg"
+    assert r.json()[0]["photo_ref"] == "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/stall1.jpg"
 
     # A stranger cannot.
     stranger_token = await _login(client, "+2348099998888")
@@ -259,13 +259,13 @@ async def test_items_keep_their_own_typed_price_not_an_even_split(client, db_ses
     # stall) with three DIFFERENT agent-typed prices summing to 4000 - an
     # even split would wrongly give each item 1333.33.
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [
             {"item_id": items[0]["id"], "price": "2000.00"},
             {"item_id": items[1]["id"], "price": "1500.00"},
             {"item_id": items[2]["id"], "price": "500.00"},
         ],
-        "photo_ref": "https://cdn.example.com/receipts/stall-batch.jpg"})
+        "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/stall-batch.jpg"})
     assert r.status_code == 200, r.text
     assert Decimal(r.json()["amount"]) == Decimal("4000.00"), "transfer amount is the SUM of the typed prices"
     transfer_id = r.json()["id"]
@@ -279,7 +279,7 @@ async def test_items_keep_their_own_typed_price_not_an_even_split(client, db_ses
         assert it["vendor_transfer_id"] == transfer_id, "all three items should link to the one shared transfer"
 
     r = await client.get(f"/jit/orders/{oid}/purchases", headers=admin_h)
-    assert r.json()[0]["photo_ref"] == "https://cdn.example.com/receipts/stall-batch.jpg"
+    assert r.json()[0]["photo_ref"] == "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/stall-batch.jpg"
 
     print("Items keep their own typed price (no even-split fabrication) and all link to the shared transfer.")
 
@@ -293,7 +293,7 @@ async def test_pay_vendor_rejects_item_not_on_order(client, db_session_factory, 
     oid, items = await _order_shopping(client, admin_h, agent_h, market_id, listed="5000.00")
 
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": str(uuid.uuid4()), "price": "1000.00"}]})
     assert r.status_code == 400, "an item id that isn't on the order must be rejected"
 
@@ -334,10 +334,10 @@ async def test_finish_shopping_blocked_until_photo_attached(client, db_session_f
 
     r = await client.post(
         f"/jit/orders/{oid}/purchases/{transfer_id}/photo", headers=agent_h,
-        json={"photo_ref": "https://cdn.example.com/receipts/late.jpg"},
+        json={"photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/late.jpg"},
     )
     assert r.status_code == 200, r.text
-    assert r.json()["photo_ref"] == "https://cdn.example.com/receipts/late.jpg"
+    assert r.json()["photo_ref"] == "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/late.jpg"
 
     r = await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
     assert r.status_code == 200, r.text
@@ -353,7 +353,7 @@ async def test_finish_shopping_blocked_reports_every_missing_purchase(client, db
     oid, items = await _order_shopping(client, admin_h, agent_h, market_id, listed="5000.00")
 
     r = await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://example.com/receipt.jpg",
+        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
         "items": [{"item_id": items[0]["id"], "price": "1500.00"}]})
     assert r.status_code == 200, r.text
 
@@ -380,6 +380,6 @@ async def test_only_assigned_agent_can_attach_photo(client, db_session_factory, 
     stranger_h = {"Authorization": f"Bearer {stranger_token}"}
     r = await client.post(
         f"/jit/orders/{oid}/purchases/{transfer_id}/photo", headers=stranger_h,
-        json={"photo_ref": "https://cdn.example.com/receipts/late.jpg"},
+        json={"photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/late.jpg"},
     )
     assert r.status_code == 403

@@ -1,11 +1,12 @@
 import uuid
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
 from app.core.database import get_db
+from app.core.etag import json_with_etag
 from app.core.enums import UserRole
 from app.core.security import get_current_user, get_customer_user, require_role
 from app.orders import service
@@ -65,10 +66,14 @@ async def my_orders_as_customer(
 @router.get("/{order_id}", response_model=OrderOut)
 async def get_order(
     order_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
-) -> OrderOut:
-    return await service.get_order(db, order_id)
+) -> Response:
+    """Polled by order tracking and the agent's Shopping screen. An unchanged
+    order goes back as an empty 304 (core/etag.py) instead of the full body."""
+    order = await service.load_order_for_viewer(db, order_id, user)
+    return json_with_etag(request, OrderOut.model_validate(order))
 
 
 @router.put("/{order_id}/draft", response_model=OrderOut)
@@ -118,7 +123,9 @@ async def proposed_agent(
 ) -> ProposedAgentOut | None:
     """Who the system is currently proposing for this order, if anyone -
     enough for the customer to recognize/accept them. None once there's no
-    pending proposal (already accepted, or nobody available)."""
+    pending proposal (already accepted, or nobody available). The order's
+    customer (or an admin) only - it's their decision screen."""
+    await service.load_order_for_viewer(db, order_id, customer, allow_agent=False)
     return await service.get_proposed_agent(db, order_id)
 
 
@@ -203,7 +210,9 @@ async def bargained_list(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> BargainedListOut:
-    """What the customer reviews before paying: real bargained prices."""
+    """What the customer reviews before paying: real bargained prices.
+    The order's customer, its agent, or an admin only."""
+    await service.load_order_for_viewer(db, order_id, user)
     data = await service.get_bargained_list(db, order_id)
     return BargainedListOut(**data)
 
