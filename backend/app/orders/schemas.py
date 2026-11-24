@@ -106,6 +106,7 @@ class OrderOut(BaseModel):
     company_share: Decimal
     agent_share: Decimal
     delivery_fee: Decimal
+    delivery_quote: Decimal
     emtl_total: Decimal
     transfer_fees_total: Decimal
     grand_total: Decimal
@@ -118,6 +119,12 @@ class OrderOut(BaseModel):
     agent_assigned_at: datetime | None
     paid_at: datetime | None
     packed_at: datetime | None
+    hub_id: uuid.UUID | None
+    dropped_at_hub_at: datetime | None
+    hub_received_at: datetime | None
+    rider_id: uuid.UUID | None
+    rider_claimed_at: datetime | None
+    rider_delivered_at: datetime | None
     dispatched_at: datetime | None
     delivered_at: datetime | None
     courier_reference: str | None

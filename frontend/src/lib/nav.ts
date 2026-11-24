@@ -31,15 +31,33 @@ export const AGENT_NAV = [
   { key: "settings", label: "Settings", icon: "settings", href: "/agent/settings" },
 ];
 
+export const SHOPKEEPER_NAV = [
+  { key: "hub", label: "Hub", icon: "store", href: "/shopkeeper" },
+  { key: "earnings", label: "Earnings", icon: "wallet", href: "/shopkeeper/earnings" },
+  { key: "settings", label: "Settings", icon: "settings", href: "/shopkeeper/settings" },
+];
+
+export const RIDER_NAV = [
+  { key: "jobs", label: "Jobs", icon: "bike", href: "/rider" },
+  { key: "earnings", label: "Earnings", icon: "wallet", href: "/rider/earnings" },
+  { key: "settings", label: "Settings", icon: "settings", href: "/rider/settings" },
+];
+
 export const ADMIN_NAV = [
   { key: "dashboard", label: "Dashboard", icon: "chart", href: "/admin" },
   { key: "orders", label: "Orders", icon: "basket", href: "/admin/orders" },
   { key: "markets", label: "Markets", icon: "store", href: "/admin/markets" },
   { key: "agents", label: "Agents", icon: "user", href: "/admin/agents" },
   { key: "riders", label: "Riders", icon: "bike", href: "/admin/riders" },
+  { key: "hubs", label: "Hubs", icon: "pin", href: "/admin/hubs" },
   { key: "users", label: "Users", icon: "flag", href: "/admin/users" },
   { key: "float", label: "Float", icon: "wallet", href: "/admin/float" },
+  { key: "pay", label: "Delivery pay", icon: "send", href: "/admin/pay", ownerOnly: true },
+  { key: "company", label: "Company", icon: "chart", href: "/admin/company", ownerOnly: true },
   { key: "analytics", label: "Analytics", icon: "trending", href: "/admin/analytics" },
-  { key: "admins", label: "Admins", icon: "shield", href: "/admin/admins" },
+  { key: "admins", label: "Admins", icon: "shield", href: "/admin/admins", ownerOnly: true },
+  { key: "content", label: "Website text", icon: "chat", href: "/admin/content", ownerOnly: true },
+  { key: "audit", label: "Audit log", icon: "clock", href: "/admin/audit", ownerOnly: true },
+  { key: "platform", label: "Platform", icon: "star", href: "/admin/platform", ownerOnly: true },
   { key: "settings", label: "Settings", icon: "settings", href: "/admin/settings" },
 ];

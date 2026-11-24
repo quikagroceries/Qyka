@@ -22,6 +22,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.auth.models import OtpCode, User
 from app.core.config import settings
+from app.platform_settings import service as platform
 from app.core.enums import UserRole, UserStatus
 from app.core.phone import normalize_phone
 
@@ -63,7 +64,7 @@ async def create_otp(db: AsyncSession, identifier: str, channel: str) -> str:
         )
     )
     recent_count = result.scalar_one()
-    if recent_count >= settings.otp_max_requests_per_hour:
+    if recent_count >= await platform.get(db, "otp_max_requests_per_hour"):
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             "Too many codes requested for this identifier. Try again later.",
@@ -80,10 +81,11 @@ async def create_otp(db: AsyncSession, identifier: str, channel: str) -> str:
             .limit(1)
         )
     ).scalar_one_or_none()
-    if latest is not None and settings.otp_resend_cooldown_seconds > 0:
+    cooldown = await platform.get(db, "otp_resend_cooldown_seconds")
+    if latest is not None and cooldown > 0:
         if latest.tzinfo is None:
             latest = latest.replace(tzinfo=timezone.utc)
-        wait = settings.otp_resend_cooldown_seconds - (datetime.now(timezone.utc) - latest).total_seconds()
+        wait = cooldown - (datetime.now(timezone.utc) - latest).total_seconds()
         if wait > 0:
             raise HTTPException(
                 status.HTTP_429_TOO_MANY_REQUESTS,
@@ -93,7 +95,7 @@ async def create_otp(db: AsyncSession, identifier: str, channel: str) -> str:
 
     code = _generate_code()
     expires = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.otp_expire_minutes
+        minutes=await platform.get(db, "otp_expire_minutes")
     )
     db.add(OtpCode(identifier=identifier, channel=channel, code=code, expires_at=expires))
     await db.flush()
@@ -123,7 +125,8 @@ async def verify_otp(db: AsyncSession, identifier: str, code: str) -> bool:
     otp = result.scalar_one_or_none()
     if otp is None:
         return False
-    if otp.attempts >= settings.otp_max_verify_attempts:
+    max_attempts = await platform.get(db, "otp_max_verify_attempts")
+    if otp.attempts >= max_attempts:
         otp.consumed = True
         await db.commit()
         return False
@@ -135,7 +138,7 @@ async def verify_otp(db: AsyncSession, identifier: str, code: str) -> bool:
         return False
     if otp.code != code:
         otp.attempts += 1
-        if otp.attempts >= settings.otp_max_verify_attempts:
+        if otp.attempts >= max_attempts:
             otp.consumed = True
         await db.commit()
         return False
@@ -209,7 +212,7 @@ async def login_or_create_with_google(db: AsyncSession, claims: dict) -> User:
         role=UserRole.CUSTOMER,
         is_email_verified=True,
         status=UserStatus.ACTIVE,
-        basket_cap_kobo=settings.default_basket_cap_kobo,
+        basket_cap_kobo=await platform.default_basket_cap_kobo(db),
         google_id=google_id,
     )
     db.add(user)
@@ -237,7 +240,7 @@ async def get_or_create_user(
             is_phone_verified=id_type == "phone",
             is_email_verified=id_type == "email",
             status=UserStatus.ACTIVE,
-            basket_cap_kobo=settings.default_basket_cap_kobo,
+            basket_cap_kobo=await platform.default_basket_cap_kobo(db),
         )
         db.add(user)
         await db.flush()

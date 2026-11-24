@@ -9,44 +9,23 @@ from app.core.enums import UserRole
 from app.core.media import is_our_cloudinary_url
 from app.core.security import get_current_user, require_role
 from app.delivery import service
-from app.delivery.schemas import PayoutOut
+from app.delivery.schemas import DropAtHubIn, PayoutOut
 from app.orders.schemas import OrderOut
 
 router = APIRouter()
 
 
-@router.post("/orders/{order_id}/pack", response_model=OrderOut)
-async def pack(
+@router.post("/orders/{order_id}/drop-at-hub", response_model=OrderOut)
+async def drop_at_hub(
     order_id: uuid.UUID,
+    body: DropAtHubIn | None = None,
     db: AsyncSession = Depends(get_db),
     agent: User = Depends(require_role(UserRole.AGENT)),
 ) -> OrderOut:
-    """Agent packs the paid order, ready for courier pickup."""
-    return await service.mark_packed(db, order_id=order_id, agent_id=agent.id)
-
-
-@router.post("/orders/{order_id}/dispatch-courier", response_model=OrderOut)
-async def dispatch_courier(
-    order_id: uuid.UUID,
-    body: dict = {},
-    db: AsyncSession = Depends(get_db),
-    actor: User = Depends(require_role(UserRole.AGENT, UserRole.ADMIN)),
-) -> OrderOut:
-    """Hand the packed order to the third-party courier.
-
-    Only reachable once the order is PACKED, which requires PAID — so a
-    courier is never dispatched for an unpaid order. Callable by the
-    assigned agent (the normal path - one tap after packing) or an admin
-    (oversight override); service.dispatch_to_courier enforces the agent
-    ownership check.
-
-    V1 records the handoff, generating a tracking reference if the caller
-    doesn't supply one. The Kwik/Sendbox booking call slots in here: quote at
-    order creation, book at this point, and pass its reference through
-    instead of the generated placeholder.
-    """
-    return await service.dispatch_to_courier(
-        db, order_id=order_id, actor=actor, courier_reference=body.get("courier_reference"),
+    """Agent drops the paid order's goods at the market hub. `hub_id` is
+    optional when the market has a single hub."""
+    return await service.drop_at_hub(
+        db, order_id=order_id, agent_id=agent.id, hub_id=body.hub_id if body else None
     )
 
 

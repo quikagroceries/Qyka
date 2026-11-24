@@ -13,8 +13,9 @@ import EmptyState from "@/components/ui/EmptyState";
 import Icon from "@/components/ui/Icon";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import Input from "@/components/ui/Input";
+import OrderInterventions from "@/components/admin/OrderInterventions";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { formatAge, isStuckOrder } from "@/lib/adminUtils";
+import { formatAge } from "@/lib/adminUtils";
 import { marketTone, TONE_COVER } from "@/lib/vendorVisuals";
 import { coverImageForMarket } from "@/lib/markets";
 import { summarizeOrderStatus } from "@/lib/orderStatus";
@@ -27,7 +28,7 @@ const POLL_MS = 15000;
 // already out with the goods (DELIVERED) is past the point of a clean cancel.
 const ADMIN_CANCELLABLE = new Set([
   "draft", "proposed", "agent_assigned", "shopping",
-  "awaiting_payment", "paid", "packed", "out_for_delivery",
+  "awaiting_payment", "paid", "dropped_at_hub", "received_by_hub", "ready_for_pickup", "packed", "out_for_delivery",
 ]);
 
 export function OrderDetailPanel({ orderId, markets, agents, onBack, onAssigned }: any) {
@@ -35,6 +36,12 @@ export function OrderDetailPanel({ orderId, markets, agents, onBack, onAssigned 
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [pickedAgent, setPickedAgent] = useState("");
+  // Who the hub and rider actually are (the order only carries ids).
+  const [hubs, setHubs] = useState<any[]>([]);
+  const [riders, setRiders] = useState<any[]>([]);
+  const [releasing, setReleasing] = useState(false);
+  const [releaseBusy, setReleaseBusy] = useState(false);
+  const [releaseError, setReleaseError] = useState("");
 
   const [cancelling, setCancelling] = useState(false);
   const [refundAmount, setRefundAmount] = useState("");
@@ -55,8 +62,27 @@ export function OrderDetailPanel({ orderId, markets, agents, onBack, onAssigned 
       setOrder(o);
       const suggestion = o.paid_at ? o.grand_total : o.deposit_paid_at ? o.deposit_amount : "0.00";
       setRefundAmount((prev) => prev || String(suggestion));
+      if (o.hub_id || o.rider_id) {
+        // Names only - the order is already on screen, so a failure here is not worth an error.
+        api.listHubs().then(setHubs).catch(() => {});
+        api.listRiders().then(setRiders).catch(() => {});
+      }
     } catch (e) {
       setError("Could not load this order. (" + e.message + ")");
+    }
+  }
+
+  async function handleReleaseRider() {
+    setReleaseBusy(true); setReleaseError("");
+    try {
+      await api.adminReleaseRider(orderId);
+      setReleasing(false);
+      await refresh();
+      onAssigned?.();
+    } catch (e) {
+      setReleaseError("Could not release the rider: " + e.message);
+    } finally {
+      setReleaseBusy(false);
     }
   }
 
@@ -110,6 +136,8 @@ export function OrderDetailPanel({ orderId, markets, agents, onBack, onAssigned 
   }
 
   const market = markets.find((m) => m.id === order?.market_id);
+  const hub = hubs.find((h) => h.id === order?.hub_id);
+  const rider = riders.find((r) => r.user_id && r.user_id === order?.rider_id);
   const marketAgents = agents.filter((a) => a.assigned_market_id === order?.market_id);
 
   if (!order) {
@@ -230,6 +258,61 @@ export function OrderDetailPanel({ orderId, markets, agents, onBack, onAssigned 
             </Card>
           )}
 
+          {order.hub_id && (
+            <Card className={releasing ? "border-2 border-amber-400" : ""}>
+              <p className="mb-2 font-bold text-ink">Hub &amp; rider</p>
+              <div className="space-y-1 text-sm text-ink/80">
+                <div className="flex justify-between gap-3"><span>Hub</span><span className="text-right font-semibold">{hub?.name || order.hub_id.slice(0, 8) + "…"}</span></div>
+                {hub?.shopkeeper_phone && (
+                  <div className="flex justify-between gap-3">
+                    <span>Shopkeeper</span>
+                    <a href={`tel:${hub.shopkeeper_phone}`} className="font-semibold text-brand-orange-dark hover:underline">{hub.shopkeeper_name || hub.shopkeeper_phone}</a>
+                  </div>
+                )}
+                {order.dropped_at_hub_at && <div className="flex justify-between gap-3"><span>Dropped</span><span className="font-semibold">{new Date(order.dropped_at_hub_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>}
+                {order.hub_received_at && <div className="flex justify-between gap-3"><span>Checked in</span><span className="font-semibold">{new Date(order.hub_received_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>}
+                {order.packed_at && <div className="flex justify-between gap-3"><span>Ready</span><span className="font-semibold">{new Date(order.packed_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>}
+                <div className="flex justify-between gap-3">
+                  <span>Rider</span>
+                  {order.rider_id ? (
+                    rider?.phone ? (
+                      <a href={`tel:${rider.phone}`} className="font-semibold text-brand-orange-dark hover:underline">{rider.full_name}</a>
+                    ) : (
+                      <span className="font-semibold">{rider?.full_name || order.rider_id.slice(0, 8) + "…"}</span>
+                    )
+                  ) : (
+                    <span className="font-semibold text-muted">{order.status === "ready_for_pickup" ? "Not claimed yet" : "—"}</span>
+                  )}
+                </div>
+                {order.rider_claimed_at && <div className="flex justify-between gap-3"><span>Claimed</span><span className="font-semibold">{new Date(order.rider_claimed_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>}
+              </div>
+
+              {/* A rider who claimed it but never turned up: put it back for the others. */}
+              {order.status === "ready_for_pickup" && order.rider_id && (
+                releasing ? (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm text-muted">This takes the job off the rider and puts it back in the pool. Their pickup code stops working.</p>
+                    {releaseError && <p className="text-sm text-red-600">{releaseError}</p>}
+                    <div className="flex gap-2">
+                      <Button variant="neutral" className="flex-1 text-sm" onClick={() => { setReleasing(false); setReleaseError(""); }} disabled={releaseBusy}>Back</Button>
+                      <Button className="flex-1 text-sm" onClick={handleReleaseRider} busy={releaseBusy}>Release rider</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button variant="neutral" onClick={() => setReleasing(true)} fullWidth className="mt-3 text-sm">
+                    Rider not showing up? Release
+                  </Button>
+                )
+              )}
+            </Card>
+          )}
+
+          <OrderInterventions
+            order={order}
+            agents={agents}
+            onDone={() => { refresh(); onAssigned?.(); }}
+          />
+
           {order.status === "shopping" && (
             <Card>
               <p className="mb-2 font-bold text-ink">Spending cap</p>
@@ -297,6 +380,9 @@ export function OrderDetailPanel({ orderId, markets, agents, onBack, onAssigned 
               {order.grand_total > 0 && (
                 <div className="flex justify-between"><span>Grand total</span><span className="font-semibold">₦{order.grand_total}</span></div>
               )}
+              {order.hub_id && (
+                <div className="flex justify-between"><span>Hub</span><span className="font-semibold">{hub?.name || order.hub_id.slice(0, 8) + "…"}</span></div>
+              )}
               {order.courier_reference && (
                 <div className="flex justify-between"><span>Courier ref</span><span className="font-semibold">{order.courier_reference}</span></div>
               )}
@@ -338,11 +424,16 @@ function AdminOrders() {
 
   const all: any[] = data?.orders ?? [];
   const unassigned = all.filter((o) => !o.agent_id).length;
-  const stuckCount = now != null ? all.filter((o) => isStuckOrder(o, now)).length : 0;
+  const stuckCount = all.filter((o) => o.stuck).length;
   const shoppingCount = all.filter((o) => o.status === "shopping").length;
+  const HUB_STATUSES = ["dropped_at_hub", "received_by_hub", "ready_for_pickup"];
+  const atHub = all.filter((o) => HUB_STATUSES.includes(o.status)).length;
+  const needsRider = all.filter((o) => o.status === "ready_for_pickup" && !o.rider_id).length;
   const visible = all.filter((o) => {
     if (filter === "unassigned" && o.agent_id) return false;
-    if (filter === "stuck" && !(now != null && isStuckOrder(o, now))) return false;
+    if (filter === "at_hub" && !HUB_STATUSES.includes(o.status)) return false;
+    if (filter === "needs_rider" && !(o.status === "ready_for_pickup" && !o.rider_id)) return false;
+    if (filter === "stuck" && !o.stuck) return false;
     if (!search) return true;
     return [o.status, marketName(o.market_id), o.agent_id, o.customer_id, o.id].some((v) =>
       String(v || "").toLowerCase().includes(search)
@@ -352,10 +443,11 @@ function AdminOrders() {
   return (
     <div>
       <AdminPageHeader icon="basket" section="Operations" title="Orders" description="Every order still in flight — not yet delivered, closed, or cancelled.">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <StatTile label="In flight" value={all.length} />
           <StatTile label="Being shopped" value={shoppingCount} />
-          <StatTile label="Unassigned" value={unassigned} />
+          <StatTile label="At a hub" value={atHub} />
+          <StatTile label="Needs a rider" value={needsRider} />
           <StatTile label="Stuck" value={stuckCount} />
         </div>
       </AdminPageHeader>
@@ -365,6 +457,8 @@ function AdminOrders() {
           options={[
             { key: "all", label: `All (${all.length})` },
             { key: "unassigned", label: `Unassigned (${unassigned})` },
+            { key: "at_hub", label: `At a hub (${atHub})` },
+            { key: "needs_rider", label: `Needs a rider (${needsRider})` },
             { key: "stuck", label: `Stuck (${stuckCount})` },
           ]}
           value={filter}
@@ -395,7 +489,7 @@ function AdminOrders() {
             </thead>
             <tbody>
               {visible.map((o) => {
-                const stuck = now != null && isStuckOrder(o, now);
+                const stuck = !!o.stuck;
                 return (
                   <tr
                     key={o.id}

@@ -4,6 +4,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from app.core.enums import AdminLevel
 from sqlalchemy import select
 from tests.conftest import pay_deposit
 
@@ -35,6 +36,7 @@ async def test_order_auto_assigns_available_agent(client, db_session_factory):
         agent_u.role = UserRole.AGENT
         cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
         cust.role = UserRole.ADMIN
+        cust.admin_level = AdminLevel.OWNER
         market = Market(name="Test Market", city="PH", state="Rivers")
         s.add(market)
         await s.flush()
@@ -83,6 +85,7 @@ async def test_no_agent_leaves_order_unassigned(client, db_session_factory):
     async with db_session_factory() as s:
         cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
         cust.role = UserRole.ADMIN
+        cust.admin_level = AdminLevel.OWNER
         await s.commit()
     admin_h = {"Authorization": f"Bearer {cust_token}"}
 
@@ -116,6 +119,7 @@ async def test_customer_notified_when_shopping_done(client, db_session_factory, 
         agent_u.role = UserRole.AGENT
         cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
         cust.role = UserRole.ADMIN
+        cust.admin_level = AdminLevel.OWNER
         market = Market(name="M", city="PH", state="Rivers")
         s.add(market); await s.flush()
         s.add(Agent(user_id=agent_u.id, assigned_market_id=market.id, is_available=True))
@@ -168,6 +172,7 @@ async def test_agent_freed_after_shopping(client, db_session_factory, monkeypatc
         agent_u.role = UserRole.AGENT
         cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
         cust.role = UserRole.ADMIN
+        cust.admin_level = AdminLevel.OWNER
         market = Market(name="M", city="PH", state="Rivers")
         s.add(market); await s.flush()
         s.add(Agent(user_id=agent_u.id, assigned_market_id=market.id, is_available=True))
@@ -220,6 +225,7 @@ async def test_admin_float_and_inflight_views(client, db_session_factory):
     async with db_session_factory() as s:
         cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
         cust.role = UserRole.ADMIN
+        cust.admin_level = AdminLevel.OWNER
         await float_service.record_movement(
             s, direction=LedgerDirection.CREDIT, amount=Decimal("100000"), note="seed")
         await s.commit()
@@ -253,6 +259,7 @@ async def test_admin_float_recent_movements_scoped_to_requested_market(client, d
     async with db_session_factory() as s:
         admin_u = (await s.execute(select(User).where(User.phone == admin_phone))).scalar_one()
         admin_u.role = UserRole.ADMIN
+        admin_u.admin_level = AdminLevel.OWNER
         await s.commit()
     admin_h = {"Authorization": f"Bearer {admin_token}"}
     m1, m2 = uuid.uuid4(), uuid.uuid4()

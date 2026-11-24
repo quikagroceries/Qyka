@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.core.enums import UserRole, UserStatus
+from app.core.enums import AdminLevel, UserRole, UserStatus
 from app.core.media import require_our_image_url
 
 OtpChannel = Literal["sms", "whatsapp", "voice", "email"]
@@ -135,6 +135,8 @@ class UserOut(BaseModel):
     # Admins only: still on a temporary password - the admin dashboard shows
     # nothing but the change-password form until this clears.
     must_change_password: bool = False
+    # Admins only: "owner" or "support" (see core.enums.AdminLevel).
+    admin_level: AdminLevel | None = None
     # False only for agent-only accounts (see auth.models.User) - the
     # frontend hides the shopping side and the mode switch until it's True.
     has_customer_side: bool = True

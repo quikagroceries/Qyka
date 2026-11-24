@@ -167,16 +167,42 @@ export const api = {
       method: "POST", body: { photo_ref: photoRef },
     }),
 
-  packOrder: (id) => request(`/delivery/orders/${id}/pack`, { method: "POST" }),
-  dispatchCourier: (id: string | number, courierReference?: string) =>
-    request(`/delivery/orders/${id}/dispatch-courier`, {
-      method: "POST",
-      body: courierReference ? { courier_reference: courierReference } : {},
-    }),
+  // Agent: drop a paid order's goods at a hub in its market. `hubId` is only
+  // needed when the market has more than one.
+  // Live fee rules (set by an owner) and whether new orders are open.
+  getPricing: () => request("/pricing"),
+  getPlatformStatus: () => request("/status"),
+  getHubsForMarket: (marketId: string) => request(`/hubs?market_id=${marketId}`),
+  dropAtHub: (id: string, hubId?: string) =>
+    request(`/delivery/orders/${id}/drop-at-hub`, { method: "POST", body: hubId ? { hub_id: hubId } : {} }),
   addPackingPhotos: (id, refs) =>
     request(`/delivery/orders/${id}/packing-photos`, { method: "POST", body: { refs } }),
   confirmDelivery: (id) =>
     request(`/delivery/orders/${id}/confirm-delivery`, { method: "POST" }),
+
+  // Hub (shopkeeper): check in what an agent dropped, mark it ready, and
+  // release it to the rider who shows their code. Item names only - the hub
+  // API never carries prices or the customer's address.
+  getMyHub: () => request("/hubs/me"),
+  getHubOrders: () => request("/hubs/orders"),
+  getHubOrder: (id: string) => request(`/hubs/orders/${id}`),
+  receiveHubOrder: (id: string, body: { received_item_ids?: string[]; note?: string; photos?: string[] }) =>
+    request(`/hubs/orders/${id}/receive`, { method: "POST", body }),
+  markHubOrderReady: (id: string) => request(`/hubs/orders/${id}/ready`, { method: "POST" }),
+  handoverHubOrder: (id: string, code: string) =>
+    request(`/hubs/orders/${id}/handover`, { method: "POST", body: { code } }),
+  getHubEarnings: () => request("/hubs/earnings"),
+
+  // Rider: claim a job from the pool, collect it from the hub with a code
+  // the shopkeeper enters, then confirm drop-off with the customer's PIN.
+  getRiderJobs: () => request("/riders/jobs"),
+  getMyRiderJobs: () => request("/riders/jobs/mine"),
+  claimRiderJob: (id: string) => request(`/riders/jobs/${id}/claim`, { method: "POST" }),
+  releaseRiderJob: (id: string) => request(`/riders/jobs/${id}/release`, { method: "POST" }),
+  deliverRiderJob: (id: string, code: string) =>
+    request(`/riders/jobs/${id}/deliver`, { method: "POST", body: { code } }),
+  getRiderEarnings: () => request("/riders/earnings"),
+  uploadHubPhoto: (file) => uploadToCloudinary(file),
 
   applyAsAgent: (body) => request("/agent-applications", { method: "POST", body }),
   getMyAgentApplications: () => request("/agent-applications/me"),
@@ -223,12 +249,39 @@ export const api = {
   getAnalytics: (days) =>
     request(`/admin/analytics${days ? `?days=${days}` : ""}`),
   listAdmins: () => request("/admin/admins"),
-  addAdmin: (body: { email: string; full_name?: string; temporary_password: string }) =>
+  setAdminLevel: (userId: string, level: "owner" | "support") =>
+    request(`/admin/admins/${userId}`, { method: "PATCH", body: { level } }),
+  getAuditLog: (params: { action?: string; adminId?: string; limit?: number; offset?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.action) q.set("action", params.action);
+    if (params.adminId) q.set("admin_id", params.adminId);
+    q.set("limit", String(params.limit ?? 50));
+    q.set("offset", String(params.offset ?? 0));
+    return request(`/admin/audit?${q}`);
+  },
+  getCompanyOverview: (days: number, includeFinancials = true) =>
+    request(`/admin/company-overview?days=${days}&include_financials=${includeFinancials}`),
+  listInvestorLinks: () => request("/admin/investor-links"),
+  createInvestorLink: (body: { label: string; expires_in_days: number | null; include_financials: boolean }) =>
+    request("/admin/investor-links", { method: "POST", body }),
+  revokeInvestorLink: (id: string) => request(`/admin/investor-links/${id}/revoke`, { method: "POST" }),
+  // Public: whoever holds a live link. No sign-in.
+  getInvestorOverview: (token: string, days: number) => request(`/investors/${encodeURIComponent(token)}/overview?days=${days}`),
+  getContentOverrides: () => request("/admin/content"),
+  setContent: (key: string, value: string) => request("/admin/content", { method: "PUT", body: { key, value } }),
+  resetContent: (key: string) => request(`/admin/content?key=${encodeURIComponent(key)}`, { method: "DELETE" }),
+  getPlatformSettings: () => request("/admin/platform-settings"),
+  setPlatformSetting: (key: string, value: string | boolean) =>
+    request(`/admin/platform-settings/${key}`, { method: "PUT", body: { value } }),
+  resetPlatformSetting: (key: string) =>
+    request(`/admin/platform-settings/${key}`, { method: "DELETE" }),
+  getSystemStatus: () => request("/admin/system"),
+  addAdmin: (body: { email: string; full_name?: string; temporary_password: string; level?: "owner" | "support" }) =>
     request("/admin/admins", { method: "POST", body }),
   removeAdmin: (userId) => request(`/admin/admins/${userId}`, { method: "DELETE" }),
   changeAdminPassword: (current_password: string, new_password: string) =>
     request("/admin/me/password", { method: "POST", body: { current_password, new_password } }),
-  getAgentApplications: (statusFilter?: string, kind?: "agent" | "rider") => {
+  getAgentApplications: (statusFilter?: string, kind?: "agent" | "rider" | "shopkeeper") => {
     const q = new URLSearchParams();
     if (statusFilter) q.set("status", statusFilter);
     if (kind) q.set("kind", kind);
@@ -237,10 +290,41 @@ export const api = {
   },
   // Public - the For Agents / For Riders pages, no sign-in.
   submitApplication: (body: {
-    kind: "agent" | "rider"; full_name: string; phone: string;
+    kind: "agent" | "rider" | "shopkeeper"; full_name: string; phone: string;
     market_id?: string; area?: string; vehicle?: string; note?: string;
   }) => request("/agent-applications/public", { method: "POST", body }),
   listRiders: () => request("/admin/riders"),
+  linkRiderAccount: (riderId: string) =>
+    request(`/admin/riders/${riderId}/link-account`, { method: "POST" }),
+  // Hubs, delivery pay, and unsticking a rider claim.
+  listHubs: () => request("/admin/hubs"),
+  createHub: (body: { full_name: string; phone: string; market_id: string; hub_name?: string }) =>
+    request("/admin/hubs", { method: "POST", body }),
+  replaceShopkeeper: (hubId: string, body: { full_name: string; phone: string }) =>
+    request(`/admin/hubs/${hubId}/replace-shopkeeper`, { method: "POST", body }),
+  reassignAgent: (orderId: string, agentId: string, note: string) =>
+    request(`/admin/orders/${orderId}/reassign-agent`, { method: "POST", body: { agent_id: agentId, note } }),
+  setHubStage: (orderId: string, stage: string, note: string) =>
+    request(`/admin/orders/${orderId}/set-hub-stage`, { method: "POST", body: { stage, note } }),
+  adminConfirmDelivery: (orderId: string, note: string) =>
+    request(`/admin/orders/${orderId}/confirm-delivery`, { method: "POST", body: { note } }),
+  moveAgentMarket: (userId: string, marketId: string) =>
+    request(`/admin/agents/${userId}/move-market`, { method: "POST", body: { market_id: marketId } }),
+  endStaffRole: (userId: string, note: string) =>
+    request(`/admin/users/${userId}/end-role`, { method: "POST", body: { note } }),
+  editUser: (userId: string, body: { full_name?: string; phone?: string; email?: string; basket_cap_naira?: number }) =>
+    request(`/admin/users/${userId}`, { method: "PATCH", body }),
+  updateHub: (hubId: string, body: { name?: string; is_active?: boolean }) =>
+    request(`/admin/hubs/${hubId}`, { method: "PATCH", body }),
+  adminReleaseRider: (orderId: string) =>
+    request(`/admin/orders/${orderId}/release-rider`, { method: "POST" }),
+  getDeliveryFees: () => request("/admin/fees"),
+  setDefaultDeliveryFees: (body: { rider_fee: string; hub_fee: string }) =>
+    request("/admin/fees", { method: "PUT", body }),
+  setMarketDeliveryFees: (marketId: string, body: { rider_fee: string; hub_fee: string }) =>
+    request(`/admin/fees/markets/${marketId}`, { method: "PUT", body }),
+  clearMarketDeliveryFees: (marketId: string) =>
+    request(`/admin/fees/markets/${marketId}`, { method: "DELETE" }),
   setRiderStatus: (riderId, status: "active" | "suspended") =>
     request(`/admin/riders/${riderId}`, { method: "PATCH", body: { status } }),
   approveAgentApplication: (id) =>

@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.core.enums import UserRole, UserStatus
+from app.core.enums import AdminLevel, UserRole, UserStatus
 from app.notifications.policy import PREFERENCE_FIELDS
 
 
@@ -45,6 +45,9 @@ class User(Base):
     status: Mapped[UserStatus] = mapped_column(
         Enum(UserStatus), default=UserStatus.ACTIVE
     )
+    # Only meaningful for role ADMIN. NULL on an admin is treated as SUPPORT
+    # (least privilege) - every way of creating an admin sets it explicitly.
+    admin_level: Mapped[AdminLevel | None] = mapped_column(Enum(AdminLevel), nullable=True)
 
     # Verification
     is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)

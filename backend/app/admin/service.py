@@ -14,9 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
 from app.core.config import settings
-from app.core.enums import OrderStatus, RiderStatus, TransactionStatus, UserRole, UserStatus
+from app.platform_settings import service as platform
+from app.core.enums import AdminLevel, OrderStatus, RiderStatus, TransactionStatus, UserRole, UserStatus
 from app.core.security import hash_password, verify_password
 from app.float.models import FloatLedger
+from app.hubs.models import Hub
 from app.jit import service as jit_service
 from app.jit.models import SpendingAuthorization, VendorTransfer
 from app.markets.models import Agent, Market
@@ -39,13 +41,15 @@ async def bootstrap_admin(db: AsyncSession, email: str | None, password: str | N
                 email=email,
                 password_hash=hash_password(password),
                 role=UserRole.ADMIN,
+                admin_level=AdminLevel.OWNER,
                 status=UserStatus.ACTIVE,
                 is_email_verified=True,
-                basket_cap_kobo=settings.default_basket_cap_kobo,
+                basket_cap_kobo=await platform.default_basket_cap_kobo(db),
             )
         )
     else:
         user.role = UserRole.ADMIN
+        user.admin_level = AdminLevel.OWNER
         user.password_hash = hash_password(password)
         user.must_change_password = False
     await db.commit()
@@ -67,6 +71,7 @@ def _admin_out(user: User) -> dict:
         # Can sign in at POST /admin/login at all (legacy phone-only admins can't).
         "has_password": user.password_hash is not None,
         "is_bootstrap": _is_bootstrap_admin(user),
+        "level": (user.admin_level or AdminLevel.SUPPORT).value,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }
 
@@ -79,7 +84,8 @@ async def list_admins(db: AsyncSession) -> list[dict]:
 
 
 async def create_admin(
-    db: AsyncSession, *, email: str, full_name: str | None, temporary_password: str
+    db: AsyncSession, *, email: str, full_name: str | None, temporary_password: str,
+    level: AdminLevel = AdminLevel.SUPPORT,
 ) -> dict:
     """A brand-new admin account on a temporary password they must replace
     at first sign-in. Never promotes an existing customer/agent account -
@@ -102,13 +108,41 @@ async def create_admin(
         password_hash=hash_password(temporary_password),
         must_change_password=True,
         role=UserRole.ADMIN,
+        admin_level=level,
         status=UserStatus.ACTIVE,
         is_email_verified=True,
-        basket_cap_kobo=settings.default_basket_cap_kobo,
+        basket_cap_kobo=await platform.default_basket_cap_kobo(db),
     )
     db.add(user)
     await db.flush()
     await db.refresh(user)
+    return _admin_out(user)
+
+
+async def _owner_count(db: AsyncSession) -> int:
+    admins = (await db.execute(select(User).where(User.role == UserRole.ADMIN))).scalars().all()
+    return sum(1 for a in admins if a.admin_level is AdminLevel.OWNER)
+
+
+async def set_admin_level(
+    db: AsyncSession, *, user_id: uuid.UUID, level: AdminLevel, actor: User
+) -> dict:
+    """Promote support to owner or demote an owner. You can't change your own
+    level (nobody should be able to quietly demote themselves out of
+    accountability, or promote themselves), and the last owner can't go."""
+    user = await _get_user(db, user_id)
+    if user.role is not UserRole.ADMIN:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Admin not found")
+    if user.id == actor.id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "You can't change your own level")
+    if _is_bootstrap_admin(user) and level is not AdminLevel.OWNER:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "The account from BOOTSTRAP_ADMIN_EMAIL is always an owner"
+        )
+    if user.admin_level is AdminLevel.OWNER and level is not AdminLevel.OWNER and await _owner_count(db) <= 1:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "There must always be at least one owner")
+    user.admin_level = level
+    await db.flush()
     return _admin_out(user)
 
 
@@ -126,7 +160,10 @@ async def remove_admin(db: AsyncSession, *, user_id: uuid.UUID, actor: User) -> 
             status.HTTP_400_BAD_REQUEST,
             "This is the owner account from the server's BOOTSTRAP_ADMIN_EMAIL - change it there instead",
         )
+    if user.admin_level is AdminLevel.OWNER and await _owner_count(db) <= 1:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "There must always be at least one owner")
     user.role = UserRole.CUSTOMER
+    user.admin_level = None
     user.password_hash = None
     user.must_change_password = False
     await db.flush()
@@ -208,7 +245,14 @@ async def list_agents(db: AsyncSession) -> list[dict]:
     result = await db.execute(select(Agent, User).join(User, User.id == Agent.user_id))
     rows = result.all()
 
-    paid_result = await db.execute(select(Order).where(Order.paid_at.is_not(None)))
+    # Earnings are what's actually been released: orders delivered and
+    # confirmed (the agent is paid out on confirmation).
+    paid_result = await db.execute(
+        select(Order).where(
+            Order.status.in_((OrderStatus.DELIVERED, OrderStatus.CLOSED)),
+            Order.delivered_at.is_not(None),
+        )
+    )
     by_agent: dict[uuid.UUID, list[Order]] = defaultdict(list)
     for order in paid_result.scalars().all():
         if order.agent_id is not None:
@@ -241,8 +285,50 @@ def _rider_out(rider: Rider) -> dict:
         "vehicle": rider.vehicle,
         "market_id": str(rider.market_id) if rider.market_id else None,
         "status": rider.status.value,
+        # False for riders approved before riders could sign in: they're on
+        # the roster but can't open the rider app until given a login.
+        "has_login": rider.user_id is not None,
+        "user_id": str(rider.user_id) if rider.user_id else None,
         "created_at": rider.created_at.isoformat() if rider.created_at else None,
     }
+
+
+async def link_rider_account(db: AsyncSession, *, rider_id: uuid.UUID) -> dict:
+    """Give a rider approved before rider logins existed a login: find (or
+    create) the account for their phone, make it a RIDER and link it. The
+    same one-staff-role-per-account rule as approving an application."""
+    rider = (await db.execute(select(Rider).where(Rider.id == rider_id))).scalar_one_or_none()
+    if rider is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Rider not found")
+    if rider.user_id is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This rider already has a login")
+
+    user = (await db.execute(select(User).where(User.phone == rider.phone))).scalar_one_or_none()
+    if user is None:
+        user = User(
+            phone=rider.phone,
+            full_name=rider.full_name,
+            role=UserRole.RIDER,
+            status=UserStatus.ACTIVE,
+            basket_cap_kobo=await platform.default_basket_cap_kobo(db),
+            has_customer_side=False,
+        )
+        db.add(user)
+        await db.flush()
+    elif user.role is UserRole.CUSTOMER:
+        user.role = UserRole.RIDER
+        if not user.full_name:
+            user.full_name = rider.full_name
+    elif user.role is not UserRole.RIDER:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"That number already belongs to a {user.role.value} account"
+        )
+    taken = (await db.execute(select(Rider).where(Rider.user_id == user.id))).scalar_one_or_none()
+    if taken is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "That account is already linked to another rider")
+    rider.user_id = user.id
+    await db.flush()
+    return _rider_out(rider)
 
 
 async def list_riders(db: AsyncSession) -> list[dict]:
@@ -294,20 +380,31 @@ async def get_analytics(db: AsyncSession, *, days: int = 30) -> dict:
     # correctly (same reasoning as agent.service.get_summary, which filters
     # today/week in Python for the same reason), and at pilot scale this is
     # cheap either way.
-    all_paid_result = await db.execute(select(Order).where(Order.paid_at.is_not(None)))
+    # Completed = delivered and confirmed, counted on the day it was delivered:
+    # that's when the money is settled and the agent, rider and hub are paid.
+    # Revenue is what Qyka keeps after those payouts (metrics/service.py defines
+    # every figure once; this screen and the investor overview agree).
+    from app.metrics.service import revenue_of
+
+    all_paid_result = await db.execute(
+        select(Order).where(
+            Order.status.in_((OrderStatus.DELIVERED, OrderStatus.CLOSED)),
+            Order.delivered_at.is_not(None),
+        )
+    )
     all_paid_orders = list(all_paid_result.scalars().all())
 
     volume: dict[str, int] = defaultdict(int)
     revenue: dict[str, Decimal] = defaultdict(lambda: Decimal("0.00"))
     for o in all_paid_orders:
-        paid_at = _aware(o.paid_at)
-        if paid_at < since:
+        delivered_at = _aware(o.delivered_at)
+        if delivered_at < since:
             continue
-        day = paid_at.date().isoformat()
+        day = delivered_at.date().isoformat()
         volume[day] += 1
-        revenue[day] += o.company_share
+        revenue[day] += revenue_of(o)
     volume_by_day = [{"date": d, "orders": c} for d, c in sorted(volume.items())]
-    revenue_by_day = [{"date": d, "company_share": str(revenue[d])} for d in sorted(revenue)]
+    revenue_by_day = [{"date": d, "revenue": str(revenue[d])} for d in sorted(revenue)]
 
     # Agent + market activity are all-time, not windowed - lifetime totals,
     # same as the Agents screen's earnings_total.
@@ -592,3 +689,84 @@ async def admin_cancel_order(
     return await orders_service.admin_cancel_order(
         db, order_id=order_id, refund_amount=refund_amount, note=note.strip()
     )
+
+
+# --- Hubs ------------------------------------------------------------------
+
+_AT_HUB = (
+    OrderStatus.DROPPED_AT_HUB,
+    OrderStatus.RECEIVED_BY_HUB,
+    OrderStatus.READY_FOR_PICKUP,
+)
+
+
+async def list_hubs(db: AsyncSession) -> list[dict]:
+    """Every hub with its market, its shopkeeper and how many orders are
+    sitting in it right now - the roster behind the Hubs admin screen."""
+    rows = (await db.execute(
+        select(Hub, Market, User)
+        .join(Market, Market.id == Hub.market_id, isouter=True)
+        .join(User, User.id == Hub.user_id, isouter=True)
+        .order_by(Hub.created_at.desc())
+    )).all()
+    counts: dict[uuid.UUID, int] = defaultdict(int)
+    at_hub = (await db.execute(
+        select(Order.hub_id).where(Order.hub_id.is_not(None), Order.status.in_(_AT_HUB))
+    )).scalars().all()
+    for hub_id in at_hub:
+        counts[hub_id] += 1
+    return [
+        {
+            "id": str(hub.id),
+            "name": hub.name,
+            "is_active": hub.is_active,
+            "market_id": str(hub.market_id),
+            "market_name": market.name if market else None,
+            "shopkeeper_name": user.full_name if user else None,
+            "shopkeeper_phone": user.phone if user else None,
+            "orders_at_hub": counts.get(hub.id, 0),
+            "created_at": hub.created_at.isoformat() if hub.created_at else None,
+        }
+        for hub, market, user in rows
+    ]
+
+
+async def update_hub(
+    db: AsyncSession, *, hub_id: uuid.UUID, name: str | None, is_active: bool | None
+) -> Hub:
+    """Rename a hub (its name is what an agent picks from when a market has
+    several) or switch it off/on. Switching off only stops NEW drop-offs
+    going there - orders already at the hub carry on through it."""
+    hub = (await db.execute(select(Hub).where(Hub.id == hub_id))).scalar_one_or_none()
+    if hub is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Hub not found")
+    if name is not None:
+        name = name.strip()
+        if not name:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A hub needs a name")
+        hub.name = name
+    if is_active is not None:
+        hub.is_active = is_active
+    await db.flush()
+    return hub
+
+
+async def release_rider(db: AsyncSession, *, order_id: uuid.UUID) -> Order:
+    """Put an order a rider claimed but never collected back in the pool.
+
+    Only before the goods have left the hub: once they're out for delivery
+    they're physically with the rider, and the fix is a call, then (if they're
+    truly lost) the existing cancel-and-refund.
+    """
+    order = (await db.execute(select(Order).where(Order.id == order_id))).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
+    if order.status is not OrderStatus.READY_FOR_PICKUP or order.rider_id is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Only an order a rider has claimed but not collected can be released"
+        )
+    order.rider_id = None
+    order.rider_claimed_at = None
+    order.pickup_code = None
+    await db.flush()
+    return order

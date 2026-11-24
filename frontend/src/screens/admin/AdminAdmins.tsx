@@ -11,6 +11,7 @@ import Input from "@/components/ui/Input";
 import SectionHeader from "@/components/ui/SectionHeader";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { errMsg } from "@/lib/hubUtils";
 
 // Readable but unguessable: no 0/O/1/l/I so it survives being read out loud.
 function generatePassword() {
@@ -33,13 +34,14 @@ function AddAdminCard({ onAdded }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState<any>(null);
+  const [level, setLevel] = useState<"support" | "owner">("support");
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(""); setBusy(true);
     try {
-      const admin = await api.addAdmin({ email, full_name: name || undefined, temporary_password: password });
-      setAdded({ email: admin.email, password });
+      const admin = await api.addAdmin({ email, full_name: name || undefined, temporary_password: password, level });
+      setAdded({ email: admin.email, password, level: admin.level });
       setEmail(""); setName(""); setPassword(generatePassword());
       onAdded();
     } catch (err: any) {
@@ -65,6 +67,26 @@ function AddAdminCard({ onAdded }) {
             New
           </Button>
         </div>
+        <div className="sm:col-span-2">
+          <p className="mb-1 text-sm font-semibold text-ink/80">Access level</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {([
+              ["support", "Support", "Runs day-to-day: orders, people, hubs, applications. Can't change money rules, wallets or other admins."],
+              ["owner", "Owner", "Everything, including money rules, platform settings, other admins and the audit log."],
+            ] as const).map(([key, title, body]) => (
+              <label
+                key={key}
+                className={"flex cursor-pointer gap-3 rounded-2xl border-2 p-3 " + (level === key ? "border-brand-orange bg-brand-orange/10" : "border-line")}
+              >
+                <input type="radio" name="level" checked={level === key} onChange={() => setLevel(key)} className="mt-1 accent-brand-orange" />
+                <span>
+                  <span className="block font-semibold text-ink">{title}</span>
+                  <span className="block text-sm text-muted">{body}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
         {error && <p className="text-sm text-red-600 sm:col-span-2">{error}</p>}
         <div className="sm:col-span-2">
           <Button type="submit" busy={busy}>Add admin</Button>
@@ -72,7 +94,7 @@ function AddAdminCard({ onAdded }) {
       </form>
       {added && (
         <div className="mt-4 rounded-2xl bg-brand-green/10 p-4 text-sm text-ink">
-          <p className="font-semibold">{added.email} is now an admin.</p>
+          <p className="font-semibold">{added.email} is now {added.level === "owner" ? "an owner" : "a support admin"}.</p>
           <p className="mt-1 text-muted">Send them this temporary password privately - it won&apos;t be shown again:</p>
           <p className="mt-2 select-all break-all font-mono text-base">{added.password}</p>
         </div>
@@ -102,6 +124,18 @@ function AdminAdmins() {
     refresh();
   }, []);
 
+  async function handleLevel(a) {
+    setError(""); setBusyId(a.id);
+    try {
+      await api.setAdminLevel(a.id, a.level === "owner" ? "support" : "owner");
+      await refresh();
+    } catch (e: any) {
+      setError("Could not change the level: " + errMsg(e));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function handleRemove(id) {
     setError(""); setBusyId(id);
     try {
@@ -117,7 +151,7 @@ function AdminAdmins() {
 
   return (
     <div>
-      <AdminPageHeader icon="shield" section="People" title="Admins" description="Everyone who can sign in to this dashboard. Any admin can add or remove others.">
+      <AdminPageHeader icon="shield" section="People" title="Admins" description="Everyone who can sign in to this dashboard. Owners can do everything; support runs day-to-day operations.">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <StatTile label="Admins" value={admins?.length ?? "—"} />
           <StatTile label="Awaiting first sign-in" value={admins ? admins.filter((a) => a.must_change_password).length : "—"} />
@@ -142,11 +176,24 @@ function AdminAdmins() {
                     {a.full_name || a.email || a.phone}
                     {isMe && <span className="ml-2 text-sm font-normal text-muted">(you)</span>}
                   </div>
-                  <div className="text-sm text-muted">{a.email || a.phone}</div>
+                  <div className="text-sm text-muted">
+                    {a.email || a.phone}
+                    <span className={"ml-2 rounded-full px-2 py-0.5 text-xs font-bold capitalize " + (a.level === "owner" ? "bg-brand-orange/15 text-brand-orange-dark" : "bg-sunken text-muted")}>
+                      {a.level}
+                    </span>
+                  </div>
                   {note && <div className="mt-1 text-sm text-amber-700">{note}</div>}
                 </div>
                 {!isMe && !a.is_bootstrap && (
-                  <div className="shrink-0">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <Button
+                      variant="neutral"
+                      className="text-sm"
+                      busy={busyId === a.id}
+                      onClick={() => handleLevel(a)}
+                    >
+                      {a.level === "owner" ? "Make support" : "Make owner"}
+                    </Button>
                     {confirmingId === a.id ? (
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted">Remove admin access?</span>

@@ -4,6 +4,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from app.core.enums import AdminLevel
 from sqlalchemy import select
 from tests.conftest import pay_deposit
 
@@ -30,6 +31,7 @@ async def _setup(client, db_session_factory):
         agent.role = UserRole.AGENT
         cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
         cust.role = UserRole.ADMIN
+        cust.admin_level = AdminLevel.OWNER
         await s.commit()
         agent_id, cust_id = agent.id, cust.id
         market_id = uuid.uuid4()
@@ -138,11 +140,17 @@ async def test_public_pricing_endpoint_matches_the_fee_rules(client):
     assert r.json() == {
         "service_fee_percent": "7.5",
         "delivery_fee": "1500.00",
-        "delivery_fee_is_placeholder": True,
+        "delivery_fee_is_placeholder": False,
         "deposit_percent": "30",
         "add_item_fee": "500.00",
         "emtl_per_transfer": "50.00",
         "emtl_threshold": "10000.00",
+        # What the people doing the work earn (default rider/hub pay unless a
+        # market has its own) - the website's earnings estimators read these.
+        "agent_base_pay": "1000.00",
+        "agent_included_minutes": 30,
+        "rider_pay": "1000.00",
+        "hub_pay": "500.00",
     }
 
 

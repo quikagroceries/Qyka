@@ -4,6 +4,7 @@ import uuid
 
 import jwt as pyjwt
 import pytest
+from app.core.enums import AdminLevel
 from sqlalchemy import select
 
 PHONE_CUST = "+2348010000001"
@@ -35,6 +36,7 @@ async def _setup_order(client, db_session_factory):
             await s.execute(select(User).where(User.phone == PHONE_CUST))
         ).scalar_one()
         cust_user.role = UserRole.ADMIN
+        cust_user.admin_level = AdminLevel.OWNER
         await s.commit()
         agent_user_id = agent_user.id
 

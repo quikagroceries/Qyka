@@ -19,6 +19,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.core.enums import OrderStatus
+from app.payments.models import JsonType
 
 
 class Order(Base):
@@ -57,8 +58,11 @@ class Order(Base):
     agent_assigned_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # The rider's USER id (same convention as agent_id). Set when a rider
+    # claims the order from the pool - see riders/service.py and the rider
+    # custody columns further down.
     rider_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
+        UUID(as_uuid=True), nullable=True, index=True
     )
     market_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
 
@@ -91,6 +95,16 @@ class Order(Base):
     )
     delivery_fee: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0.00")
+    )
+    # What the rider and the hub earn for this order, snapshotted from the
+    # admin's fee settings when the order is CREATED - changing the settings
+    # later never touches an order already in progress. Paid out of the float
+    # pool on delivery confirmation (delivery/service.py::confirm_delivery).
+    rider_fee: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0.00"), server_default="0"
+    )
+    hub_fee: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0.00"), server_default="0"
     )
     grand_total: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0.00")
@@ -149,24 +163,53 @@ class Order(Base):
     # Drop-off coordinates for courier quotes. From a map pin or geocoding.
     dropoff_latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     dropoff_longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
-    # Tracking reference from the courier partner, set at dispatch. Free text
-    # (V1 placeholder - a real Kwik/Sendbox integration would set this from
-    # their booking response) so there's somewhere for tracking data to live
-    # even before that integration exists. rider_id above predates the
-    # third-party-courier model and is unused; this is deliberately separate
-    # rather than repurposing it.
+    # Legacy: tracking reference from the old third-party courier. Nothing
+    # sets it any more (riders claim jobs in-app); kept so past orders still
+    # show theirs.
     courier_reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    # Short PIN shown to the customer, given to the rider at handover - a
-    # verifiable-handoff step, not a hard gate (there's no rider-side app in
-    # this system yet to check it against). Generated at dispatch, alongside
-    # courier_reference.
+    # Short PIN shown to the customer and given to the rider at drop-off; the
+    # rider app checks it (riders/service.py::deliver). Generated when the
+    # shopkeeper releases the goods to the rider.
     handover_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
 
     # Status-timeline timestamps (packed/dispatched/delivered) - each stamped
     # exactly once, at the matching transition in delivery.service. Together
     # with created_at/agent_assigned_at/paid_at above, these back the
     # customer's post-payment status feed end to end.
+    # packed_at is stamped when the shopkeeper marks the order ready for a
+    # rider (READY_FOR_PICKUP) - the timeline's "packed" step.
     packed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Hub custody: which hub the agent dropped at, when, and when the
+    # shopkeeper confirmed receipt. hub_missing_item_ids lists item ids the
+    # shopkeeper did NOT see arrive (receipt is still recorded - accountability
+    # catches up, the goods never wait on it).
+    hub_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )
+    dropped_at_hub_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    hub_received_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    hub_missing_item_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    hub_receipt_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The fee rules this order is priced by, copied from the platform settings
+    # when it was created (orders/fees.py PricingConfig). NULL on orders from
+    # before pricing was editable: they were priced by the built-in defaults.
+    pricing: Mapped[dict | None] = mapped_column(JsonType, nullable=True)
+    # Rider custody (rider_id above). A rider claims a ready order from the pool, which also
+    # issues pickup_code: the rider shows it at the hub and the shopkeeper
+    # enters it to release the goods. rider_delivered_at is the rider
+    # confirming drop-off with the customer's handover_code; the customer's
+    # own confirmation (not this) still ends the order and releases payouts.
+    rider_claimed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    pickup_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    rider_delivered_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     dispatched_at: Mapped[datetime | None] = mapped_column(
@@ -179,6 +222,14 @@ class Order(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+    @property
+    def delivery_quote(self) -> Decimal:
+        """What delivery was quoted at when this order was created - the
+        pre-shopping estimate shows this, not today's (possibly changed) rate."""
+        from app.orders.fees import PricingConfig
+
+        return PricingConfig.from_snapshot(self.pricing).delivery_fee
 
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan"

@@ -100,7 +100,13 @@ export function summarizeOrderStatus(order): string {
     case "awaiting_payment":
       return "Shopping done — balance due";
     case "paid":
-      return "Packing your order";
+      return "Your agent is taking your order to the market hub";
+    case "dropped_at_hub":
+      return "At the market hub — waiting to be checked in";
+    case "received_by_hub":
+      return "Checked in at the hub — being got ready for a rider";
+    case "ready_for_pickup":
+      return "Ready at the hub — waiting for a rider";
     case "packed":
       return "Packed, waiting for pickup";
     case "out_for_delivery":

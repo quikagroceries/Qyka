@@ -10,12 +10,13 @@ from app.agent_applications.schemas import (
     PublicApplyIn,
     PublicApplyOut,
 )
+from app.admin.guards import AuditedRoute, require_admin
 from app.auth.models import User
 from app.core.database import get_db
 from app.core.enums import ApplicationKind, ApplicationStatus, UserRole
 from app.core.security import get_current_user, require_role
 
-router = APIRouter()
+router = APIRouter(route_class=AuditedRoute)
 
 
 @router.post("", response_model=AgentApplicationOut, status_code=201)
@@ -61,7 +62,7 @@ async def list_applications(
     status: ApplicationStatus | None = None,
     kind: ApplicationKind | None = None,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> list[AgentApplicationOut]:
     return await service.list_applications(db, status_filter=status, kind=kind)
 
@@ -70,7 +71,7 @@ async def list_applications(
 async def approve(
     application_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("application.approve")),
 ) -> AgentApplicationOut:
     return await service.approve(db, application_id=application_id, admin=admin)
 
@@ -79,6 +80,6 @@ async def approve(
 async def reject(
     application_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("application.reject")),
 ) -> AgentApplicationOut:
     return await service.reject(db, application_id=application_id, admin=admin)

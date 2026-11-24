@@ -33,14 +33,14 @@ const TRAIL = [
   },
   {
     n: "04",
-    title: "Photos",
-    body: "Purchases and packing documented before the haul leaves the market.",
+    title: "Hub check-in",
+    body: "Purchases are photographed, then checked against your list at a market hub.",
     accent: "text-brand-orange",
   },
   {
     n: "05",
-    title: "Confirm",
-    body: "The run ends when you confirm delivery — or raise an issue on the trail.",
+    title: "Codes & confirm",
+    body: "A rider collects with a code and gives you theirs at the door. The run ends when you confirm.",
     accent: "text-brand-orange-dark",
   },
 ];
@@ -52,8 +52,8 @@ const PILLARS = [
     img: CAT_PRODUCE,
   },
   {
-    title: "Photo proof on the run",
-    body: "Purchases and packing are documented so you can see what left the market before it reaches your door.",
+    title: "Checked at a market hub",
+    body: "Purchases are photographed, then checked against your list by a shopkeeper at a hub in the market before a rider ever touches them - so you can see what left the market before it reaches your door.",
     img: TRUST_BASKET,
   },
   {
@@ -62,8 +62,8 @@ const PILLARS = [
     img: HERO_PERSON,
   },
   {
-    title: "You confirm delivery",
-    body: "The run isn't done until you confirm. Issues can be raised against the order trail — list, transfers, and photos.",
+    title: "Codes at both ends, and you confirm",
+    body: "A rider can only collect an order with the right code, and gives it to you at your door with your own. The run isn't done until you confirm. Issues can be raised against the order trail — list, transfers, photos, and the hub's check-in.",
     img: CAT_PROTEIN,
   },
 ];

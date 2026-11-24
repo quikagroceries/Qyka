@@ -11,7 +11,7 @@ import { coverImageForMarket } from "@/lib/markets";
 // The five beats of an order, left to right. Where an order is right now maps
 // onto one of them (see stepIndex) so the card can show real progress, not
 // just a sentence.
-const STEPS = ["Agent", "Shopping", "Payment", "Packing", "Delivery"];
+const STEPS = ["Agent", "Shopping", "Payment", "Hub", "Delivery"];
 
 function stepIndex(status: string): number {
   switch (status) {
@@ -21,6 +21,9 @@ function stepIndex(status: string): number {
     case "awaiting_payment":
       return 2;
     case "paid":
+    case "dropped_at_hub":
+    case "received_by_hub":
+    case "ready_for_pickup":
     case "packed":
       return 3;
     case "out_for_delivery":

@@ -3,6 +3,8 @@ import { Bagel_Fat_One, Bricolage_Grotesque, DM_Sans, Fraunces } from "next/font
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import LocaleSync from "@/components/marketing/LocaleSync";
 import { CONTACT_EMAIL } from "@/lib/contact";
+import ContentBoot from "@/components/marketing/ContentBoot";
+import { fetchOverrides } from "@/lib/content";
 
 // Logo wordmark only ("Qyka" / "Groceries" beside the mark in the expanded
 // sidebar) - a decorative display face, never used for real UI text.
@@ -118,7 +120,10 @@ const WEBSITE_JSON_LD = {
 // tiny and dependency-free. Qyka is light-only (no theme to boot).
 const THEME_BOOT = `(function(){try{var p=JSON.parse(localStorage.getItem('qyka_prefs')||'{}');if(p.reduceMotion)document.documentElement.classList.add('reduce-motion');}catch(e){}})();`;
 
-export default function RootLayout({ children }: any) {
+export default async function RootLayout({ children }: any) {
+  // Wording an owner has changed in Admin > Website text (empty if none, or if
+  // the server can't be reached - the site then shows its shipped wording).
+  const overrides = await fetchOverrides();
   return (
     <html lang="en-NG" suppressHydrationWarning>
       <head>
@@ -140,8 +145,10 @@ export default function RootLayout({ children }: any) {
         className={`${dmSans.variable} ${bricolage.variable} ${fraunces.variable} ${bagelFatOne.variable} font-sans antialiased`}
         suppressHydrationWarning
       >
-        <LocaleSync />
-        <AuthProvider>{children}</AuthProvider>
+        <ContentBoot overrides={overrides}>
+          <LocaleSync />
+          <AuthProvider>{children}</AuthProvider>
+        </ContentBoot>
       </body>
     </html>
   );

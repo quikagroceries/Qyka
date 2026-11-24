@@ -13,6 +13,7 @@ from sqlalchemy import select
 
 from app.auth.models import User
 from app.core.config import settings
+from app.platform_settings import service as platform
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -41,7 +42,7 @@ async def _make_user(
     if user is None:
         user = User(
             phone=phone, role=role, status=UserStatus.ACTIVE,
-            is_phone_verified=True, basket_cap_kobo=settings.default_basket_cap_kobo,
+            is_phone_verified=True, basket_cap_kobo=await platform.default_basket_cap_kobo(db),
             full_name=full_name, default_delivery_address=default_delivery_address,
         )
         db.add(user)

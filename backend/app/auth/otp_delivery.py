@@ -44,15 +44,14 @@ def _digits(phone: str) -> str:
     return "".join(ch for ch in phone if ch.isdigit())
 
 
-def _message(code: str) -> str:
-    minutes = settings.otp_expire_minutes
+def _message(code: str, minutes: int) -> str:
     return (
         f"Your Qyka verification code is {code}. It expires in {minutes} "
         f"minute{'s' if minutes != 1 else ''}. Never share this code with anyone."
     )
 
 
-async def deliver_otp(phone: str, code: str, channel: str) -> bool:
+async def deliver_otp(phone: str, code: str, channel: str, expire_minutes: int | None = None) -> bool:
     """Send `code` to `phone` over `channel` ("sms" | "whatsapp" | "voice").
 
     Returns True if a provider accepted it, False if no provider is configured
@@ -76,7 +75,7 @@ async def deliver_otp(phone: str, code: str, channel: str) -> bool:
             "api_key": settings.sms_api_key,
             "to": to,
             "from": settings.sms_sender_id,
-            "sms": _message(code),
+            "sms": _message(code, expire_minutes or settings.otp_expire_minutes),
             "type": "plain",
             # "dnd" is the transactional route that also reaches numbers on
             # Nigeria's do-not-disturb list - the whole point of using it for
@@ -97,7 +96,7 @@ async def deliver_otp(phone: str, code: str, channel: str) -> bool:
     return True
 
 
-async def deliver_email_otp(email: str, code: str) -> bool:
+async def deliver_email_otp(email: str, code: str, expire_minutes: int | None = None) -> bool:
     """Email `code` to `email` through Resend.
 
     Returns True if Resend accepted it, False if no email key is configured
@@ -106,7 +105,7 @@ async def deliver_email_otp(email: str, code: str) -> bool:
     if not email_configured():
         return False
 
-    subject, text, html = otp_email(code, settings.otp_expire_minutes)
+    subject, text, html = otp_email(code, expire_minutes or settings.otp_expire_minutes)
     payload = {"from": settings.email_from, "to": [email], "subject": subject, "text": text, "html": html}
     headers = {"Authorization": f"Bearer {settings.email_api_key}"}
 

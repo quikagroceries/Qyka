@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
+from app.core.enums import AdminLevel
 from sqlalchemy import select
 
 from app.core.config import settings
@@ -40,6 +41,7 @@ async def _drive_order_to_awaiting_payment(client, db_session_factory, monkeypat
         agent.role = UserRole.AGENT
         cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
         cust.role = UserRole.ADMIN  # so the same token can assign the agent
+        cust.admin_level = AdminLevel.OWNER
         await s.commit()
         agent_id = agent.id
         # seed float pool

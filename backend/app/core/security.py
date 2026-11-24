@@ -134,4 +134,6 @@ def require_role(*roles: UserRole):
             )
         return user
 
+    # Lets tests (and tooling) see which roles a route is guarded by.
+    checker.roles = roles
     return checker

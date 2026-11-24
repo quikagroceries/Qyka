@@ -9,7 +9,6 @@ Delivery confirmation is the terminal money event: it computes the payout split
 and releases the agent's and rider's shares from the float pool.
 """
 
-import secrets
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -23,6 +22,7 @@ from app.auth.models import User
 from app.core.enums import LedgerDirection, OrderStatus, UserRole
 from app.delivery import payouts
 from app.float import service as float_service
+from app.hubs.models import Hub
 from app.notifications import service as notif_service
 from app.orders.models import Order
 from app.orders.state_machine import IllegalTransition, assert_can_transition
@@ -48,61 +48,53 @@ async def _transition(db: AsyncSession, order: Order, target: OrderStatus) -> No
     await db.flush()
 
 
-async def mark_packed(
-    db: AsyncSession, *, order_id: uuid.UUID, agent_id: uuid.UUID
+async def drop_at_hub(
+    db: AsyncSession,
+    *,
+    order_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    hub_id: uuid.UUID | None,
 ) -> Order:
-    """Agent packs the order. Only valid once PAID (state machine enforces)."""
+    """Agent drops the paid order's goods at a hub in the order's market.
+
+    Only valid once PAID (state machine enforces), so goods never travel on
+    an unpaid order. The hub is the one given, which must be an active hub
+    in this order's market - or, when omitted, the market's only active hub.
+    The shopkeeper is told; custody passes to them when they confirm receipt.
+    """
     order = await _load(db, order_id)
     if order.agent_id != agent_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the assigned agent")
-    await _transition(db, order, OrderStatus.PACKED)
-    order.packed_at = datetime.now(timezone.utc)
-    await db.flush()
-    return order
-
-
-async def dispatch_to_courier(
-    db: AsyncSession, *, order_id: uuid.UUID, actor: User, courier_reference: str | None = None
-) -> Order:
-    """Hand a packed order to the third-party courier (Kwik / Sendbox).
-
-    Qyka does not employ riders. The courier is only alerted AFTER payment,
-    so nobody travels for an order that might not be paid for — and the goods
-    are already packed when they arrive, so there is no paid waiting time.
-
-    Callable by the assigned agent (the one actually handing the package
-    over, right after packing it - see delivery.routes) or an admin
-    (oversight override, no ownership check). V1 records the handoff and
-    moves the order out for delivery, generating a placeholder tracking
-    reference if the caller doesn't supply one, so there's always something
-    for a tracking screen to show. The partner's booking API call goes here
-    once a courier partnership is live; courier_reference would then come
-    from its response instead of being generated.
-    """
-    order = await _load(db, order_id)
-    if order.status is not OrderStatus.PACKED:
+    if order.status is not OrderStatus.PAID:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "Order must be packed before courier dispatch",
+            f"Cannot drop at a hub from {order.status.value}: the order must be paid",
         )
-    if actor.role is not UserRole.ADMIN and order.agent_id != actor.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the assigned agent")
-    order.courier_reference = courier_reference or f"QK-{order.id.hex[:8].upper()}"
-    # A short PIN the customer shares with the rider at handover - a
-    # verifiable-handoff step. secrets, not random, since it's shared as a
-    # (light) proof-of-identity even though nothing here checks it against a
-    # rider-side app yet.
-    order.handover_code = f"{secrets.randbelow(10_000):04d}"
-    order.dispatched_at = datetime.now(timezone.utc)
-    await _transition(db, order, OrderStatus.OUT_FOR_DELIVERY)
-    # Critical: in-app AND email/SMS, whatever the customer's toggles - this
-    # is the one message they need even with the app closed.
+
+    hubs = list((await db.execute(
+        select(Hub).where(Hub.market_id == order.market_id, Hub.is_active.is_(True))
+    )).scalars().all())
+    if hub_id is not None:
+        hub = next((h for h in hubs if h.id == hub_id), None)
+        if hub is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "That hub isn't an active hub in this order's market"
+            )
+    elif not hubs:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This market has no hub yet")
+    elif len(hubs) > 1:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "This market has several hubs - pick one"
+        )
+    else:
+        hub = hubs[0]
+
+    order.hub_id = hub.id
+    order.dropped_at_hub_at = datetime.now(timezone.utc)
+    await _transition(db, order, OrderStatus.DROPPED_AT_HUB)
     await notif_service.send(
-        db, user_id=order.customer_id, order_id=order.id, kind="out_for_delivery",
-        message=(
-            f"Your order is on its way (tracking {order.courier_reference}). "
-            f"Give the rider this code at handover: {order.handover_code}."
-        ),
+        db, user_id=hub.user_id, order_id=order.id, kind="hub_drop",
+        message="An agent has dropped an order at your hub - check it in.",
     )
     return order
 
@@ -112,9 +104,11 @@ async def confirm_delivery(
 ) -> dict:
     """Customer confirms receipt. Terminal money event: release payouts.
 
-    The agent fee and rider fee are debited OUT of the float pool to them; the
-    company retains item-cost recovery + service charge. The split is recorded
-    on the order's transaction for audit.
+    The agent, rider and hub fees are debited OUT of the float pool to them;
+    the company retains item-cost recovery + service charge + whatever the
+    delivery fee leaves. Orders that went out before riders existed (no rider
+    on them) keep the old behaviour: the whole delivery fee as courier cost.
+    The split is recorded on the order's transaction for audit.
     """
     order = await _load(db, order_id)
     if order.customer_id != customer_id:
@@ -135,15 +129,20 @@ async def confirm_delivery(
             market_id=order.market_id,
             note="Agent payout",
         )
-    if order.delivery_fee > 0:
-        await float_service.record_movement(
-            db,
-            direction=LedgerDirection.DEBIT,
-            amount=order.delivery_fee,
-            order_id=order.id,
-            market_id=order.market_id,
-            note="Courier delivery cost",
-        )
+    for amount, note in (
+        (Decimal(split["rider_payout"]), "Rider payout"),
+        (Decimal(split["hub_payout"]), "Hub payout"),
+        (Decimal(split["courier_cost"]), "Courier delivery cost"),
+    ):
+        if amount > 0:
+            await float_service.record_movement(
+                db,
+                direction=LedgerDirection.DEBIT,
+                amount=amount,
+                order_id=order.id,
+                market_id=order.market_id,
+                note=note,
+            )
 
     # Record the split on the transaction for audit.
     result = await db.execute(

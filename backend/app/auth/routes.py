@@ -18,6 +18,7 @@ from app.auth.schemas import (
     VerifyOtpIn,
 )
 from app.core.config import settings
+from app.platform_settings import service as platform
 from app.core.database import get_db
 from app.core.enums import UserRole, UserStatus
 from app.core.security import create_access_token, get_current_user
@@ -46,15 +47,16 @@ async def request_otp(
     if id_type == "email" and channel != "email":
         channel = "email"
     code = await service.create_otp(db, identifier, channel)
+    expire_minutes = await platform.get(db, "otp_expire_minutes")
 
     # Phone codes go out over the chosen channel; email codes through Resend.
     # With no provider configured (dev/tests) nothing is sent and the code
     # comes back as dev_otp instead.
     try:
         if id_type == "phone":
-            await otp_delivery.deliver_otp(identifier, code, channel)
+            await otp_delivery.deliver_otp(identifier, code, channel, expire_minutes)
         else:
-            await otp_delivery.deliver_email_otp(identifier, code)
+            await otp_delivery.deliver_email_otp(identifier, code, expire_minutes)
     except otp_delivery.OtpDeliveryError:
         # Raising rolls the just-created code back (get_db), so a failed
         # send leaves nothing behind.
@@ -72,8 +74,8 @@ async def request_otp(
         detail="OTP sent",
         channel=channel,
         dev_otp=dev_otp,
-        expires_in_seconds=settings.otp_expire_minutes * 60,
-        fallback_after_seconds=settings.otp_fallback_after_seconds,
+        expires_in_seconds=expire_minutes * 60,
+        fallback_after_seconds=await platform.get(db, "otp_fallback_after_seconds"),
         fallback_channels=["sms", "whatsapp", "voice"] if id_type == "phone" else [],
     )
 

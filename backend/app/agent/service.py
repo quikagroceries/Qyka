@@ -31,33 +31,50 @@ async def get_summary(db: AsyncSession, *, user_id: uuid.UUID) -> dict:
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = now - timedelta(days=7)
 
-    # paid_at is stamped exactly once, the moment an order first reaches
-    # PAID (see payments.service) — it never moves again after that, so it's
-    # the correct "when was this actually earned" signal, unlike created_at
-    # which can be days before the customer got around to paying.
-    paid_result = await db.execute(
+    # Earnings are what has actually been released: the agent is paid out
+    # when the customer confirms delivery (delivery.service.confirm_delivery),
+    # so an order counts on the day it was delivered. Orders paid for but not
+    # yet delivered are shown separately as pending - the same moment-of-payout
+    # rule the rider's and hub's earnings follow, and the company's revenue.
+    done_result = await db.execute(
         select(Order)
-        .where(Order.agent_id == user_id, Order.paid_at.is_not(None))
-        .order_by(Order.paid_at.desc())
+        .where(
+            Order.agent_id == user_id,
+            Order.status.in_((OrderStatus.DELIVERED, OrderStatus.CLOSED)),
+            Order.delivered_at.is_not(None),
+        )
+        .order_by(Order.delivered_at.desc())
     )
-    paid_orders = list(paid_result.scalars().all())
+    completed_orders = list(done_result.scalars().all())
 
-    def _paid_at(order: Order) -> datetime:
+    def _delivered_at(order: Order) -> datetime:
         # SQLite (the test DB) hands back naive datetimes even for
         # timezone-aware columns; Postgres (real DB) doesn't. Normalize so
         # the comparisons below work identically either way.
-        ts = order.paid_at
+        ts = order.delivered_at
         return ts if ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
 
     earnings_today = sum(
-        (o.agent_share for o in paid_orders if _paid_at(o) >= today_start),
+        (o.agent_share for o in completed_orders if _delivered_at(o) >= today_start),
         start=Decimal("0.00"),
     )
     earnings_week = sum(
-        (o.agent_share for o in paid_orders if _paid_at(o) >= week_start),
+        (o.agent_share for o in completed_orders if _delivered_at(o) >= week_start),
         start=Decimal("0.00"),
     )
-    earnings_total = sum((o.agent_share for o in paid_orders), start=Decimal("0.00"))
+    earnings_total = sum((o.agent_share for o in completed_orders), start=Decimal("0.00"))
+
+    pending_result = await db.execute(
+        select(Order).where(
+            Order.agent_id == user_id,
+            Order.paid_at.is_not(None),
+            Order.status.in_((
+                OrderStatus.PAID, OrderStatus.DROPPED_AT_HUB, OrderStatus.RECEIVED_BY_HUB,
+                OrderStatus.READY_FOR_PICKUP, OrderStatus.PACKED, OrderStatus.OUT_FOR_DELIVERY,
+            )),
+        )
+    )
+    earnings_pending = sum((o.agent_share for o in pending_result.scalars().all()), start=Decimal("0.00"))
 
     # The same two buckets Home groups its task list into (see the agent
     # Home screen) — surfaced here as counts only, for the dashboard summary.
@@ -79,11 +96,12 @@ async def get_summary(db: AsyncSession, *, user_id: uuid.UUID) -> dict:
         "earnings_today": earnings_today,
         "earnings_week": earnings_week,
         "earnings_total": earnings_total,
+        "earnings_pending": earnings_pending,
         "ready_to_shop_count": len(ready),
         "in_progress_count": len(in_progress),
         "is_available": agent.is_available,
         "on_duty": agent.on_duty,
-        "completed_orders": paid_orders[:50],
+        "completed_orders": completed_orders[:50],
     }
 
 

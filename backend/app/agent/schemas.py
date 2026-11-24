@@ -20,6 +20,7 @@ class CompletedOrderOut(BaseModel):
     agent_share: Decimal
     grand_total: Decimal
     paid_at: datetime | None
+    delivered_at: datetime | None
     status: OrderStatus
 
 
@@ -27,6 +28,8 @@ class AgentSummaryOut(BaseModel):
     earnings_today: Decimal
     earnings_week: Decimal
     earnings_total: Decimal
+    # Paid for but not yet delivered - released to the agent on confirmation.
+    earnings_pending: Decimal = Decimal("0.00")
     ready_to_shop_count: int
     in_progress_count: int
     is_available: bool

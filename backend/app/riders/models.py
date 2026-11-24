@@ -12,17 +12,20 @@ from app.core.enums import RiderStatus
 class Rider(Base):
     """An approved rider on Qyka's roster.
 
-    Deliberately NOT a login role (yet): there's no rider app, and deliveries
-    still go through the third-party courier (see delivery.service
-    .dispatch_to_courier). This is the admin's record of who's been vetted,
-    where they cover and whether they're active - created only by approving
-    a rider application.
+    The admin's record of who's been vetted, where they cover and whether
+    they're active - created only by approving a rider application. Approval
+    also gives the rider a login (UserRole.RIDER) and links it here through
+    user_id. user_id is NULL only for riders approved before riders could
+    sign in.
     """
 
     __tablename__ = "riders"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), unique=True, index=True, nullable=True
     )
     full_name: Mapped[str] = mapped_column(String(120))
     phone: Mapped[str] = mapped_column(String(20), unique=True, index=True)

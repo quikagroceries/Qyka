@@ -20,7 +20,7 @@ const CFG: EarnConfig = {
   eyebrow: "For riders",
   title: "Deliver market hauls,",
   titleAccent: "earn on your schedule.",
-  lede: "Pick up packed orders at the market gate and ride them to the door. Paid for every completed delivery.",
+  lede: "Claim a delivery, collect it from the market hub with your code, and ride it to the door. Paid a fixed fee for every completed delivery.",
   cta: "Apply as a rider",
   hero: {
     main: earnRiderBikes,
@@ -33,23 +33,23 @@ const CFG: EarnConfig = {
   },
   perks: [
     { title: "Flexible hours", body: "Come online when it suits you and accept the deliveries that fit your route.", art: badgeExpress },
-    { title: "Paid per delivery", body: "Earnings are tied to completed runs, confirmed by the customer.", art: badgeHuman },
-    { title: "Already packed and proven", body: "Orders arrive sealed and photographed. You're moving it, not assembling it.", art: badgeFresh },
+    { title: "A fixed fee per delivery", body: "You know what a delivery pays before you claim it. It counts once the customer confirms they got their order.", art: badgeHuman },
+    { title: "Already checked and ready", body: "A shopkeeper at the hub has checked every order against the list. You're moving it, not assembling it.", art: badgeFresh },
   ],
   dayTitle: "A delivery, start to finish.",
   day: [
-    { title: "Accept a delivery", body: "A packed order needs a ride from a market gate to a customer's door.", art: route },
-    { title: "Pick up at the gate", body: "Collect the sealed order from the agent, already packed and photographed.", art: handoff },
-    { title: "Ride it home", body: "Bike, keke or car - whatever fits your route.", art: earnKekeCar },
-    { title: "Confirm and earn", body: "The customer confirms receipt, the run closes, and your earnings land.", art: phone },
+    { title: "Claim a delivery", body: "Ready orders from your market appear in the app. Claim one - first to claim gets it, and you take one at a time.", art: route },
+    { title: "Collect it at the hub", body: "Go to the market hub and show the shopkeeper your 4-digit code. They check it and hand you the order.", art: handoff },
+    { title: "Ride it to the door", body: "Bike, keke or car - whatever fits your route. The customer's address and number are in the app.", art: earnKekeCar },
+    { title: "Get their code, then earn", body: "Ask the customer for their 4-digit code and enter it to confirm the drop-off. When they confirm receipt, your earnings land.", art: phone },
   ],
   fit: [
     { title: "You know the routes", body: "Market exits, traffic patterns and the fastest way to a doorstep." },
-    { title: "You have your own ride", body: "Bike, keke or car: whatever gets a packed order there intact." },
-    { title: "You're phone-fluent", body: "Confirming pickups, following drop-off details and chatting if plans change." },
+    { title: "You have your own ride", body: "Bike, keke or car: whatever gets an order there intact." },
+    { title: "You're phone-fluent", body: "Claiming deliveries, showing your pickup code and entering the customer's code at the door." },
   ],
   requirements: [
-    "A smartphone with data, since pickup and drop-off details live in the app",
+    "A smartphone with data, since deliveries, codes and drop-off details live in the app",
     "Your own bike, keke or car in good working order",
     "A bank account or wallet your delivery earnings can be paid into",
     "Valid ID (and a rider's licence, where your vehicle requires one)",
@@ -57,6 +57,8 @@ const CFG: EarnConfig = {
   faq: [
     { q: "How am I paid?", a: "Earnings are tracked per completed delivery in the app and paid out to your linked account." },
     { q: "Do I deliver across the whole city?", a: "No. You register for an area or market, and only see deliveries starting near you." },
+    { q: "What are the codes for?", a: "Your pickup code proves to the shopkeeper that you're the rider who claimed the order. The customer's code, which you ask for at their door, proves you handed it to the right person. Neither can be skipped." },
+    { q: "Can I give a delivery back?", a: "Yes, any time before you collect it from the hub - it goes back for other riders. Once you've collected it, it's yours to deliver." },
     { q: "What if I can't find the address?", a: "Drop-off details and the customer's contact are in the app. Chat with them directly if plans change." },
   ],
   form: {
@@ -70,6 +72,7 @@ const CFG: EarnConfig = {
     ],
     art: earnPayoutMoment,
   },
+  estimator: { pay: "rider", unit: "Deliveries", min: 5, max: 60, start: 25, footnote: "A fixed fee for each completed delivery. Actual earnings depend on the deliveries you complete." },
   other: {
     label: "Know the market? Shop for others",
     href: "/for-agents",

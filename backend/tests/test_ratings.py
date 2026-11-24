@@ -72,10 +72,8 @@ async def _completed_order(client, db_session_factory, monkeypatch):
     await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
     r = await client.post(f"/payments/orders/{oid}/pay-from-wallet", headers=cust_h)
     assert r.status_code == 200, r.text
-    r = await client.post(f"/delivery/orders/{oid}/pack", headers=agent_h)
-    assert r.status_code == 200, r.text
-    r = await client.post(f"/delivery/orders/{oid}/dispatch-courier", headers=agent_h, json={})
-    assert r.status_code == 200, r.text
+    from tests.conftest import out_for_delivery
+    await out_for_delivery(client, db_session_factory, oid, market_id, agent_h)
     r = await client.post(f"/delivery/orders/{oid}/confirm-delivery", headers=cust_h)
     assert r.status_code == 200, r.text
 

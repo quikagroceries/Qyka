@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.admin.guards import AuditedRoute, require_admin
 from app.auth.models import User
 from app.core.database import get_db
 from app.core.enums import LedgerDirection, UserRole
@@ -10,14 +11,14 @@ from app.core.security import require_role
 from app.float import service
 from app.float.schemas import PoolBalanceOut, TopUpIn, TransferIn
 
-router = APIRouter()
+router = APIRouter(route_class=AuditedRoute)
 
 
 @router.get("/balance", response_model=PoolBalanceOut)
 async def balance(
     market_id: uuid.UUID | None = None,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> PoolBalanceOut:
     """market_id omitted reads the legacy/global pool, as before."""
     return PoolBalanceOut(balance=await service.get_pool_balance(db, market_id))
@@ -28,7 +29,7 @@ async def top_up(
     body: TopUpIn,
     market_id: uuid.UUID | None = None,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("float.top_up", owner_only=True)),
 ) -> PoolBalanceOut:
     """market_id omitted credits the legacy/global pool, as before."""
     entry = await service.record_movement(
@@ -45,7 +46,7 @@ async def top_up(
 async def transfer(
     body: TransferIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("float.transfer", owner_only=True)),
 ) -> dict:
     """Move float from one market's pool to another - the "quiet market
     subsidizes a busy one" case. Thin route over the already-tested

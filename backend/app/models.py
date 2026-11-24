@@ -14,4 +14,9 @@ from app.jit.models import (  # noqa: F401
 )
 from app.ratings.models import AgentRating  # noqa: F401
 from app.locations.models import LocationSearch  # noqa: F401
-from app.riders.models import Rider  # noqa: F401
+from app.riders.models import Rider  # noqa: F401from app.hubs.models import Hub  # noqa: F401
+from app.orders.fee_settings import FeeSetting  # noqa: F401
+from app.admin.audit import AdminAuditLog  # noqa: F401
+from app.platform_settings.models import PlatformSetting  # noqa: F401
+from app.content.models import SiteContent  # noqa: F401
+from app.investors.models import InvestorLink  # noqa: F401

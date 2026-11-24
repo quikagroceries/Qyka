@@ -1,42 +1,45 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Icon from "@/components/ui/Icon";
 
 // Post-payment status screen: a vertical timeline built entirely from the
 // order's own timestamps (created_at / agent_assigned_at / paid_at /
-// packed_at / dispatched_at / delivered_at) - no map, no API key, no
-// "address not located" awkwardness. A live map can slot back in later as
-// an optional view once a courier API feeds real position data; until then
-// this is the primary (and only) reassurance, and it's honest about what
-// this system actually knows.
-//
-// "Rider assigned / at pickup" and "Out for delivery" share one timestamp
-// (dispatched_at) - V1 hands off to the courier and marks the order out for
-// delivery in one action, so there's no real in-between moment to record
-// separately yet. Both rows still show, they just complete together.
+// dropped_at_hub_at / hub_received_at / packed_at / rider_claimed_at /
+// dispatched_at / delivered_at) - no map, no API key, no "address not
+// located" awkwardness. It's honest about what this system actually knows:
+// the agent drops the goods at the market hub, the shopkeeper checks them
+// in and readies them, a rider claims the job and collects it, then it's
+// out for delivery.
 const ROWS = [
   { key: "placed", label: "Order placed", ts: (o) => o.created_at },
   { key: "agent_assigned", label: "Agent assigned & accepted", ts: (o) => o.agent_assigned_at },
   { key: "paid", label: "Balance paid", ts: (o) => o.paid_at },
-  { key: "packaging", label: "Packaging", ts: (o) => o.packed_at },
-  { key: "packed", label: "Packed", ts: (o) => o.packed_at },
-  { key: "rider_assigned", label: "Rider assigned / at pickup", ts: (o) => o.dispatched_at },
+  { key: "at_hub", label: "Dropped at the market hub", ts: (o) => o.dropped_at_hub_at },
+  { key: "checked_in", label: "Checked in at the hub", ts: (o) => o.hub_received_at },
+  { key: "ready", label: "Ready for a rider", ts: (o) => o.packed_at },
+  { key: "rider_assigned", label: "Rider assigned", ts: (o) => o.rider_claimed_at },
   { key: "out_for_delivery", label: "Out for delivery", ts: (o) => o.dispatched_at },
   { key: "delivered", label: "Delivered", ts: (o) => o.delivered_at },
 ];
 
-const PACKAGING_WINDOW_MS = 10 * 60 * 1000;
+// Orders that went out before the hub existed: the agent packed them and a
+// courier took them, so they never have the hub or rider timestamps. Show
+// them the way they actually happened rather than as a stalled new timeline.
+const LEGACY_ROWS = [
+  { key: "placed", label: "Order placed", ts: (o) => o.created_at },
+  { key: "agent_assigned", label: "Agent assigned & accepted", ts: (o) => o.agent_assigned_at },
+  { key: "paid", label: "Balance paid", ts: (o) => o.paid_at },
+  { key: "packed", label: "Packed", ts: (o) => o.packed_at },
+  { key: "out_for_delivery", label: "Out for delivery", ts: (o) => o.dispatched_at },
+  { key: "delivered", label: "Delivered", ts: (o) => o.delivered_at },
+];
 
-function formatRemaining(ms) {
-  const overrun = ms < 0;
-  const abs = Math.abs(ms);
-  const m = Math.floor(abs / 60000);
-  const s = Math.floor((abs % 60000) / 1000);
-  const clock = `${m}:${String(s).padStart(2, "0")}`;
-  return overrun ? `+${clock} over` : clock;
+function rowsFor(order) {
+  const legacy = !order.hub_id && (order.status === "packed" || order.dispatched_at || order.delivered_at);
+  return legacy ? LEGACY_ROWS : ROWS;
 }
 
 function formatTimestamp(iso) {
@@ -49,9 +52,9 @@ function formatTimestamp(iso) {
 // is done (has a timestamp), everything after is still future. Fully
 // data-driven, so a stalled/failed step (e.g. packed but dispatch failed)
 // correctly parks the timeline there instead of guessing from `status`.
-function currentRowIndex(order) {
-  for (let i = 0; i < ROWS.length; i++) {
-    if (!ROWS[i].ts(order)) return i;
+function currentRowIndex(rows, order) {
+  for (let i = 0; i < rows.length; i++) {
+    if (!rows[i].ts(order)) return i;
   }
   return -1;
 }
@@ -95,35 +98,36 @@ function TimelineRow({ label, timestamp, done, current, isLast, children }: any)
   );
 }
 
+function PhotoRow({ photos, onPreview }: any) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {photos.map((src, idx) => (
+        <button key={src + idx} onClick={() => onPreview(src)} className="shrink-0 overflow-hidden rounded-lg">
+          {/* eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary photo */}
+          <img src={src} alt="" className="h-16 w-16 object-cover" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function DeliveryTracking({ order, onConfirmDelivery, busy }: any) {
-  // Seeded null (never Date.now() during render, which is impure) - the
-  // interval below fills in a real clock reading within a second of mount,
-  // fine for a soft guidance countdown.
-  const [now, setNow] = useState<any>(null);
   const [preview, setPreview] = useState<any>(null);
   // Confirming delivery releases the agent's payout - a deliberate two-step
   // tap, not a single button sitting there ready to mis-tap.
   const [confirming, setConfirming] = useState(false);
 
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const startedAt = order.paid_at ? new Date(order.paid_at).getTime() : null;
-  const remaining = now != null && startedAt != null ? startedAt + PACKAGING_WINDOW_MS - now : PACKAGING_WINDOW_MS;
-  const overrun = remaining < 0;
-  const nearOverrun = !overrun && remaining < 2 * 60 * 1000;
-
-  const currentIdx = currentRowIndex(order);
+  const rows = rowsFor(order);
+  const currentIdx = currentRowIndex(rows, order);
   const packingPhotos = order.packing_photos || [];
+  const riderSaysDelivered = order.status === "out_for_delivery" && !!order.rider_delivered_at;
 
   return (
     <Card>
       <p className="mb-4 font-bold text-ink">Order status</p>
 
       <div>
-        {ROWS.map((row, i) => {
+        {rows.map((row, i) => {
           const rawTs = row.ts(order);
           const done = !!rawTs;
           const current = i === currentIdx;
@@ -134,43 +138,25 @@ function DeliveryTracking({ order, onConfirmDelivery, busy }: any) {
               timestamp={rawTs}
               done={done}
               current={current}
-              isLast={i === ROWS.length - 1}
+              isLast={i === rows.length - 1}
             >
-              {row.key === "packaging" && current && (
-                <div className="mt-2 rounded-2xl bg-brand-orange/[0.09] p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm text-muted">Your agent is preparing your order.</p>
-                    <span
-                      className={
-                        "shrink-0 rounded-full px-2.5 py-1 text-xs font-bold " +
-                        (overrun ? "bg-red-100 text-red-700" : nearOverrun ? "bg-brand-orange/15 text-brand-orange-dark" : "bg-surface text-muted")
-                      }
-                    >
-                      {overrun ? formatRemaining(remaining) : `ready in ~${formatRemaining(remaining)}`}
-                    </span>
-                  </div>
-                  {packingPhotos.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {packingPhotos.map((src, idx) => (
-                        <button key={src + idx} onClick={() => setPreview(src)} className="shrink-0 overflow-hidden rounded-lg">
-                          <img src={src} alt="" className="h-16 w-16 object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              {row.key === "at_hub" && current && (
+                <p className="mt-1 text-sm text-faint">Your agent is taking your order to the hub in the market.</p>
+              )}
+              {row.key === "at_hub" && done && packingPhotos.length > 0 && (
+                <PhotoRow photos={packingPhotos} onPreview={setPreview} />
+              )}
+              {row.key === "checked_in" && current && order.dropped_at_hub_at && (
+                <p className="mt-1 text-sm text-faint">The hub is checking everything arrived.</p>
+              )}
+              {row.key === "ready" && current && order.hub_received_at && (
+                <p className="mt-1 text-sm text-faint">Being bagged up for your rider.</p>
+              )}
+              {row.key === "rider_assigned" && current && order.packed_at && (
+                <p className="mt-1 text-sm text-faint">Waiting for a rider to pick up your order.</p>
               )}
               {row.key === "packed" && done && packingPhotos.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {packingPhotos.map((src, idx) => (
-                    <button key={src + idx} onClick={() => setPreview(src)} className="shrink-0 overflow-hidden rounded-lg">
-                      <img src={src} alt="" className="h-16 w-16 object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
-              {row.key === "rider_assigned" && current && (
-                <p className="mt-1 text-sm text-faint">Waiting for a rider to pick up your order.</p>
+                <PhotoRow photos={packingPhotos} onPreview={setPreview} />
               )}
             </TimelineRow>
           );
@@ -182,7 +168,8 @@ function DeliveryTracking({ order, onConfirmDelivery, busy }: any) {
           className="fixed inset-0 z-[1800] flex items-center justify-center bg-black/90 p-4"
           onClick={() => setPreview(null)}
         >
-          <img src={preview} alt="Packing photo" className="max-h-full max-w-full rounded-lg" />
+          {/* eslint-disable-next-line @next/next/no-img-element -- remote Cloudinary photo */}
+          <img src={preview} alt="Photo of your order" className="max-h-full max-w-full rounded-lg" />
           <button
             onClick={() => setPreview(null)}
             aria-label="Close"
@@ -193,12 +180,11 @@ function DeliveryTracking({ order, onConfirmDelivery, busy }: any) {
         </div>
       )}
 
-      {/* A short PIN for the customer to hand the rider at pickup -
-          verifiable handoff, no rider-side app needed to check it. No
-          longer relevant once delivered. */}
+      {/* The PIN the customer gives the rider at their door - the rider's app
+          checks it. No longer relevant once delivered. */}
       {order.handover_code && order.status !== "delivered" && order.status !== "closed" && (
         <div className="mt-5 rounded-2xl border border-dashed border-brand-orange/40 bg-brand-orange/[0.08] p-4 text-center">
-          <p className="text-sm font-semibold text-muted">Share this code with the rider at handover</p>
+          <p className="text-sm font-semibold text-muted">Give this code to the rider when they hand you your order</p>
           <p className="mt-1 text-3xl font-extrabold tracking-[0.3em] text-brand-orange">{order.handover_code}</p>
         </div>
       )}
@@ -206,6 +192,11 @@ function DeliveryTracking({ order, onConfirmDelivery, busy }: any) {
       {/* Only ever appears once the order is actually out for delivery -
           never during packaging, and never a one-tap action, since
           confirming releases the agent's payout. */}
+      {riderSaysDelivered && !confirming && (
+        <p className="mt-5 rounded-2xl bg-brand-orange/[0.12] px-4 py-3 text-center text-sm font-semibold text-ink">
+          Your rider says your order has been handed over. Please confirm below.
+        </p>
+      )}
       {order.status === "out_for_delivery" && !confirming && (
         <Button onClick={() => setConfirming(true)} fullWidth className="mt-5 text-lg">
           Confirm delivery received

@@ -16,9 +16,15 @@ function activeKeyFromPath(pathname) {
   if (pathname.startsWith("/admin/agents")) return "agents";
   if (pathname.startsWith("/admin/riders")) return "riders";
   if (pathname.startsWith("/admin/users")) return "users";
+  if (pathname.startsWith("/admin/hubs")) return "hubs";
+  if (pathname.startsWith("/admin/pay")) return "pay";
   if (pathname.startsWith("/admin/float")) return "float";
+  if (pathname.startsWith("/admin/company")) return "company";
   if (pathname.startsWith("/admin/analytics")) return "analytics";
   if (pathname.startsWith("/admin/admins")) return "admins";
+  if (pathname.startsWith("/admin/audit")) return "audit";
+  if (pathname.startsWith("/admin/content")) return "content";
+  if (pathname.startsWith("/admin/platform")) return "platform";
   if (pathname.startsWith("/admin/settings")) return "settings";
   return "dashboard";
 }
@@ -78,7 +84,9 @@ export default function AdminLayout({ children }: any) {
         <FirstPasswordGate onDone={() => api.me().then(setUser)} onLogout={handleLogout} />
       ) : (
         <AppShell
-          navItems={ADMIN_NAV}
+          // Support staff run operations; money rules, other admins and the
+          // audit log are owner-only (the server enforces it too).
+          navItems={ADMIN_NAV.filter((i: any) => !i.ownerOnly || user?.admin_level === "owner")}
           activeKey={activeKeyFromPath(pathname)}
           user={user}
           onLogout={handleLogout}

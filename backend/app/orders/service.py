@@ -16,7 +16,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.enums import MarketStatus, OrderStatus, UserRole
-from app.orders import fees
+from app.orders import fee_settings, fees
+from app.platform_settings import service as platform
 from app.orders.models import Order, OrderItem
 from app.wallet import service as wallet_service
 from app.orders import assignment
@@ -91,6 +92,7 @@ async def _estimates(
     items: list[dict],
     listed_items_total: Decimal,
     must_prepay: bool = False,
+    cfg: fees.PricingConfig = fees.DEFAULT_PRICING,
 ) -> tuple[Decimal, Decimal, Decimal]:
     """(goods_estimate, estimated_value, deposit) for a list - shared by
     create_order and update_draft so an edited list is priced by exactly the
@@ -100,7 +102,7 @@ async def _estimates(
     ]
     priced_total = sum(item_prices, start=Decimal("0.00"))
     listed_items_total = priced_total + listed_items_total
-    estimated_value = fees.estimate_order_value(listed_items_total)
+    estimated_value = fees.estimate_order_value(listed_items_total, cfg=cfg)
     # A customer flagged must_prepay (a past non-payer) pays 100% up
     # front regardless of order size, until they complete a paid order. Read the
     # flag from their record so it can't be bypassed by the caller.
@@ -110,7 +112,7 @@ async def _estimates(
     ).scalar_one_or_none()
     effective_prepay = must_prepay or bool(cust and cust.must_prepay)
     deposit = fees.required_deposit(
-        listed_items_total, estimated_value, must_prepay=effective_prepay
+        listed_items_total, estimated_value, must_prepay=effective_prepay, cfg=cfg
     )
     return listed_items_total, estimated_value, deposit
 
@@ -154,13 +156,22 @@ async def create_order(
             )
         market_hours.ensure_open(market)
 
+    if await platform.get(db, "orders_paused"):
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            await platform.get(db, "orders_paused_message"),
+        )
+    cfg = await platform.pricing(db)
     listed_items_total, estimated_value, deposit = await _estimates(
-        db, customer_id, items, listed_items_total, must_prepay
+        db, customer_id, items, listed_items_total, must_prepay, cfg
     )
 
+    rider_fee, hub_fee = await fee_settings.resolve(db, market_id)
     order = Order(
         customer_id=customer_id,
         market_id=market_id,
+        rider_fee=rider_fee,
+        hub_fee=hub_fee,
         status=OrderStatus.DRAFT,
         delivery_address=delivery_address,
         dropoff_latitude=dropoff_latitude,
@@ -168,6 +179,7 @@ async def create_order(
         estimated_value=estimated_value,
         goods_estimate=listed_items_total,
         deposit_amount=deposit,
+        pricing=cfg.to_snapshot(),
     )
     order.items = [
         OrderItem(
@@ -217,7 +229,8 @@ async def update_draft(
             status.HTTP_409_CONFLICT, "Only a draft list can be edited"
         )
     goods, estimated, deposit = await _estimates(
-        db, customer_id, items, listed_items_total
+        db, customer_id, items, listed_items_total,
+        cfg=fees.PricingConfig.from_snapshot(order.pricing),
     )
     order.goods_estimate = goods
     order.estimated_value = estimated
@@ -312,7 +325,8 @@ async def cancel_order(
 _ADMIN_CANCELLABLE = {
     OrderStatus.DRAFT, OrderStatus.PROPOSED, OrderStatus.AGENT_ASSIGNED,
     OrderStatus.SHOPPING, OrderStatus.AWAITING_PAYMENT, OrderStatus.PAID,
-    OrderStatus.PACKED, OrderStatus.OUT_FOR_DELIVERY,
+    OrderStatus.DROPPED_AT_HUB, OrderStatus.RECEIVED_BY_HUB,
+    OrderStatus.READY_FOR_PICKUP, OrderStatus.PACKED, OrderStatus.OUT_FOR_DELIVERY,
 }
 
 
@@ -585,8 +599,9 @@ async def finish_shopping(
     # EMTL: ₦50 per confirmed item transfer >= ₦10,000. Once the JIT transfer
     # layer is live these come from actual vendor_transfers; for now they're
     # derived from confirmed item prices, which is the same set of payments.
+    cfg = fees.PricingConfig.from_snapshot(order.pricing)
     emtl_total = sum(
-        (fees.emtl_for_transfer(it.confirmed_price) for it in confirmed),
+        (fees.emtl_for_transfer(it.confirmed_price, cfg) for it in confirmed),
         start=Decimal("0.00"),
     )
     breakdown = fees.calculate_fees(
@@ -595,6 +610,7 @@ async def finish_shopping(
         emtl_total=emtl_total,
         transfer_fees_total=order.transfer_fees_total,
         delivery_fee=order.delivery_fee if order.delivery_fee else None,
+        cfg=cfg,
     )
     order.items_total = breakdown["items_total"]
     order.combined_fee = breakdown["combined_fee"]
@@ -622,7 +638,7 @@ async def finish_shopping(
         order.deposit_amount = order.grand_total
 
     order.payment_window_expires_at = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.payment_window_minutes
+        minutes=await platform.get(db, "payment_window_minutes")
     )
 
     await assignment.set_agent_availability(db, agent_id, available=True)
@@ -673,7 +689,7 @@ async def add_item(
 
     try:
         await wallet_service.debit(
-            db, customer_id, fees.ADD_ITEM_FEE, order_id=order.id,
+            db, customer_id, fees.PricingConfig.from_snapshot(order.pricing).add_item_fee, order_id=order.id,
             note="Mid-order add-item fee",
         )
     except ValueError:

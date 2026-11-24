@@ -22,6 +22,9 @@ function kindLabel(kind) {
     case "order_cancelled": return "Order cancelled";
     case "item_decided": return "Customer decision";
     case "overage_approval": return "Approval needed";
+    case "out_for_delivery": return "On its way";
+    case "rider_delivered": return "Handed over";
+    case "hub_drop": return "New drop-off";
     default: return kind;
   }
 }

@@ -28,7 +28,11 @@ export const FAQS = [
   },
   {
     q: "Can I become a Qyka agent or rider?",
-    a: "Yes. Agents apply on the Agent page if they already know a market's stalls and prices; riders apply on the Rider page to run deliveries between markets and doorsteps. Both earn on completed runs.",
+    a: "Yes. Agents apply on the Agent page if they already know a market's stalls and prices; riders apply on the Rider page to carry orders from a market hub to the customer's door. Both earn on completed runs. Hubs are set up by Qyka directly - to host one in your market, get in touch.",
+  },
+  {
+    q: "How does my order get from the market to me?",
+    a: "After your agent has bought everything and you’ve paid, they drop it at a hub in the market. The shopkeeper there checks it against your list, and a Qyka rider collects it and brings it to your door. You’ll get a 4-digit code to give the rider when they arrive, so it only ever goes to you.",
   },
   {
     q: "What if something’s wrong with my order?",
@@ -39,7 +43,7 @@ export const FAQS = [
 export const HELP_TOPICS = [
   {
     title: "Orders & tracking",
-    body: "Where's my run, what does each status mean, and what to do if it's stalled.",
+    body: "Where's my run, what each step means (shopping, the market hub, your rider), and what to do if it's stalled.",
     href: "/#faq",
   },
   {
@@ -54,7 +58,7 @@ export const HELP_TOPICS = [
   },
   {
     title: "Become a Rider",
-    body: "Pickup points, delivery windows, and how rider earnings are paid out.",
+    body: "Claiming deliveries, collecting from market hubs with your code, and how rider earnings are paid out.",
     href: "/for-riders",
   },
   {
