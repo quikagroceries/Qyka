@@ -88,7 +88,8 @@ async def remove_admin(
 # Statuses that mean an order is still "in flight" (not finished/dead).
 _ACTIVE = [
     OrderStatus.DRAFT, OrderStatus.AGENT_ASSIGNED, OrderStatus.SHOPPING,
-    OrderStatus.AWAITING_PAYMENT, OrderStatus.PAID, OrderStatus.PACKED,
+    OrderStatus.AWAITING_PAYMENT, OrderStatus.PAID, OrderStatus.DROPPED_AT_HUB,
+    OrderStatus.RECEIVED_BY_HUB, OrderStatus.READY_FOR_PICKUP, OrderStatus.PACKED,
     OrderStatus.OUT_FOR_DELIVERY,
 ]
 

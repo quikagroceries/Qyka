@@ -164,10 +164,15 @@ async def test_dispatch_to_courier_sends_the_critical_out_for_delivery_notice(db
         agent = User(phone="+2348079990001", role=UserRole.AGENT, status=UserStatus.ACTIVE)
         s.add(agent)
         await s.flush()
-        order = Order(customer_id=customer_id, agent_id=agent.id, market_id=uuid.uuid4(), status=OrderStatus.PACKED)
+        admin = User(email="notif-admin@qyka.com", role=UserRole.ADMIN, status=UserStatus.ACTIVE)
+        s.add(admin)
+        order = Order(
+            customer_id=customer_id, agent_id=agent.id, market_id=uuid.uuid4(),
+            status=OrderStatus.READY_FOR_PICKUP,
+        )
         s.add(order)
         await s.flush()
-        await dispatch_to_courier(s, order_id=order.id, actor=agent)
+        await dispatch_to_courier(s, order_id=order.id, actor=admin)
         await s.commit()
         [note] = (await s.execute(select(Notification).where(Notification.user_id == customer_id))).scalars().all()
 

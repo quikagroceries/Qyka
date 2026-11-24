@@ -312,7 +312,8 @@ async def cancel_order(
 _ADMIN_CANCELLABLE = {
     OrderStatus.DRAFT, OrderStatus.PROPOSED, OrderStatus.AGENT_ASSIGNED,
     OrderStatus.SHOPPING, OrderStatus.AWAITING_PAYMENT, OrderStatus.PAID,
-    OrderStatus.PACKED, OrderStatus.OUT_FOR_DELIVERY,
+    OrderStatus.DROPPED_AT_HUB, OrderStatus.RECEIVED_BY_HUB,
+    OrderStatus.READY_FOR_PICKUP, OrderStatus.PACKED, OrderStatus.OUT_FOR_DELIVERY,
 }
 
 

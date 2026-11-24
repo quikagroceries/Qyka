@@ -23,6 +23,7 @@ from app.auth.models import User
 from app.core.enums import LedgerDirection, OrderStatus, UserRole
 from app.delivery import payouts
 from app.float import service as float_service
+from app.hubs.models import Hub
 from app.notifications import service as notif_service
 from app.orders.models import Order
 from app.orders.state_machine import IllegalTransition, assert_can_transition
@@ -48,16 +49,54 @@ async def _transition(db: AsyncSession, order: Order, target: OrderStatus) -> No
     await db.flush()
 
 
-async def mark_packed(
-    db: AsyncSession, *, order_id: uuid.UUID, agent_id: uuid.UUID
+async def drop_at_hub(
+    db: AsyncSession,
+    *,
+    order_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    hub_id: uuid.UUID | None,
 ) -> Order:
-    """Agent packs the order. Only valid once PAID (state machine enforces)."""
+    """Agent drops the paid order's goods at a hub in the order's market.
+
+    Only valid once PAID (state machine enforces), so goods never travel on
+    an unpaid order. The hub is the one given, which must be an active hub
+    in this order's market - or, when omitted, the market's only active hub.
+    The shopkeeper is told; custody passes to them when they confirm receipt.
+    """
     order = await _load(db, order_id)
     if order.agent_id != agent_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the assigned agent")
-    await _transition(db, order, OrderStatus.PACKED)
-    order.packed_at = datetime.now(timezone.utc)
-    await db.flush()
+    if order.status is not OrderStatus.PAID:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Cannot drop at a hub from {order.status.value}: the order must be paid",
+        )
+
+    hubs = list((await db.execute(
+        select(Hub).where(Hub.market_id == order.market_id, Hub.is_active.is_(True))
+    )).scalars().all())
+    if hub_id is not None:
+        hub = next((h for h in hubs if h.id == hub_id), None)
+        if hub is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "That hub isn't an active hub in this order's market"
+            )
+    elif not hubs:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This market has no hub yet")
+    elif len(hubs) > 1:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "This market has several hubs - pick one"
+        )
+    else:
+        hub = hubs[0]
+
+    order.hub_id = hub.id
+    order.dropped_at_hub_at = datetime.now(timezone.utc)
+    await _transition(db, order, OrderStatus.DROPPED_AT_HUB)
+    await notif_service.send(
+        db, user_id=hub.user_id, order_id=order.id, kind="hub_drop",
+        message="An agent has dropped an order at your hub - check it in.",
+    )
     return order
 
 
@@ -70,9 +109,10 @@ async def dispatch_to_courier(
     so nobody travels for an order that might not be paid for — and the goods
     are already packed when they arrive, so there is no paid waiting time.
 
-    Callable by the assigned agent (the one actually handing the package
-    over, right after packing it - see delivery.routes) or an admin
-    (oversight override, no ownership check). V1 records the handoff and
+    TEMPORARY, admin only: the hub flow hands orders to riders instead (the
+    rider claim/pickup endpoints replace this and it goes away with them),
+    but until those exist this is the only way a ready order gets moving.
+    V1 records the handoff and
     moves the order out for delivery, generating a placeholder tracking
     reference if the caller doesn't supply one, so there's always something
     for a tracking screen to show. The partner's booking API call goes here
@@ -80,13 +120,13 @@ async def dispatch_to_courier(
     from its response instead of being generated.
     """
     order = await _load(db, order_id)
-    if order.status is not OrderStatus.PACKED:
+    if order.status not in (OrderStatus.READY_FOR_PICKUP, OrderStatus.PACKED):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "Order must be packed before courier dispatch",
+            "Order must be ready for pickup at the hub before dispatch",
         )
-    if actor.role is not UserRole.ADMIN and order.agent_id != actor.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the assigned agent")
+    if actor.role is not UserRole.ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin only")
     order.courier_reference = courier_reference or f"QK-{order.id.hex[:8].upper()}"
     # A short PIN the customer shares with the rider at handover - a
     # verifiable-handoff step. secrets, not random, since it's shared as a

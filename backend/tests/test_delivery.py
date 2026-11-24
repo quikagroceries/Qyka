@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.config import settings
-from tests.conftest import pay_deposit
+from tests.conftest import make_hub, pay_deposit, through_hub
 
 PHONE_CUST = "+2348010000001"
 PHONE_AGENT = "+2348020000002"
@@ -98,12 +98,17 @@ async def test_full_delivery_and_payout(client, db_session_factory, monkeypatch)
         pool_after_payment = await float_service.get_pool_balance(s, market_id)
 
     # --- delivery arc ---
-    # can't pack as wrong role
-    r = await client.post(f"/delivery/orders/{oid}/pack", headers=rider_h)
+    # can't drop at a hub as the wrong role
+    r = await client.post(f"/delivery/orders/{oid}/drop-at-hub", headers=rider_h)
     assert r.status_code == 403
 
-    r = await client.post(f"/delivery/orders/{oid}/pack", headers=agent_h)
-    assert r.status_code == 200 and r.json()["status"] == "packed"
+    # No hub in the market yet -> nowhere to drop.
+    r = await client.post(f"/delivery/orders/{oid}/drop-at-hub", headers=agent_h)
+    assert r.status_code == 409
+
+    await through_hub(client, db_session_factory, oid, market_id, agent_h)
+    r = await client.get(f"/orders/{oid}", headers=admin_h)
+    assert r.json()["status"] == "ready_for_pickup"
 
     r = await client.post(
         f"/delivery/orders/{oid}/dispatch-courier", headers=admin_h,
@@ -183,18 +188,18 @@ async def test_cannot_pack_unpaid_order(client, db_session_factory):
     await pay_deposit(client, admin_h, oid)
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
-    # order is in SHOPPING, never paid — packing must fail
-    r = await client.post(f"/delivery/orders/{oid}/pack", headers=agent_h)
-    assert r.status_code == 409, "unpaid order should not be packable"
+    # order is in SHOPPING, never paid — dropping at a hub must fail
+    await make_hub(client, db_session_factory, market_id)
+    r = await client.post(f"/delivery/orders/{oid}/drop-at-hub", headers=agent_h)
+    assert r.status_code == 409, "unpaid order should not be droppable at a hub"
     print("Unpaid order correctly blocked from delivery.")
 
 
 @pytest.mark.asyncio
-async def test_agent_can_dispatch_own_order_others_cannot(client, db_session_factory, monkeypatch):
-    """The assigned agent can dispatch their own packed order (the normal
-    one-tap-after-packing path) without needing an admin; a DIFFERENT agent
-    is refused. No explicit courier_reference -> one is auto-generated so
-    there's always something for a tracking screen to show."""
+async def test_only_admin_can_dispatch_a_ready_order(client, db_session_factory, monkeypatch):
+    """Dispatch is a temporary admin-only stand-in until riders claim jobs:
+    no agent may do it, assigned or not. No explicit courier_reference -> one
+    is auto-generated so there's always something for a tracking screen."""
     from app.auth.models import User
     from app.core.enums import LedgerDirection, UserRole
     from app.float import service as float_service
@@ -242,15 +247,16 @@ async def test_agent_can_dispatch_own_order_others_cannot(client, db_session_fac
     r = await client.post(f"/payments/orders/{oid}/pay-from-wallet", headers=admin_h)
     assert r.status_code == 200, r.text
 
-    r = await client.post(f"/delivery/orders/{oid}/pack", headers=agent_h)
-    assert r.status_code == 200, r.text
+    await through_hub(client, db_session_factory, oid, market_id, agent_h)
 
-    # A different agent, not assigned to this order, cannot dispatch it.
+    # Agents no longer dispatch - not the assigned one, not anyone else's.
     r = await client.post(f"/delivery/orders/{oid}/dispatch-courier", headers=other_agent_h)
-    assert r.status_code == 403, "only the assigned agent (or an admin) may dispatch"
-
-    # The assigned agent can, with no explicit reference -> one is generated.
+    assert r.status_code == 403
     r = await client.post(f"/delivery/orders/{oid}/dispatch-courier", headers=agent_h)
+    assert r.status_code == 403
+
+    # The admin can, with no explicit reference -> one is generated.
+    r = await client.post(f"/delivery/orders/{oid}/dispatch-courier", headers=admin_h)
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "out_for_delivery"
     assert r.json()["courier_reference"], "a tracking reference should be auto-generated"

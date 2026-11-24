@@ -50,6 +50,14 @@ class OrderStatus(str, enum.Enum):
     SHOPPING = "shopping"
     AWAITING_PAYMENT = "awaiting_payment"
     PAID = "paid"
+    # Custody at the market hub (see app/hubs): the agent drops the goods,
+    # the shopkeeper confirms what actually arrived, then marks them ready
+    # for a rider.
+    DROPPED_AT_HUB = "dropped_at_hub"
+    RECEIVED_BY_HUB = "received_by_hub"
+    READY_FOR_PICKUP = "ready_for_pickup"
+    # Legacy: the agent used to pack and hand to a courier. Nothing moves INTO
+    # this any more; it stays only so orders already packed can finish.
     PACKED = "packed"
     OUT_FOR_DELIVERY = "out_for_delivery"
     DELIVERED = "delivered"

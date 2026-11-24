@@ -1,8 +1,8 @@
 """Order state machine — the single source of truth for legal transitions.
 
-The critical guard lives here: nothing moves from AWAITING_PAYMENT to PACKED
-without going through PAID first. That one rule is the entire risk model —
-delivery never starts on an unpaid order.
+The critical guard lives here: nothing moves from AWAITING_PAYMENT towards
+the hub or a rider without going through PAID first. That one rule is the
+entire risk model — delivery never starts on an unpaid order.
 """
 
 from app.core.enums import OrderStatus
@@ -34,10 +34,22 @@ ALLOWED_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
         OrderStatus.CANCELLED,         # admin override, see orders/service.py::admin_cancel_order
     },
     OrderStatus.PAID: {
-        OrderStatus.PACKED,
+        OrderStatus.DROPPED_AT_HUB,  # agent drops the goods at the market hub
         OrderStatus.CANCELLED,  # admin override
     },
-    OrderStatus.PACKED: {
+    OrderStatus.DROPPED_AT_HUB: {
+        OrderStatus.RECEIVED_BY_HUB,  # shopkeeper confirms what arrived
+        OrderStatus.CANCELLED,  # admin override
+    },
+    OrderStatus.RECEIVED_BY_HUB: {
+        OrderStatus.READY_FOR_PICKUP,  # shopkeeper has it ready for a rider
+        OrderStatus.CANCELLED,  # admin override
+    },
+    OrderStatus.READY_FOR_PICKUP: {
+        OrderStatus.OUT_FOR_DELIVERY,
+        OrderStatus.CANCELLED,  # admin override
+    },
+    OrderStatus.PACKED: {  # legacy - orders packed before the hub flow
         OrderStatus.OUT_FOR_DELIVERY,
         OrderStatus.CANCELLED,  # admin override
     },

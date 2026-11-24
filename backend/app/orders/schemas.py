@@ -118,6 +118,9 @@ class OrderOut(BaseModel):
     agent_assigned_at: datetime | None
     paid_at: datetime | None
     packed_at: datetime | None
+    hub_id: uuid.UUID | None
+    dropped_at_hub_at: datetime | None
+    hub_received_at: datetime | None
     dispatched_at: datetime | None
     delivered_at: datetime | None
     courier_reference: str | None

@@ -101,3 +101,38 @@ async def pay_deposit(client, headers, order_id):
     assert r.status_code == 200, r.text
     r = await client.post(f"/payments/orders/{order_id}/deposit/pay-from-wallet", headers=headers)
     assert r.status_code == 200, r.text
+
+
+async def make_hub(client, db_session_factory, market_id, phone="+2348055500001"):
+    """A shopkeeper account with a hub in `market_id`; returns (headers, hub_id)."""
+    from sqlalchemy import select
+
+    from app.auth.models import User
+    from app.core.enums import UserRole
+    from app.hubs.models import Hub
+
+    r = await client.post("/auth/request-otp", json={"identifier": phone})
+    code = r.json()["dev_otp"]
+    r = await client.post("/auth/verify-otp", json={"identifier": phone, "code": code})
+    token = r.json()["access_token"]
+    async with db_session_factory() as s:
+        user = (await s.execute(select(User).where(User.phone == phone))).scalar_one()
+        user.role = UserRole.SHOPKEEPER
+        hub = Hub(market_id=market_id, user_id=user.id, name="Test Hub")
+        s.add(hub)
+        await s.commit()
+        hub_id = hub.id
+    return {"Authorization": f"Bearer {token}"}, hub_id
+
+
+async def through_hub(client, db_session_factory, order_id, market_id, agent_h):
+    """Take a PAID order through the hub: agent drops, shopkeeper receives,
+    shopkeeper marks ready. Leaves it READY_FOR_PICKUP; returns hub headers."""
+    hub_h, _ = await make_hub(client, db_session_factory, market_id)
+    r = await client.post(f"/delivery/orders/{order_id}/drop-at-hub", headers=agent_h)
+    assert r.status_code == 200, r.text
+    r = await client.post(f"/hubs/orders/{order_id}/receive", headers=hub_h, json={})
+    assert r.status_code == 200, r.text
+    r = await client.post(f"/hubs/orders/{order_id}/ready", headers=hub_h)
+    assert r.status_code == 200, r.text
+    return hub_h

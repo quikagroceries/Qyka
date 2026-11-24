@@ -166,9 +166,26 @@ class Order(Base):
     # exactly once, at the matching transition in delivery.service. Together
     # with created_at/agent_assigned_at/paid_at above, these back the
     # customer's post-payment status feed end to end.
+    # packed_at is stamped when the shopkeeper marks the order ready for a
+    # rider (READY_FOR_PICKUP) - the timeline's "packed" step.
     packed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Hub custody: which hub the agent dropped at, when, and when the
+    # shopkeeper confirmed receipt. hub_missing_item_ids lists item ids the
+    # shopkeeper did NOT see arrive (receipt is still recorded - accountability
+    # catches up, the goods never wait on it).
+    hub_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )
+    dropped_at_hub_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    hub_received_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    hub_missing_item_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    hub_receipt_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     dispatched_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
