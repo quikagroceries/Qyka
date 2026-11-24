@@ -169,6 +169,9 @@ export const api = {
 
   // Agent: drop a paid order's goods at a hub in its market. `hubId` is only
   // needed when the market has more than one.
+  // Live fee rules (set by an owner) and whether new orders are open.
+  getPricing: () => request("/pricing"),
+  getPlatformStatus: () => request("/status"),
   getHubsForMarket: (marketId: string) => request(`/hubs?market_id=${marketId}`),
   dropAtHub: (id: string, hubId?: string) =>
     request(`/delivery/orders/${id}/drop-at-hub`, { method: "POST", body: hubId ? { hub_id: hubId } : {} }),
@@ -246,7 +249,23 @@ export const api = {
   getAnalytics: (days) =>
     request(`/admin/analytics${days ? `?days=${days}` : ""}`),
   listAdmins: () => request("/admin/admins"),
-  addAdmin: (body: { email: string; full_name?: string; temporary_password: string }) =>
+  setAdminLevel: (userId: string, level: "owner" | "support") =>
+    request(`/admin/admins/${userId}`, { method: "PATCH", body: { level } }),
+  getAuditLog: (params: { action?: string; adminId?: string; limit?: number; offset?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.action) q.set("action", params.action);
+    if (params.adminId) q.set("admin_id", params.adminId);
+    q.set("limit", String(params.limit ?? 50));
+    q.set("offset", String(params.offset ?? 0));
+    return request(`/admin/audit?${q}`);
+  },
+  getPlatformSettings: () => request("/admin/platform-settings"),
+  setPlatformSetting: (key: string, value: string | boolean) =>
+    request(`/admin/platform-settings/${key}`, { method: "PUT", body: { value } }),
+  resetPlatformSetting: (key: string) =>
+    request(`/admin/platform-settings/${key}`, { method: "DELETE" }),
+  getSystemStatus: () => request("/admin/system"),
+  addAdmin: (body: { email: string; full_name?: string; temporary_password: string; level?: "owner" | "support" }) =>
     request("/admin/admins", { method: "POST", body }),
   removeAdmin: (userId) => request(`/admin/admins/${userId}`, { method: "DELETE" }),
   changeAdminPassword: (current_password: string, new_password: string) =>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { LANDING } from "@/content/landing";
+import { usePricing } from "@/lib/usePricing";
 import Chip from "@/components/ui/Chip";
 import PriceRow from "@/components/marketing/PriceRow";
 
@@ -9,8 +10,12 @@ export default function PricingCalculator({ className = "" }: { className?: stri
   const [pricingTier, setPricingTier] = useState<number>(1); // default to middle tier (25k)
 
   const selectedTier = LANDING.pricing.tiers[pricingTier] || LANDING.pricing.tiers[0];
-  const serviceFee = Math.round((selectedTier.amount * LANDING.pricing.fees.serviceFeePercent) / 100);
-  const deliveryFee = LANDING.pricing.fees.deliveryFee;
+  // Live numbers from the server (an owner sets them); the landing copy is
+  // only what shows before the first response.
+  const live = usePricing();
+  const feePercent = live.loaded ? +(live.serviceFeeRate * 100).toFixed(1) : LANDING.pricing.fees.serviceFeePercent;
+  const deliveryFee = live.loaded ? live.deliveryFee : LANDING.pricing.fees.deliveryFee;
+  const serviceFee = Math.round((selectedTier.amount * feePercent) / 100);
   const total = selectedTier.amount + serviceFee + deliveryFee;
 
   return (
@@ -35,7 +40,7 @@ export default function PricingCalculator({ className = "" }: { className?: stri
           tooltip="We don't mark up items. You pay what the vendor charges."
         />
         <PriceRow 
-          label={`Service fee (${LANDING.pricing.fees.serviceFeePercent}%)`} 
+          label={`Service fee (${feePercent}%)`} 
           amount={serviceFee} 
           tooltip="Covers agent effort and platform processing."
         />

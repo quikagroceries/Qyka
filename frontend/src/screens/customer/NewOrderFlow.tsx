@@ -1,5 +1,6 @@
 "use client";
 
+import { usePricing, useOrdersOpen } from "@/lib/usePricing";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -63,14 +64,13 @@ function CheckoutHero({
   );
 }
 
-// Mirrors backend/app/orders/fees.py (also served at GET /pricing): 7.5%
-// service fee on goods, a flat delivery placeholder, and a 30% deposit on
-// every order (100% for a must_prepay customer).
-const DELIVERY_QUOTE = 1500;
-const SERVICE_FEE_RATE = 0.075;
-const DEPOSIT_RATE = 0.3;
+// The service fee, delivery fee and deposit rate come from GET /pricing (an
+// owner sets them), via usePricing() inside the component. A must_prepay
+// customer pays 100% of the estimate as the deposit instead.
 
 function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
+  const pricing = usePricing();
+  const ordersOpen = useOrdersOpen();
   const { token } = useAuth();
   const searchParams = useSearchParams();
   const marketSlug = searchParams.get("market");
@@ -105,6 +105,7 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
     setOpenStatus(getMarketOpenStatus(market));
   }, [market, step]);
   const marketClosed = openStatus?.open === false;
+  const paused = !ordersOpen.open;
   const [authOpen, setAuthOpen] = useState(false);
   const pendingPlaceRef = useRef(false);
   const stagedList = listDraft;
@@ -421,10 +422,10 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
   }
 
   const goodsTotal = Number(stagedList.goodsTotal);
-  const serviceFee = goodsTotal * SERVICE_FEE_RATE;
-  const estimatedValue = goodsTotal + DELIVERY_QUOTE + serviceFee;
+  const serviceFee = goodsTotal * pricing.serviceFeeRate;
+  const estimatedValue = goodsTotal + pricing.deliveryFee + serviceFee;
   const mustPrepay = !!user?.must_prepay;
-  const depositAmount = mustPrepay ? estimatedValue : goodsTotal * DEPOSIT_RATE;
+  const depositAmount = mustPrepay ? estimatedValue : goodsTotal * pricing.depositRate;
   const isSuperQuote = (market.venue_type || "") === "supermarket";
 
   return (
@@ -486,11 +487,11 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
             </div>
             <div className="flex justify-between">
               <span>Delivery quote</span>
-              <span className="font-semibold tabular-nums text-ink">₦{DELIVERY_QUOTE.toFixed(2)}</span>
+              <span className="font-semibold tabular-nums text-ink">₦{pricing.deliveryFee.toFixed(2)}</span>
             </div>
           </div>
           <p className="mt-2 text-xs text-faint">
-            Plus a 7.5% service fee on what&apos;s actually bought (about ₦{serviceFee.toFixed(2)} on this estimate).
+            Plus a {+(pricing.serviceFeeRate * 100).toFixed(1)}% service fee on what&apos;s actually bought (about ₦{serviceFee.toFixed(2)} on this estimate).
           </p>
 
           {depositAmount > 0 && (
@@ -529,7 +530,12 @@ function NewOrderFlow({ user, onCancel, onOrderPlaced }: any) {
             </div>
           )}
 
-          <Button onClick={handleGetQuote} busy={busy} disabled={marketClosed} fullWidth className="mt-3 text-lg">
+          {paused && (
+            <p className="mt-3 rounded-2xl bg-brand-orange/10 px-4 py-3 text-sm font-semibold text-ink">
+              {ordersOpen.message || "We're not taking new orders right now."}
+            </p>
+          )}
+          <Button onClick={handleGetQuote} busy={busy} disabled={marketClosed || paused} fullWidth className="mt-3 text-lg">
             Get My Quote
           </Button>
           {!token && (

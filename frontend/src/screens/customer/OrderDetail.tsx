@@ -35,9 +35,9 @@ import { usePolling } from "@/lib/usePolling";
 const POLL_MS = 25000;
 const POLL_MS_WHILE_SHOPPING = 8000;
 
-// Mirrors app/orders/fees.py's DELIVERY_FEE_FLAT placeholder (also served at
-// GET /pricing), for the pre-shopping estimate card below.
-const DELIVERY_QUOTE = 1500;
+// The pre-shopping estimate shows what delivery was QUOTED at when this order
+// was created (order.delivery_quote), not today's rate - an owner may have
+// changed it since.
 
 // Statuses before finish_shopping has ever run - items_total/combined_fee/
 // delivery_fee/grand_total are all still their unset 0.00 defaults, so the
@@ -759,7 +759,7 @@ function OrderDetail({ orderId, onBack, onTopUpWallet }: any) {
             <SectionHeader icon="chart" title="Order estimate" className="mb-2" />
             <div className="space-y-1 text-muted">
               <div className="flex justify-between"><span>Goods estimate</span><span className="font-semibold">₦{goodsEstimate.toFixed(2)}</span></div>
-              <div className="flex justify-between"><span>Delivery quote</span><span className="font-semibold">₦{DELIVERY_QUOTE.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span>Delivery quote</span><span className="font-semibold">₦{Number(order.delivery_quote ?? 0).toFixed(2)}</span></div>
               {/* No grand total shown here on purpose - the service fee is
                   time-based and unknown until shopping finishes, so a number
                   shown now wouldn't match the real bill later. See the same
@@ -950,7 +950,7 @@ function OrderDetail({ orderId, onBack, onTopUpWallet }: any) {
               <SectionHeader icon="chart" title="Order estimate" className="mb-2" />
               <div className="space-y-1 text-muted">
                 <div className="flex justify-between"><span>Goods estimate</span><span className="font-semibold">₦{goodsEstimate.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Delivery quote</span><span className="font-semibold">₦{DELIVERY_QUOTE.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Delivery quote</span><span className="font-semibold">₦{Number(order.delivery_quote ?? 0).toFixed(2)}</span></div>
                 {depositPaid && (
                   <div className="flex justify-between">
                     <span>Deposit</span>

@@ -106,6 +106,7 @@ class OrderOut(BaseModel):
     company_share: Decimal
     agent_share: Decimal
     delivery_fee: Decimal
+    delivery_quote: Decimal
     emtl_total: Decimal
     transfer_fees_total: Decimal
     grand_total: Decimal

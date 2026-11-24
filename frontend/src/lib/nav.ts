@@ -52,8 +52,10 @@ export const ADMIN_NAV = [
   { key: "hubs", label: "Hubs", icon: "pin", href: "/admin/hubs" },
   { key: "users", label: "Users", icon: "flag", href: "/admin/users" },
   { key: "float", label: "Float", icon: "wallet", href: "/admin/float" },
-  { key: "pay", label: "Delivery pay", icon: "send", href: "/admin/pay" },
+  { key: "pay", label: "Delivery pay", icon: "send", href: "/admin/pay", ownerOnly: true },
   { key: "analytics", label: "Analytics", icon: "trending", href: "/admin/analytics" },
-  { key: "admins", label: "Admins", icon: "shield", href: "/admin/admins" },
+  { key: "admins", label: "Admins", icon: "shield", href: "/admin/admins", ownerOnly: true },
+  { key: "audit", label: "Audit log", icon: "clock", href: "/admin/audit", ownerOnly: true },
+  { key: "platform", label: "Platform", icon: "star", href: "/admin/platform", ownerOnly: true },
   { key: "settings", label: "Settings", icon: "settings", href: "/admin/settings" },
 ];

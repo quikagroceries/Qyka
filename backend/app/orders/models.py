@@ -223,6 +223,14 @@ class Order(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
+    @property
+    def delivery_quote(self) -> Decimal:
+        """What delivery was quoted at when this order was created - the
+        pre-shopping estimate shows this, not today's (possibly changed) rate."""
+        from app.orders.fees import PricingConfig
+
+        return PricingConfig.from_snapshot(self.pricing).delivery_fee
+
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan"
     )
