@@ -7,7 +7,7 @@ left, what's in flight, who to watch. All admin-gated.
 import uuid
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +17,7 @@ from app.admin.schemas import (
     AdminCreateIn,
     AdminLoginIn,
     AdminPasswordChangeIn,
+    DeliveryFeesIn,
     RaiseCapIn,
     RiderStatusIn,
     VendorTransferAckIn,
@@ -28,6 +29,8 @@ from app.core.database import get_db
 from app.core.enums import OrderStatus, UserRole, UserStatus
 from app.core.security import create_access_token, get_current_user, require_role
 from app.float import service as float_service
+from app.orders import fee_settings, fees as order_fees
+from app.markets.models import Market
 from app.float.models import FloatLedger
 from app.orders.models import Order
 
@@ -434,3 +437,87 @@ async def analytics(
     activity, and completion/cancellation/non-payment rates - computed only
     from data actually recorded (see admin.service.get_analytics)."""
     return await admin_service.get_analytics(db, days=days)
+
+
+def _fees_out(rider_fee, hub_fee, *, market_id=None, market_name=None) -> dict:
+    # delivery_margin: what the customer's flat delivery fee leaves after the
+    # two payouts. Negative = the company tops it up on every order.
+    return {
+        "market_id": str(market_id) if market_id else None,
+        "market_name": market_name,
+        "rider_fee": str(rider_fee),
+        "hub_fee": str(hub_fee),
+        "delivery_margin": str(order_fees.DELIVERY_FEE_FLAT - rider_fee - hub_fee),
+    }
+
+
+@router.get("/fees")
+async def get_delivery_fees(
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_role(UserRole.ADMIN)),
+) -> dict:
+    """The global rider/hub pay plus every per-market override. Orders copy
+    the figures when they are created, so changes only affect new orders."""
+    default = await fee_settings.get_global(db)
+    rider, hub = (
+        (default.rider_fee, default.hub_fee) if default
+        else (order_fees.DEFAULT_RIDER_FEE, order_fees.DEFAULT_HUB_FEE)
+    )
+    rows = (await db.execute(
+        select(fee_settings.FeeSetting, Market)
+        .join(Market, Market.id == fee_settings.FeeSetting.market_id)
+        .order_by(Market.name)
+    )).all()
+    return {
+        "delivery_fee": str(order_fees.DELIVERY_FEE_FLAT),
+        "default": {**_fees_out(rider, hub), "is_built_in": default is None},
+        "markets": [
+            _fees_out(s.rider_fee, s.hub_fee, market_id=m.id, market_name=m.name)
+            for s, m in rows
+        ],
+    }
+
+
+@router.put("/fees")
+async def set_default_delivery_fees(
+    body: DeliveryFeesIn,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_role(UserRole.ADMIN)),
+) -> dict:
+    """Set the global rider/hub pay (applies to new orders in every market
+    without its own override)."""
+    row = await fee_settings.upsert(
+        db, market_id=None, rider_fee=body.rider_fee, hub_fee=body.hub_fee, admin_id=admin.id
+    )
+    return _fees_out(row.rider_fee, row.hub_fee)
+
+
+@router.put("/fees/markets/{market_id}")
+async def set_market_delivery_fees(
+    market_id: uuid.UUID,
+    body: DeliveryFeesIn,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_role(UserRole.ADMIN)),
+) -> dict:
+    """Override the rider/hub pay for one market."""
+    market = (await db.execute(select(Market).where(Market.id == market_id))).scalar_one_or_none()
+    if market is None:
+        raise HTTPException(404, "Market not found")
+    row = await fee_settings.upsert(
+        db, market_id=market_id, rider_fee=body.rider_fee, hub_fee=body.hub_fee, admin_id=admin.id
+    )
+    return _fees_out(row.rider_fee, row.hub_fee, market_id=market.id, market_name=market.name)
+
+
+@router.delete("/fees/markets/{market_id}", status_code=204)
+async def clear_market_delivery_fees(
+    market_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_role(UserRole.ADMIN)),
+) -> None:
+    """Drop a market's override so it follows the global default again."""
+    row = (await db.execute(
+        select(fee_settings.FeeSetting).where(fee_settings.FeeSetting.market_id == market_id)
+    )).scalar_one_or_none()
+    if row is not None:
+        await db.delete(row)

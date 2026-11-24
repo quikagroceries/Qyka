@@ -46,3 +46,11 @@ class RaiseCapIn(BaseModel):
 class AdminCancelOrderIn(BaseModel):
     refund_amount: Decimal = Field(..., ge=0)
     note: str = Field(..., min_length=1, max_length=300)
+
+
+class DeliveryFeesIn(BaseModel):
+    """What a rider and a hub earn per delivered order. Fixed amounts, in
+    naira. The upper bound is a typo guard, not a business rule."""
+
+    rider_fee: Decimal = Field(..., ge=0, le=100000, decimal_places=2)
+    hub_fee: Decimal = Field(..., ge=0, le=100000, decimal_places=2)

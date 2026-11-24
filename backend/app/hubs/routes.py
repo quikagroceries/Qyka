@@ -8,8 +8,11 @@ from app.auth.models import User
 from app.core.database import get_db
 from app.core.enums import UserRole
 from app.core.security import get_current_user, require_role
+from app.delivery import earnings
+from app.delivery.schemas import EarningsOut
 from app.hubs import service
 from app.hubs.models import Hub
+from app.orders.models import Order
 from app.hubs.schemas import HandoverIn, HubOrderOut, HubOut, ReceiveIn
 
 router = APIRouter()
@@ -91,3 +94,13 @@ async def handover_order(
     """Release the goods to the rider who claimed them, using the code the
     rider shows. The order goes out for delivery."""
     return await service.handover(db, user=user, order_id=order_id, code=body.code)
+
+
+@router.get("/earnings", response_model=EarningsOut)
+async def hub_earnings(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role(UserRole.SHOPKEEPER)),
+) -> dict:
+    """What this hub has earned: counted once the customer confirms receipt."""
+    hub = await service.hub_for_shopkeeper(db, user)
+    return await earnings.summarize(db, where=Order.hub_id == hub.id, amount_attr="hub_fee")

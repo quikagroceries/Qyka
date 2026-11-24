@@ -104,9 +104,11 @@ async def confirm_delivery(
 ) -> dict:
     """Customer confirms receipt. Terminal money event: release payouts.
 
-    The agent fee and rider fee are debited OUT of the float pool to them; the
-    company retains item-cost recovery + service charge. The split is recorded
-    on the order's transaction for audit.
+    The agent, rider and hub fees are debited OUT of the float pool to them;
+    the company retains item-cost recovery + service charge + whatever the
+    delivery fee leaves. Orders that went out before riders existed (no rider
+    on them) keep the old behaviour: the whole delivery fee as courier cost.
+    The split is recorded on the order's transaction for audit.
     """
     order = await _load(db, order_id)
     if order.customer_id != customer_id:
@@ -127,15 +129,20 @@ async def confirm_delivery(
             market_id=order.market_id,
             note="Agent payout",
         )
-    if order.delivery_fee > 0:
-        await float_service.record_movement(
-            db,
-            direction=LedgerDirection.DEBIT,
-            amount=order.delivery_fee,
-            order_id=order.id,
-            market_id=order.market_id,
-            note="Courier delivery cost",
-        )
+    for amount, note in (
+        (Decimal(split["rider_payout"]), "Rider payout"),
+        (Decimal(split["hub_payout"]), "Hub payout"),
+        (Decimal(split["courier_cost"]), "Courier delivery cost"),
+    ):
+        if amount > 0:
+            await float_service.record_movement(
+                db,
+                direction=LedgerDirection.DEBIT,
+                amount=amount,
+                order_id=order.id,
+                market_id=order.market_id,
+                note=note,
+            )
 
     # Record the split on the transaction for audit.
     result = await db.execute(

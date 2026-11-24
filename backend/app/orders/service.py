@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.enums import MarketStatus, OrderStatus, UserRole
-from app.orders import fees
+from app.orders import fee_settings, fees
 from app.orders.models import Order, OrderItem
 from app.wallet import service as wallet_service
 from app.orders import assignment
@@ -158,9 +158,12 @@ async def create_order(
         db, customer_id, items, listed_items_total, must_prepay
     )
 
+    rider_fee, hub_fee = await fee_settings.resolve(db, market_id)
     order = Order(
         customer_id=customer_id,
         market_id=market_id,
+        rider_fee=rider_fee,
+        hub_fee=hub_fee,
         status=OrderStatus.DRAFT,
         delivery_address=delivery_address,
         dropoff_latitude=dropoff_latitude,

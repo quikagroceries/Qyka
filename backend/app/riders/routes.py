@@ -7,6 +7,9 @@ from app.auth.models import User
 from app.core.database import get_db
 from app.core.enums import UserRole
 from app.core.security import require_role
+from app.delivery import earnings
+from app.delivery.schemas import EarningsOut
+from app.orders.models import Order
 from app.riders import service
 from app.riders.schemas import DeliverIn, RiderJobOut
 
@@ -52,3 +55,10 @@ async def deliver_job(
 ) -> dict:
     """Confirm drop-off with the customer's PIN."""
     return await service.deliver(db, user=user, order_id=order_id, code=body.code)
+
+
+@router.get("/earnings", response_model=EarningsOut)
+async def my_earnings(db: AsyncSession = Depends(get_db), user: User = Depends(_rider)) -> dict:
+    """What the rider has earned: counted once the customer confirms receipt."""
+    await service.get_active_rider(db, user)
+    return await earnings.summarize(db, where=Order.rider_id == user.id, amount_attr="rider_fee")

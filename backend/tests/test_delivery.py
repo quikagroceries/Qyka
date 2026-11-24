@@ -127,8 +127,12 @@ async def test_full_delivery_and_payout(client, db_session_factory, monkeypatch)
     assert r.status_code == 200, r.text
     split = r.json()
     assert Decimal(split["agent_payout"]) == agent_share
-    assert Decimal(split["courier_cost"]) == delivery_fee
-    assert Decimal(split["company_retained"]) == company_share
+    # The delivery fee pays the rider and the hub (1000 + 500 by default),
+    # not a courier, so nothing is left over for the company here.
+    assert Decimal(split["rider_payout"]) == Decimal("1000.00")
+    assert Decimal(split["hub_payout"]) == Decimal("500.00")
+    assert Decimal(split["courier_cost"]) == 0
+    assert Decimal(split["company_retained"]) == company_share + delivery_fee - Decimal("1500.00")
 
     # order closed
     async with db_session_factory() as s:

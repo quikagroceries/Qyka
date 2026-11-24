@@ -39,6 +39,13 @@ PER_MINUTE = Decimal("50.00")            # agent's, per minute beyond the window
 # --- Delivery ---
 DELIVERY_FEE_FLAT = Decimal("1500.00")   # placeholder until courier quotes live
 
+# --- Delivery pay (what the rider and the hub earn per delivered order) ---
+# Admin-configurable (orders/fee_settings.py); these are only the fallback when
+# nothing has been set. Together they equal the flat delivery fee, so out of
+# the box the delivery fee pays exactly the two people who carry the order.
+DEFAULT_RIDER_FEE = Decimal("1000.00")
+DEFAULT_HUB_FEE = Decimal("500.00")
+
 # --- Government stamp duty (EMTL) ---
 EMTL_PER_TRANSFER = Decimal("50.00")
 EMTL_THRESHOLD = Decimal("10000.00")     # applies to transfers >= this

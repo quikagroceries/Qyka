@@ -95,6 +95,16 @@ class Order(Base):
     delivery_fee: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0.00")
     )
+    # What the rider and the hub earn for this order, snapshotted from the
+    # admin's fee settings when the order is CREATED - changing the settings
+    # later never touches an order already in progress. Paid out of the float
+    # pool on delivery confirmation (delivery/service.py::confirm_delivery).
+    rider_fee: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0.00"), server_default="0"
+    )
+    hub_fee: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0.00"), server_default="0"
+    )
     grand_total: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0.00")
     )
