@@ -10,6 +10,7 @@ from app.admin import service as admin_service
 from app.agent_applications.models import AgentApplication
 from app.auth.models import User
 from app.core.config import settings
+from app.platform_settings import service as platform
 from app.core.enums import ApplicationKind, ApplicationStatus, UserRole, UserStatus
 from app.core.phone import normalize_phone
 from app.hubs.models import Hub
@@ -205,7 +206,7 @@ async def _account_for(db: AsyncSession, application: AgentApplication) -> User:
             full_name=application.full_name,
             role=UserRole.CUSTOMER,
             status=UserStatus.ACTIVE,
-            basket_cap_kobo=settings.default_basket_cap_kobo,
+            basket_cap_kobo=await platform.default_basket_cap_kobo(db),
             # Applied as an agent, never registered as a customer: agent-only
             # until they do (POST /auth/me/register-customer).
             has_customer_side=False,

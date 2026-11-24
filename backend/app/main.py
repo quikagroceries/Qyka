@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin import service as admin_service
 from app.orders import fees
@@ -11,7 +12,8 @@ from app.auth.routes import router as auth_router
 from app.calls.routes import router as calls_router
 from app.chat.routes import conversations_router, router as chat_router
 from app.core.config import settings
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, get_db
+from app.platform_settings import service as platform
 from app.delivery.routes import router as delivery_router
 from app.dev.routes import router as dev_router
 from app.float.routes import router as float_router
@@ -55,10 +57,21 @@ async def health() -> dict[str, str]:
 
 
 @app.get("/pricing")
-async def pricing() -> dict:
-    """Public fee rules (orders/fees.py) - the single source the website's
-    pricing calculator and checkout estimates read from."""
-    return fees.pricing_summary()
+async def pricing(db: AsyncSession = Depends(get_db)) -> dict:
+    """Public fee rules - what a new order would be priced by right now. The
+    single source the website's pricing calculator and checkout estimates
+    read from (set by an owner under Platform settings)."""
+    return fees.pricing_summary(await platform.pricing(db))
+
+
+@app.get("/status")
+async def platform_status(db: AsyncSession = Depends(get_db)) -> dict:
+    """Public: whether new orders are open, and what to tell customers if not."""
+    paused = await platform.get(db, "orders_paused")
+    return {
+        "orders_paused": paused,
+        "message": await platform.get(db, "orders_paused_message") if paused else None,
+    }
 
 
 # Registered in the order they'd actually be hit in a real run of the app:

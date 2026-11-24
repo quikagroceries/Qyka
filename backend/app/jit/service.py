@@ -29,6 +29,7 @@ from app.float import service as float_service
 from app.jit.models import SpendingAuthorization, VendorAccount, VendorTransfer
 from app.notifications import service as notif_service
 from app.orders import fees
+from app.platform_settings import service as platform
 from app.orders.models import Order
 from app.payments import transfers
 
@@ -213,10 +214,11 @@ async def pay_vendor(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Amount must be positive")
 
     # --- Safety cap: no single transfer above the ceiling ---
-    if amount > Decimal(settings.max_transfer_naira):
+    max_transfer = await platform.get(db, "max_transfer_naira")
+    if amount > Decimal(max_transfer):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            f"Transfer exceeds the per-transfer cap of N{settings.max_transfer_naira}",
+            f"Transfer exceeds the per-transfer cap of N{max_transfer}",
         )
 
     # --- Authorization: spent + this must fit under the order's cap ---
@@ -245,7 +247,7 @@ async def pay_vendor(
         )
 
     # --- Safety cap: daily outbound ceiling ---
-    if await _daily_outbound(db) + amount > Decimal(settings.max_daily_transfers_naira):
+    if await _daily_outbound(db) + amount > Decimal(await platform.get(db, "max_daily_transfers_naira")):
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             "Daily transfer ceiling reached",
@@ -253,7 +255,7 @@ async def pay_vendor(
 
     # --- Float pool must actually have the money ---
     pool = await float_service.get_pool_balance(db, order.market_id)
-    emtl = fees.emtl_for_transfer(amount)
+    emtl = fees.emtl_for_transfer(amount, fees.PricingConfig.from_snapshot(order.pricing))
     if pool < amount + emtl:
         raise HTTPException(
             status.HTTP_402_PAYMENT_REQUIRED, "Float pool has insufficient funds"

@@ -22,7 +22,8 @@ async def _login(client, phone):
     return r.json()["access_token"]
 
 
-async def _paid_order(client, db_session_factory, monkeypatch, descriptions=("pepper", "rice")):
+async def _paid_order(client, db_session_factory, monkeypatch, descriptions=("pepper", "rice"), stop_after_start=False,
+                      cust_phone=PHONE_CUST, agent_phone=PHONE_AGENT):
     """An order taken all the way to PAID. Returns (oid, market_id, agent_h, admin_h, item_ids)."""
     from app.auth.models import User
     from app.core.enums import LedgerDirection, UserRole
@@ -33,12 +34,12 @@ async def _paid_order(client, db_session_factory, monkeypatch, descriptions=("pe
         return {"reference": reference, "status": "success", "fee": 0}
     monkeypatch.setattr(transfers, "send_transfer", fake_send)
 
-    cust_token = await _login(client, PHONE_CUST)
-    agent_token = await _login(client, PHONE_AGENT)
+    cust_token = await _login(client, cust_phone)
+    agent_token = await _login(client, agent_phone)
     async with db_session_factory() as s:
-        agent = (await s.execute(select(User).where(User.phone == PHONE_AGENT))).scalar_one()
+        agent = (await s.execute(select(User).where(User.phone == agent_phone))).scalar_one()
         agent.role = UserRole.AGENT
-        cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
+        cust = (await s.execute(select(User).where(User.phone == cust_phone))).scalar_one()
         cust.role = UserRole.ADMIN
         cust.admin_level = AdminLevel.OWNER
         await s.commit()
@@ -59,6 +60,8 @@ async def _paid_order(client, db_session_factory, monkeypatch, descriptions=("pe
     await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
     r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
     item_ids = [i["id"] for i in r.json()["items"]]
+    if stop_after_start:
+        return oid, market_id, agent_h, admin_h, item_ids
     await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
         "account_number": "9012345678", "bank_code": "999992", "photo_ref": OURS,
         "items": [{"item_id": i, "price": "500.00"} for i in item_ids]})

@@ -19,6 +19,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.core.enums import OrderStatus
+from app.payments.models import JsonType
 
 
 class Order(Base):
@@ -195,6 +196,10 @@ class Order(Base):
     )
     hub_missing_item_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
     hub_receipt_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The fee rules this order is priced by, copied from the platform settings
+    # when it was created (orders/fees.py PricingConfig). NULL on orders from
+    # before pricing was editable: they were priced by the built-in defaults.
+    pricing: Mapped[dict | None] = mapped_column(JsonType, nullable=True)
     # Rider custody (rider_id above). A rider claims a ready order from the pool, which also
     # issues pickup_code: the rider shows it at the hub and the shopkeeper
     # enters it to release the goods. rider_delivered_at is the rider

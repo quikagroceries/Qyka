@@ -66,3 +66,9 @@ class DeliveryFeesIn(BaseModel):
 class HubUpdateIn(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     is_active: bool | None = None
+
+
+class SettingValueIn(BaseModel):
+    # Decimals, whole numbers, yes/no and text all arrive here; the setting's
+    # own type and bounds decide what's acceptable (platform_settings/registry).
+    value: str | bool | int | float

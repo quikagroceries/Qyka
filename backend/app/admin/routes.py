@@ -12,6 +12,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin import audit
+from app.platform_settings import service as platform
 from app.admin import service as admin_service
 from app.admin.schemas import (
     AdminCancelOrderIn,
@@ -21,6 +22,7 @@ from app.admin.schemas import (
     AdminPasswordChangeIn,
     DeliveryFeesIn,
     HubUpdateIn,
+    SettingValueIn,
     RaiseCapIn,
     RiderStatusIn,
     VendorTransferAckIn,
@@ -492,7 +494,7 @@ async def analytics(
     return await admin_service.get_analytics(db, days=days)
 
 
-def _fees_out(rider_fee, hub_fee, *, market_id=None, market_name=None) -> dict:
+def _fees_out(rider_fee, hub_fee, delivery_fee, *, market_id=None, market_name=None) -> dict:
     # delivery_margin: what the customer's flat delivery fee leaves after the
     # two payouts. Negative = the company tops it up on every order.
     return {
@@ -500,7 +502,7 @@ def _fees_out(rider_fee, hub_fee, *, market_id=None, market_name=None) -> dict:
         "market_name": market_name,
         "rider_fee": str(rider_fee),
         "hub_fee": str(hub_fee),
-        "delivery_margin": str(order_fees.DELIVERY_FEE_FLAT - rider_fee - hub_fee),
+        "delivery_margin": str(delivery_fee - rider_fee - hub_fee),
     }
 
 
@@ -511,6 +513,7 @@ async def get_delivery_fees(
 ) -> dict:
     """The global rider/hub pay plus every per-market override. Orders copy
     the figures when they are created, so changes only affect new orders."""
+    delivery_fee = (await platform.pricing(db)).delivery_fee
     default = await fee_settings.get_global(db)
     rider, hub = (
         (default.rider_fee, default.hub_fee) if default
@@ -522,10 +525,10 @@ async def get_delivery_fees(
         .order_by(Market.name)
     )).all()
     return {
-        "delivery_fee": str(order_fees.DELIVERY_FEE_FLAT),
-        "default": {**_fees_out(rider, hub), "is_built_in": default is None},
+        "delivery_fee": str(delivery_fee),
+        "default": {**_fees_out(rider, hub, delivery_fee), "is_built_in": default is None},
         "markets": [
-            _fees_out(s.rider_fee, s.hub_fee, market_id=m.id, market_name=m.name)
+            _fees_out(s.rider_fee, s.hub_fee, delivery_fee, market_id=m.id, market_name=m.name)
             for s, m in rows
         ],
     }
@@ -542,7 +545,7 @@ async def set_default_delivery_fees(
     row = await fee_settings.upsert(
         db, market_id=None, rider_fee=body.rider_fee, hub_fee=body.hub_fee, admin_id=admin.id
     )
-    return _fees_out(row.rider_fee, row.hub_fee)
+    return _fees_out(row.rider_fee, row.hub_fee, (await platform.pricing(db)).delivery_fee)
 
 
 @router.put("/fees/markets/{market_id}")
@@ -559,7 +562,10 @@ async def set_market_delivery_fees(
     row = await fee_settings.upsert(
         db, market_id=market_id, rider_fee=body.rider_fee, hub_fee=body.hub_fee, admin_id=admin.id
     )
-    return _fees_out(row.rider_fee, row.hub_fee, market_id=market.id, market_name=market.name)
+    return _fees_out(
+        row.rider_fee, row.hub_fee, (await platform.pricing(db)).delivery_fee,
+        market_id=market.id, market_name=market.name,
+    )
 
 
 @router.delete("/fees/markets/{market_id}", status_code=204)
@@ -658,4 +664,89 @@ async def audit_log(
             }
             for r in rows
         ],
+    }
+
+
+@router.get("/platform-settings")
+async def get_platform_settings(
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin(owner_only=True)),
+) -> list[dict]:
+    """Every business rule an owner can change, with its current value, its
+    built-in default, and whether a change applies to new orders only or
+    straight away."""
+    return await platform.describe(db)
+
+
+@router.put("/platform-settings/{key}")
+async def set_platform_setting(
+    key: str,
+    body: SettingValueIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("settings.update", owner_only=True)),
+) -> list[dict]:
+    old, new = await platform.set_value(db, key=key, raw=body.value, admin_id=admin.id)
+    audit.note(request, key=key, old=str(old), new=str(new))
+    return [s for s in await platform.describe(db) if s["key"] == key]
+
+
+@router.delete("/platform-settings/{key}", status_code=204)
+async def reset_platform_setting(
+    key: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("settings.reset", owner_only=True)),
+) -> None:
+    """Put a setting back to its built-in default."""
+    old, new = await platform.reset(db, key=key)
+    audit.note(request, key=key, old=str(old), new=str(new))
+
+
+@router.get("/system")
+async def system_status(
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin(owner_only=True)),
+) -> dict:
+    """Is everything the app depends on actually switched on? Booleans and
+    short notes only - never a key or secret."""
+    from sqlalchemy import text
+
+    from app.core.config import settings as cfg
+
+    def check(key, label, ok, detail, *, off_ok=False):
+        return {"key": key, "label": label, "status": "ok" if ok else ("off" if off_ok else "warn"), "detail": detail}
+
+    try:
+        await db.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:  # noqa: BLE001 - reporting, not handling
+        db_ok = False
+    try:
+        migration = (await db.execute(text("SELECT version_num FROM alembic_version"))).scalar_one_or_none()
+    except Exception:  # noqa: BLE001 - e.g. SQLite in tests: no alembic table
+        migration = None
+
+    live_payments = cfg.paystack_secret_key.startswith("sk_live")
+    checks = [
+        check("database", "Database", db_ok, "Reachable" if db_ok else "Can't reach the database"),
+        check("payments", "Payments (Paystack)", bool(cfg.paystack_secret_key),
+              ("Live keys" if live_payments else "TEST keys - no real money moves") if cfg.paystack_secret_key else "No key set - payments won't work"),
+        check("sms", "SMS codes", bool(cfg.sms_api_key), "Configured" if cfg.sms_api_key else "No key - sign-in codes aren't sent by SMS", off_ok=True),
+        check("whatsapp", "WhatsApp codes", bool(cfg.whatsapp_api_key), "Configured" if cfg.whatsapp_api_key else "No key", off_ok=True),
+        check("email", "Email", bool(cfg.email_api_key) and "resend.dev" not in cfg.email_from,
+              "Sending from your own domain" if cfg.email_api_key and "resend.dev" not in cfg.email_from
+              else ("Using the shared test sender" if cfg.email_api_key else "No key - emails aren't sent"), off_ok=not cfg.email_api_key),
+        check("google", "Google sign-in", bool(cfg.google_client_id), "Configured" if cfg.google_client_id else "Not set up", off_ok=True),
+        check("photos", "Photo uploads (Cloudinary)", bool(cfg.cloudinary_cloud_name), cfg.cloudinary_cloud_name or "Not set"),
+        check("calls", "In-app calls (LiveKit)", bool(cfg.livekit_url and cfg.livekit_api_key and cfg.livekit_api_secret),
+              "Configured" if cfg.livekit_url else "Not set up", off_ok=True),
+        check("jwt", "Session signing secret", cfg.jwt_secret != "change-me-in-production" and len(cfg.jwt_secret) >= 32,
+              "Strong, custom secret" if cfg.jwt_secret != "change-me-in-production" else "Still the default - change it before launch"),
+    ]
+    return {
+        "environment": cfg.environment,
+        "migration": migration,
+        "allowed_origins": cfg.allowed_origins_list,
+        "checks": checks,
     }

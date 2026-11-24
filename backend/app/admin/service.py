@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
 from app.core.config import settings
+from app.platform_settings import service as platform
 from app.core.enums import AdminLevel, OrderStatus, RiderStatus, TransactionStatus, UserRole, UserStatus
 from app.core.security import hash_password, verify_password
 from app.float.models import FloatLedger
@@ -43,7 +44,7 @@ async def bootstrap_admin(db: AsyncSession, email: str | None, password: str | N
                 admin_level=AdminLevel.OWNER,
                 status=UserStatus.ACTIVE,
                 is_email_verified=True,
-                basket_cap_kobo=settings.default_basket_cap_kobo,
+                basket_cap_kobo=await platform.default_basket_cap_kobo(db),
             )
         )
     else:
@@ -110,7 +111,7 @@ async def create_admin(
         admin_level=level,
         status=UserStatus.ACTIVE,
         is_email_verified=True,
-        basket_cap_kobo=settings.default_basket_cap_kobo,
+        basket_cap_kobo=await platform.default_basket_cap_kobo(db),
     )
     db.add(user)
     await db.flush()
@@ -302,7 +303,7 @@ async def link_rider_account(db: AsyncSession, *, rider_id: uuid.UUID) -> dict:
             full_name=rider.full_name,
             role=UserRole.RIDER,
             status=UserStatus.ACTIVE,
-            basket_cap_kobo=settings.default_basket_cap_kobo,
+            basket_cap_kobo=await platform.default_basket_cap_kobo(db),
             has_customer_side=False,
         )
         db.add(user)

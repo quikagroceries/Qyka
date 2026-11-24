@@ -140,7 +140,7 @@ async def test_public_pricing_endpoint_matches_the_fee_rules(client):
     assert r.json() == {
         "service_fee_percent": "7.5",
         "delivery_fee": "1500.00",
-        "delivery_fee_is_placeholder": True,
+        "delivery_fee_is_placeholder": False,
         "deposit_percent": "30",
         "add_item_fee": "500.00",
         "emtl_per_transfer": "50.00",

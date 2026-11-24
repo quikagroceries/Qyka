@@ -20,11 +20,10 @@ from app.core.enums import OrderStatus, RiderStatus
 from app.hubs.models import Hub
 from app.markets.models import Market
 from app.notifications import service as notif_service
+from app.platform_settings import service as platform
 from app.orders.models import Order
 from app.riders.models import Rider
 
-# One job at a time: a pool only works if nobody sits on several.
-MAX_ACTIVE_JOBS = 1
 _ACTIVE = (OrderStatus.READY_FOR_PICKUP, OrderStatus.OUT_FOR_DELIVERY)
 
 
@@ -103,7 +102,8 @@ async def claim(db: AsyncSession, *, user: User, order_id: uuid.UUID) -> dict:
         select(func.count()).select_from(Order)
         .where(Order.rider_id == user.id, Order.status.in_(_ACTIVE))
     )).scalar_one()
-    if active >= MAX_ACTIVE_JOBS:
+    # A pool only works if nobody sits on several jobs (the limit is an owner setting).
+    if active >= await platform.get(db, "rider_max_active_jobs"):
         raise HTTPException(status.HTTP_409_CONFLICT, "Finish your current delivery before claiming another")
 
     order = (await db.execute(select(Order).where(Order.id == order_id))).scalar_one_or_none()
