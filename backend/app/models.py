@@ -19,3 +19,4 @@ from app.orders.fee_settings import FeeSetting  # noqa: F401
 from app.admin.audit import AdminAuditLog  # noqa: F401
 from app.platform_settings.models import PlatformSetting  # noqa: F401
 from app.content.models import SiteContent  # noqa: F401
+from app.investors.models import InvestorLink  # noqa: F401

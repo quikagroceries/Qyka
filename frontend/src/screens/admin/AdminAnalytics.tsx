@@ -54,7 +54,7 @@ function AdminAnalytics() {
   }
 
   const volume = data.volume_by_day.map((d) => ({ ...d, label: formatShortDate(d.date) }));
-  const revenue = data.revenue_by_day.map((d) => ({ ...d, label: formatShortDate(d.date), company_share: Number(d.company_share) }));
+  const revenue = data.revenue_by_day.map((d) => ({ ...d, label: formatShortDate(d.date), revenue: Number(d.revenue) }));
   const agents = [...data.agent_activity].sort((a, b) => Number(b.earnings) - Number(a.earnings));
   const marketsSorted = [...data.market_activity].sort((a, b) => b.orders - a.orders);
   const rates = data.rates;
@@ -65,13 +65,13 @@ function AdminAnalytics() {
 
   return (
     <div>
-      <AdminPageHeader icon="trending" section="Insights" title="Analytics" description="Last 30 days, plus lifetime agent/market activity — computed only from what&apos;s actually recorded." />
+      <AdminPageHeader icon="trending" section="Insights" title="Analytics" description="Last 30 days, plus lifetime agent/market activity — counted when an order is delivered and confirmed, the moment everyone is paid." />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <p className="mb-3 font-bold text-ink">Order volume</p>
+          <p className="mb-3 font-bold text-ink">Order volume <span className="text-sm font-normal text-faint">(completed orders, by delivery day)</span></p>
           {volume.length === 0 ? (
-            <p className="py-8 text-center text-sm text-faint">No paid orders in the last 30 days.</p>
+            <p className="py-8 text-center text-sm text-faint">No completed orders in the last 30 days.</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={volume}>
@@ -86,17 +86,17 @@ function AdminAnalytics() {
         </Card>
 
         <Card>
-          <p className="mb-3 font-bold text-ink">Revenue (company share)</p>
+          <p className="mb-3 font-bold text-ink">Revenue <span className="text-sm font-normal text-faint">(kept after paying agents, riders and hubs; counted when delivered)</span></p>
           {revenue.length === 0 ? (
-            <p className="py-8 text-center text-sm text-faint">No paid orders in the last 30 days.</p>
+            <p className="py-8 text-center text-sm text-faint">No completed orders in the last 30 days.</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={revenue}>
                 <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 12, fill: CHART_AXIS_TEXT }} axisLine={{ stroke: CHART_GRID }} tickLine={false} />
                 <YAxis tick={{ fontSize: 12, fill: CHART_AXIS_TEXT }} width={50} tickFormatter={(v) => `₦${v}`} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip formatter={(v: any) => [`₦${v}`, "company share"]} />} />
-                <Line type="monotone" dataKey="company_share" stroke={GREEN} strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+                <Tooltip content={<ChartTooltip formatter={(v: any) => [`₦${v}`, "revenue"]} />} />
+                <Line type="monotone" dataKey="revenue" stroke={GREEN} strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
               </LineChart>
             </ResponsiveContainer>
           )}

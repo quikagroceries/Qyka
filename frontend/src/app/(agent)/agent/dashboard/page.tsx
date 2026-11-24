@@ -28,8 +28,8 @@ function last14DaysEarnings(completedOrders: any[]) {
     days.push({ date: d, label: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }), earnings: 0 });
   }
   for (const o of completedOrders) {
-    if (!o.paid_at) continue;
-    const paid = new Date(o.paid_at);
+    if (!o.delivered_at) continue;
+    const paid = new Date(o.delivered_at);
     const bucket = days.find((d) => d.date.toDateString() === paid.toDateString());
     if (bucket) bucket.earnings += Number(o.agent_share) || 0;
   }
@@ -102,6 +102,9 @@ export default function AgentDashboardPage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile label="This week" value={`₦${summary.earnings_week}`} tone="green" />
             <StatTile label="All time" value={`₦${summary.earnings_total}`} tone="green" />
+            {Number(summary.earnings_pending) > 0 && (
+              <StatTile label="Coming once delivered" value={`₦${summary.earnings_pending}`} />
+            )}
             <StatTile label="Ready to shop" value={summary.ready_to_shop_count} />
             <StatTile label="In progress" value={summary.in_progress_count} />
           </div>
@@ -119,7 +122,7 @@ export default function AgentDashboardPage() {
       ) : (
         <>
           {/* Real trend, not decoration - the same 14 completed_orders the
-              list below renders, just bucketed by paid_at day instead of
+              list below renders, just bucketed by delivery day instead of
               listed one row per order. */}
           {summary.completed_orders.length > 0 && (() => {
             const days = last14DaysEarnings(summary.completed_orders);
@@ -151,7 +154,7 @@ export default function AgentDashboardPage() {
                   <div className="min-w-0">
                     <div className="truncate font-semibold text-ink">{marketName(o.market_id) || "—"}</div>
                     <div className="text-sm text-muted">
-                      {o.paid_at ? new Date(o.paid_at).toLocaleDateString() : "—"}
+                      {o.delivered_at ? new Date(o.delivered_at).toLocaleDateString() : "—"}
                     </div>
                   </div>
                   <div className="shrink-0 text-right font-bold text-brand-green">+₦{o.agent_share}</div>

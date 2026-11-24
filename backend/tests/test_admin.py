@@ -325,6 +325,13 @@ async def test_admin_lists_agents_with_earnings(client, db_session_factory):
     r = await client.get(f"/orders/{oid}", headers=admin_h)
     agent_share = r.json()["agent_share"]
 
+    # Paid but not yet delivered: nothing has been released to the agent.
+    r = await client.get("/admin/agents", headers=admin_h)
+    row = next(a for a in r.json() if a["user_id"] == str(agent_id))
+    assert row["completed_orders"] == 0 and row["earnings_total"] == "0.00"
+
+    from tests.conftest import deliver_order
+    await deliver_order(db_session_factory, oid)
     r = await client.get("/admin/agents", headers=admin_h)
     row = next(a for a in r.json() if a["user_id"] == str(agent_id))
     assert row["completed_orders"] == 1
@@ -413,15 +420,28 @@ async def test_admin_analytics_reflects_recorded_data(client, db_session_factory
     r = await client.get(f"/orders/{oid}", headers=admin_h)
     order = r.json()
 
+    # Paid but not delivered: not counted anywhere yet - revenue, volume and
+    # earnings are recognised when the order is delivered and confirmed.
     r = await client.get("/admin/analytics", headers=admin_h)
     assert r.status_code == 200, r.text
+    assert sum(d["orders"] for d in r.json()["volume_by_day"]) == 0
+    assert r.json()["revenue_by_day"] == []
+
+    from tests.conftest import deliver_order
+    await deliver_order(db_session_factory, oid)
+    r = await client.get("/admin/analytics", headers=admin_h)
     data = r.json()
 
     # Today's bucket exists and reflects this exact order's numbers - not
-    # fabricated, traceable straight back to the order just paid.
-    assert sum(d["orders"] for d in data["volume_by_day"]) >= 1
-    total_revenue = sum(Decimal(d["company_share"]) for d in data["revenue_by_day"])
-    assert total_revenue >= Decimal(order["company_share"])
+    # fabricated, traceable straight back to the order just delivered.
+    assert sum(d["orders"] for d in data["volume_by_day"]) == 1
+    from app.delivery.payouts import compute_split
+    from app.orders.models import Order
+    async with db_session_factory() as s:
+        db_order = (await s.execute(select(Order).where(Order.id == uuid.UUID(oid)))).scalar_one()
+        expected_revenue = Decimal(compute_split(db_order)["company_retained"])
+    total_revenue = sum(Decimal(d["revenue"]) for d in data["revenue_by_day"])
+    assert total_revenue == expected_revenue
 
     agent_row = next(a for a in data["agent_activity"] if a["agent_id"] == str(agent_id))
     assert agent_row["completed_orders"] == 1
@@ -430,9 +450,8 @@ async def test_admin_analytics_reflects_recorded_data(client, db_session_factory
     market_row = next(m for m in data["market_activity"] if m["market_id"] == str(market_id))
     assert market_row["orders"] == 1
 
-    # This order is still PAID (not delivered/closed/cancelled), so it must
-    # NOT be counted in the terminal-status rates yet.
-    assert data["rates"]["total_terminal"] == 0
+    # It's now delivered, so it counts as one completed outcome.
+    assert data["rates"]["total_terminal"] == 1 and data["rates"]["completed"] == 1
 
     print("Admin analytics correctly reflects only recorded, real data.")
 

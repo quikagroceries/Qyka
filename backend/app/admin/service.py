@@ -245,7 +245,14 @@ async def list_agents(db: AsyncSession) -> list[dict]:
     result = await db.execute(select(Agent, User).join(User, User.id == Agent.user_id))
     rows = result.all()
 
-    paid_result = await db.execute(select(Order).where(Order.paid_at.is_not(None)))
+    # Earnings are what's actually been released: orders delivered and
+    # confirmed (the agent is paid out on confirmation).
+    paid_result = await db.execute(
+        select(Order).where(
+            Order.status.in_((OrderStatus.DELIVERED, OrderStatus.CLOSED)),
+            Order.delivered_at.is_not(None),
+        )
+    )
     by_agent: dict[uuid.UUID, list[Order]] = defaultdict(list)
     for order in paid_result.scalars().all():
         if order.agent_id is not None:
@@ -373,20 +380,31 @@ async def get_analytics(db: AsyncSession, *, days: int = 30) -> dict:
     # correctly (same reasoning as agent.service.get_summary, which filters
     # today/week in Python for the same reason), and at pilot scale this is
     # cheap either way.
-    all_paid_result = await db.execute(select(Order).where(Order.paid_at.is_not(None)))
+    # Completed = delivered and confirmed, counted on the day it was delivered:
+    # that's when the money is settled and the agent, rider and hub are paid.
+    # Revenue is what Qyka keeps after those payouts (metrics/service.py defines
+    # every figure once; this screen and the investor overview agree).
+    from app.metrics.service import revenue_of
+
+    all_paid_result = await db.execute(
+        select(Order).where(
+            Order.status.in_((OrderStatus.DELIVERED, OrderStatus.CLOSED)),
+            Order.delivered_at.is_not(None),
+        )
+    )
     all_paid_orders = list(all_paid_result.scalars().all())
 
     volume: dict[str, int] = defaultdict(int)
     revenue: dict[str, Decimal] = defaultdict(lambda: Decimal("0.00"))
     for o in all_paid_orders:
-        paid_at = _aware(o.paid_at)
-        if paid_at < since:
+        delivered_at = _aware(o.delivered_at)
+        if delivered_at < since:
             continue
-        day = paid_at.date().isoformat()
+        day = delivered_at.date().isoformat()
         volume[day] += 1
-        revenue[day] += o.company_share
+        revenue[day] += revenue_of(o)
     volume_by_day = [{"date": d, "orders": c} for d, c in sorted(volume.items())]
-    revenue_by_day = [{"date": d, "company_share": str(revenue[d])} for d in sorted(revenue)]
+    revenue_by_day = [{"date": d, "revenue": str(revenue[d])} for d in sorted(revenue)]
 
     # Agent + market activity are all-time, not windowed - lifetime totals,
     # same as the Agents screen's earnings_total.

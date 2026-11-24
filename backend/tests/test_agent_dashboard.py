@@ -196,15 +196,26 @@ async def test_agent_earnings_reflect_paid_orders_with_correct_share(client, db_
     r = await client.post(f"/payments/orders/{oid}/pay-from-wallet", headers=cust_h)
     assert r.status_code == 200, r.text
 
+    # Paid, not yet delivered: shown as pending, not earned - the agent is
+    # paid out when the customer confirms delivery.
+    r = await client.get("/agent/summary", headers=agent_h)
+    body = r.json()
+    assert Decimal(body["earnings_total"]) == Decimal("0.00")
+    assert Decimal(body["earnings_pending"]) == expected_share
+    assert body["completed_orders"] == []
+
+    from tests.conftest import deliver_order
+    await deliver_order(db_session_factory, oid)
     r = await client.get("/agent/summary", headers=agent_h)
     body = r.json()
     assert Decimal(body["earnings_today"]) == expected_share
     assert Decimal(body["earnings_week"]) == expected_share
     assert Decimal(body["earnings_total"]) == expected_share
+    assert Decimal(body["earnings_pending"]) == Decimal("0.00")
     assert len(body["completed_orders"]) == 1
     assert body["completed_orders"][0]["id"] == oid
     assert Decimal(body["completed_orders"][0]["agent_share"]) == expected_share
-    assert body["completed_orders"][0]["status"] == OrderStatus.PAID.value
+    assert body["completed_orders"][0]["status"] == OrderStatus.CLOSED.value
 
 
 @pytest.mark.asyncio

@@ -259,6 +259,14 @@ export const api = {
     q.set("offset", String(params.offset ?? 0));
     return request(`/admin/audit?${q}`);
   },
+  getCompanyOverview: (days: number, includeFinancials = true) =>
+    request(`/admin/company-overview?days=${days}&include_financials=${includeFinancials}`),
+  listInvestorLinks: () => request("/admin/investor-links"),
+  createInvestorLink: (body: { label: string; expires_in_days: number | null; include_financials: boolean }) =>
+    request("/admin/investor-links", { method: "POST", body }),
+  revokeInvestorLink: (id: string) => request(`/admin/investor-links/${id}/revoke`, { method: "POST" }),
+  // Public: whoever holds a live link. No sign-in.
+  getInvestorOverview: (token: string, days: number) => request(`/investors/${encodeURIComponent(token)}/overview?days=${days}`),
   getContentOverrides: () => request("/admin/content"),
   setContent: (key: string, value: string) => request("/admin/content", { method: "PUT", body: { key, value } }),
   resetContent: (key: string) => request(`/admin/content?key=${encodeURIComponent(key)}`, { method: "DELETE" }),

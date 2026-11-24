@@ -5,7 +5,8 @@ left, what's in flight, who to watch. All admin-gated.
 """
 
 import uuid
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -14,6 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin import audit, ops
 from app.content.models import SiteContent
+from app.investors.models import InvestorLink
+from app.investors.routes import hash_token, link_is_live
+from app.metrics import service as metrics
 from app.platform_settings import service as platform
 from app.admin import service as admin_service
 from app.admin.schemas import (
@@ -27,6 +31,7 @@ from app.admin.schemas import (
     HubCreateIn,
     HubStageIn,
     HubUpdateIn,
+    InvestorLinkIn,
     MoveMarketIn,
     NoteIn,
     ReassignAgentIn,
@@ -966,3 +971,83 @@ async def reset_content(
     if row is not None:
         audit.note(request, key=key, old=row.value[:200])
         await db.delete(row)
+
+
+# --- Company overview and the investor link ----------------------------------
+
+@router.get("/company-overview")
+async def company_overview(
+    days: int | None = 30,
+    include_financials: bool = True,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin(owner_only=True)),
+) -> dict:
+    """The same figures an investor link shows, for the owner (also a way to
+    preview a link without or with financials)."""
+    # 0 means all time; anything else that isn't an offered window is 30 days.
+    days = None if days == 0 else (days if days in (30, 90, 365) else 30)
+    return await metrics.company_overview(db, days=days, include_financials=include_financials)
+
+
+def _link_out(link: InvestorLink) -> dict:
+    live = link_is_live(link)
+    return {
+        "id": str(link.id),
+        "label": link.label,
+        "include_financials": link.include_financials,
+        "created_at": link.created_at.isoformat() if link.created_at else None,
+        "expires_at": link.expires_at.isoformat() if link.expires_at else None,
+        "revoked_at": link.revoked_at.isoformat() if link.revoked_at else None,
+        "status": "live" if live else ("revoked" if link.revoked_at else "expired"),
+        "view_count": link.view_count or 0,
+        "last_viewed_at": link.last_viewed_at.isoformat() if link.last_viewed_at else None,
+    }
+
+
+@router.get("/investor-links")
+async def list_investor_links(
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin(owner_only=True)),
+) -> list[dict]:
+    rows = (await db.execute(select(InvestorLink).order_by(InvestorLink.created_at.desc()))).scalars().all()
+    return [_link_out(r) for r in rows]
+
+
+@router.post("/investor-links", status_code=201)
+async def create_investor_link(
+    body: InvestorLinkIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("investors.create_link", owner_only=True)),
+) -> dict:
+    """Make a read-only link to the company overview. The secret is returned
+    ONCE, here - only its hash is kept - so copy it now."""
+    token = secrets.token_urlsafe(24)
+    link = InvestorLink(
+        token_hash=hash_token(token),
+        label=body.label.strip(),
+        include_financials=body.include_financials,
+        created_by=admin.id,
+        expires_at=(datetime.now(timezone.utc) + timedelta(days=body.expires_in_days)) if body.expires_in_days else None,
+    )
+    db.add(link)
+    await db.flush()
+    # Deliberately NOT the token: the audit log must never hold a working secret.
+    audit.note(request, label=link.label, include_financials=link.include_financials, expires_in_days=body.expires_in_days)
+    return {**_link_out(link), "token": token}
+
+
+@router.post("/investor-links/{link_id}/revoke")
+async def revoke_investor_link(
+    link_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("investors.revoke_link", owner_only=True)),
+) -> dict:
+    """Switch a link off immediately."""
+    link = (await db.execute(select(InvestorLink).where(InvestorLink.id == link_id))).scalar_one_or_none()
+    if link is None:
+        raise HTTPException(404, "Link not found")
+    if link.revoked_at is None:
+        link.revoked_at = datetime.now(timezone.utc)
+        await db.flush()
+    return _link_out(link)

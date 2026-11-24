@@ -170,3 +170,21 @@ async def out_for_delivery(client, db_session_factory, order_id, market_id, agen
                           json={"code": r.json()["pickup_code"]})
     assert r.status_code == 200, r.text
     return hub_h, rider_h
+
+
+async def deliver_order(db_session_factory, order_id):
+    """Mark an order delivered and confirmed, as the customer's confirmation
+    would (without the payouts) - for tests about what counts as completed."""
+    import uuid
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from app.core.enums import OrderStatus
+    from app.orders.models import Order
+
+    async with db_session_factory() as s:
+        o = (await s.execute(select(Order).where(Order.id == uuid.UUID(str(order_id))))).scalar_one()
+        o.status = OrderStatus.CLOSED
+        o.delivered_at = datetime.now(timezone.utc)
+        await s.commit()

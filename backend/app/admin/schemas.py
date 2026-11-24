@@ -117,3 +117,10 @@ class ContentIn(BaseModel):
     key: str = Field(..., min_length=3, max_length=300, pattern=r"^(en|pcm|faqs|help|landing)\.[A-Za-z0-9_.\-]+$")
     # Plain text. To go back to the original wording, reset instead of blanking.
     value: str = Field(..., min_length=1, max_length=2000)
+
+
+class InvestorLinkIn(BaseModel):
+    label: str = Field(..., min_length=2, max_length=120, examples=["Seed round - November"])
+    # None = never expires. Short is safer: a link can always be replaced.
+    expires_in_days: int | None = Field(default=30, ge=1, le=365)
+    include_financials: bool = True

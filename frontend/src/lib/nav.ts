@@ -53,6 +53,7 @@ export const ADMIN_NAV = [
   { key: "users", label: "Users", icon: "flag", href: "/admin/users" },
   { key: "float", label: "Float", icon: "wallet", href: "/admin/float" },
   { key: "pay", label: "Delivery pay", icon: "send", href: "/admin/pay", ownerOnly: true },
+  { key: "company", label: "Company", icon: "chart", href: "/admin/company", ownerOnly: true },
   { key: "analytics", label: "Analytics", icon: "trending", href: "/admin/analytics" },
   { key: "admins", label: "Admins", icon: "shield", href: "/admin/admins", ownerOnly: true },
   { key: "content", label: "Website text", icon: "chat", href: "/admin/content", ownerOnly: true },
