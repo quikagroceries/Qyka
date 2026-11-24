@@ -18,6 +18,7 @@ from app.admin.schemas import (
     AdminLoginIn,
     AdminPasswordChangeIn,
     DeliveryFeesIn,
+    HubUpdateIn,
     RaiseCapIn,
     RiderStatusIn,
     VendorTransferAckIn,
@@ -128,6 +129,18 @@ async def float_status(
     return {"pool_balance": str(balance), "recent_movements": recent}
 
 
+def _stage_started_at(o: Order) -> str | None:
+    ts = {
+        OrderStatus.PAID: o.paid_at,
+        OrderStatus.DROPPED_AT_HUB: o.dropped_at_hub_at,
+        OrderStatus.RECEIVED_BY_HUB: o.hub_received_at,
+        # A claim restarts the clock: the order is no longer waiting for a rider.
+        OrderStatus.READY_FOR_PICKUP: o.rider_claimed_at or o.packed_at,
+        OrderStatus.OUT_FOR_DELIVERY: o.dispatched_at,
+    }.get(o.status)
+    return ts.isoformat() if ts else None
+
+
 @router.get("/orders/in-flight")
 async def in_flight_orders(
     db: AsyncSession = Depends(get_db),
@@ -153,6 +166,12 @@ async def in_flight_orders(
             "grand_total": str(o.grand_total),
             "payment_window_expires_at": o.payment_window_expires_at.isoformat() if o.payment_window_expires_at else None,
             "created_at": o.created_at.isoformat() if o.created_at else None,
+            "hub_id": str(o.hub_id) if o.hub_id else None,
+            "rider_id": str(o.rider_id) if o.rider_id else None,
+            # When it reached its CURRENT stage - what "stuck" is measured
+            # from at the hub (a 3-hour-old order that reached the hub a
+            # minute ago isn't stuck).
+            "stage_started_at": _stage_started_at(o),
         }
         for o in orders
     ]
@@ -521,3 +540,46 @@ async def clear_market_delivery_fees(
     )).scalar_one_or_none()
     if row is not None:
         await db.delete(row)
+
+
+@router.get("/hubs")
+async def list_hubs(
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_role(UserRole.ADMIN)),
+) -> list[dict]:
+    """Every hub: market, shopkeeper, active flag, and orders sitting in it.
+    Pending shopkeeper applications come from GET /agent-applications?kind=shopkeeper."""
+    return await admin_service.list_hubs(db)
+
+
+@router.patch("/hubs/{hub_id}")
+async def update_hub(
+    hub_id: uuid.UUID,
+    body: HubUpdateIn,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_role(UserRole.ADMIN)),
+) -> dict:
+    """Rename a hub or switch it off/on (off = no NEW drop-offs)."""
+    await admin_service.update_hub(db, hub_id=hub_id, name=body.name, is_active=body.is_active)
+    return next(h for h in await admin_service.list_hubs(db) if h["id"] == str(hub_id))
+
+
+@router.post("/orders/{order_id}/release-rider")
+async def release_rider(
+    order_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_role(UserRole.ADMIN)),
+) -> dict:
+    """Return an order a rider claimed but never collected to the pool."""
+    order = await admin_service.release_rider(db, order_id=order_id)
+    return {"id": str(order.id), "status": order.status.value, "rider_id": None}
+
+
+@router.post("/riders/{rider_id}/link-account")
+async def link_rider_account(
+    rider_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_role(UserRole.ADMIN)),
+) -> dict:
+    """Give a rider approved before rider logins existed a login."""
+    return await admin_service.link_rider_account(db, rider_id=rider_id)

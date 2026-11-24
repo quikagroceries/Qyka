@@ -16,6 +16,8 @@ function activeKeyFromPath(pathname) {
   if (pathname.startsWith("/admin/agents")) return "agents";
   if (pathname.startsWith("/admin/riders")) return "riders";
   if (pathname.startsWith("/admin/users")) return "users";
+  if (pathname.startsWith("/admin/hubs")) return "hubs";
+  if (pathname.startsWith("/admin/pay")) return "pay";
   if (pathname.startsWith("/admin/float")) return "float";
   if (pathname.startsWith("/admin/analytics")) return "analytics";
   if (pathname.startsWith("/admin/admins")) return "admins";

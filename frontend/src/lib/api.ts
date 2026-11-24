@@ -251,7 +251,7 @@ export const api = {
   removeAdmin: (userId) => request(`/admin/admins/${userId}`, { method: "DELETE" }),
   changeAdminPassword: (current_password: string, new_password: string) =>
     request("/admin/me/password", { method: "POST", body: { current_password, new_password } }),
-  getAgentApplications: (statusFilter?: string, kind?: "agent" | "rider") => {
+  getAgentApplications: (statusFilter?: string, kind?: "agent" | "rider" | "shopkeeper") => {
     const q = new URLSearchParams();
     if (statusFilter) q.set("status", statusFilter);
     if (kind) q.set("kind", kind);
@@ -260,10 +260,25 @@ export const api = {
   },
   // Public - the For Agents / For Riders pages, no sign-in.
   submitApplication: (body: {
-    kind: "agent" | "rider"; full_name: string; phone: string;
+    kind: "agent" | "rider" | "shopkeeper"; full_name: string; phone: string;
     market_id?: string; area?: string; vehicle?: string; note?: string;
   }) => request("/agent-applications/public", { method: "POST", body }),
   listRiders: () => request("/admin/riders"),
+  linkRiderAccount: (riderId: string) =>
+    request(`/admin/riders/${riderId}/link-account`, { method: "POST" }),
+  // Hubs, delivery pay, and unsticking a rider claim.
+  listHubs: () => request("/admin/hubs"),
+  updateHub: (hubId: string, body: { name?: string; is_active?: boolean }) =>
+    request(`/admin/hubs/${hubId}`, { method: "PATCH", body }),
+  adminReleaseRider: (orderId: string) =>
+    request(`/admin/orders/${orderId}/release-rider`, { method: "POST" }),
+  getDeliveryFees: () => request("/admin/fees"),
+  setDefaultDeliveryFees: (body: { rider_fee: string; hub_fee: string }) =>
+    request("/admin/fees", { method: "PUT", body }),
+  setMarketDeliveryFees: (marketId: string, body: { rider_fee: string; hub_fee: string }) =>
+    request(`/admin/fees/markets/${marketId}`, { method: "PUT", body }),
+  clearMarketDeliveryFees: (marketId: string) =>
+    request(`/admin/fees/markets/${marketId}`, { method: "DELETE" }),
   setRiderStatus: (riderId, status: "active" | "suspended") =>
     request(`/admin/riders/${riderId}`, { method: "PATCH", body: { status } }),
   approveAgentApplication: (id) =>

@@ -70,6 +70,18 @@ function AdminRiders() {
     }
   }
 
+  async function giveLogin(rider) {
+    setError(""); setBusyId(rider.id);
+    try {
+      await api.linkRiderAccount(rider.id);
+      await refresh();
+    } catch (e) {
+      setError("Could not give this rider a login: " + e.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function toggleStatus(rider) {
     setError(""); setBusyId(rider.id);
     try {
@@ -89,10 +101,23 @@ function AdminRiders() {
   );
 
   const statusButton = (r) => (
-    <Button variant="neutral" onClick={() => toggleStatus(r)} busy={busyId === r.id} className="text-sm">
-      {r.status === "active" ? "Suspend" : "Reactivate"}
-    </Button>
+    <div className="flex flex-wrap justify-end gap-2">
+      {!r.has_login && (
+        <Button onClick={() => giveLogin(r)} busy={busyId === r.id} className="text-sm">
+          Give login
+        </Button>
+      )}
+      <Button variant="neutral" onClick={() => toggleStatus(r)} busy={busyId === r.id} className="text-sm">
+        {r.status === "active" ? "Suspend" : "Reactivate"}
+      </Button>
+    </div>
   );
+  const signIn = (r) =>
+    r.has_login ? (
+      <span className="text-ink/80">Can sign in</span>
+    ) : (
+      <span className="font-semibold text-amber-700">No login yet</span>
+    );
 
   return (
     <div>
@@ -152,6 +177,7 @@ function AdminRiders() {
                   <div className="col-span-2"><dt className="text-xs text-faint">Covers</dt><dd className="text-ink/80">{coverage(r)}</dd></div>
                   <div><dt className="text-xs text-faint">Vehicle</dt><dd className="text-ink/80">{r.vehicle || "—"}</dd></div>
                   <div><dt className="text-xs text-faint">Joined</dt><dd className="text-ink/80">{joined(r.created_at)}</dd></div>
+                  <div className="col-span-2"><dt className="text-xs text-faint">Rider app</dt><dd>{signIn(r)}</dd></div>
                 </dl>
                 {statusButton(r)}
               </Card>
@@ -166,6 +192,7 @@ function AdminRiders() {
                   <th className="px-4 py-3 font-semibold">Covers</th>
                   <th className="px-4 py-3 font-semibold">Vehicle</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Rider app</th>
                   <th className="px-4 py-3 font-semibold">Joined</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -180,6 +207,7 @@ function AdminRiders() {
                     <td className="px-4 py-3 text-ink/80">{coverage(r)}</td>
                     <td className="px-4 py-3 text-ink/80">{r.vehicle || "—"}</td>
                     <td className="px-4 py-3"><StatusPill status={r.status} /></td>
+                    <td className="px-4 py-3">{signIn(r)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-ink/80">{joined(r.created_at)}</td>
                     <td className="px-4 py-3 text-right">{statusButton(r)}</td>
                   </tr>

@@ -54,3 +54,8 @@ class DeliveryFeesIn(BaseModel):
 
     rider_fee: Decimal = Field(..., ge=0, le=100000, decimal_places=2)
     hub_fee: Decimal = Field(..., ge=0, le=100000, decimal_places=2)
+
+
+class HubUpdateIn(BaseModel):
+    name: str | None = Field(default=None, max_length=120)
+    is_active: bool | None = None

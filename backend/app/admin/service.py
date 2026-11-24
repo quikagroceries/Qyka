@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.enums import OrderStatus, RiderStatus, TransactionStatus, UserRole, UserStatus
 from app.core.security import hash_password, verify_password
 from app.float.models import FloatLedger
+from app.hubs.models import Hub
 from app.jit import service as jit_service
 from app.jit.models import SpendingAuthorization, VendorTransfer
 from app.markets.models import Agent, Market
@@ -241,8 +242,50 @@ def _rider_out(rider: Rider) -> dict:
         "vehicle": rider.vehicle,
         "market_id": str(rider.market_id) if rider.market_id else None,
         "status": rider.status.value,
+        # False for riders approved before riders could sign in: they're on
+        # the roster but can't open the rider app until given a login.
+        "has_login": rider.user_id is not None,
+        "user_id": str(rider.user_id) if rider.user_id else None,
         "created_at": rider.created_at.isoformat() if rider.created_at else None,
     }
+
+
+async def link_rider_account(db: AsyncSession, *, rider_id: uuid.UUID) -> dict:
+    """Give a rider approved before rider logins existed a login: find (or
+    create) the account for their phone, make it a RIDER and link it. The
+    same one-staff-role-per-account rule as approving an application."""
+    rider = (await db.execute(select(Rider).where(Rider.id == rider_id))).scalar_one_or_none()
+    if rider is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Rider not found")
+    if rider.user_id is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This rider already has a login")
+
+    user = (await db.execute(select(User).where(User.phone == rider.phone))).scalar_one_or_none()
+    if user is None:
+        user = User(
+            phone=rider.phone,
+            full_name=rider.full_name,
+            role=UserRole.RIDER,
+            status=UserStatus.ACTIVE,
+            basket_cap_kobo=settings.default_basket_cap_kobo,
+            has_customer_side=False,
+        )
+        db.add(user)
+        await db.flush()
+    elif user.role is UserRole.CUSTOMER:
+        user.role = UserRole.RIDER
+        if not user.full_name:
+            user.full_name = rider.full_name
+    elif user.role is not UserRole.RIDER:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"That number already belongs to a {user.role.value} account"
+        )
+    taken = (await db.execute(select(Rider).where(Rider.user_id == user.id))).scalar_one_or_none()
+    if taken is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "That account is already linked to another rider")
+    rider.user_id = user.id
+    await db.flush()
+    return _rider_out(rider)
 
 
 async def list_riders(db: AsyncSession) -> list[dict]:
@@ -592,3 +635,84 @@ async def admin_cancel_order(
     return await orders_service.admin_cancel_order(
         db, order_id=order_id, refund_amount=refund_amount, note=note.strip()
     )
+
+
+# --- Hubs ------------------------------------------------------------------
+
+_AT_HUB = (
+    OrderStatus.DROPPED_AT_HUB,
+    OrderStatus.RECEIVED_BY_HUB,
+    OrderStatus.READY_FOR_PICKUP,
+)
+
+
+async def list_hubs(db: AsyncSession) -> list[dict]:
+    """Every hub with its market, its shopkeeper and how many orders are
+    sitting in it right now - the roster behind the Hubs admin screen."""
+    rows = (await db.execute(
+        select(Hub, Market, User)
+        .join(Market, Market.id == Hub.market_id, isouter=True)
+        .join(User, User.id == Hub.user_id, isouter=True)
+        .order_by(Hub.created_at.desc())
+    )).all()
+    counts: dict[uuid.UUID, int] = defaultdict(int)
+    at_hub = (await db.execute(
+        select(Order.hub_id).where(Order.hub_id.is_not(None), Order.status.in_(_AT_HUB))
+    )).scalars().all()
+    for hub_id in at_hub:
+        counts[hub_id] += 1
+    return [
+        {
+            "id": str(hub.id),
+            "name": hub.name,
+            "is_active": hub.is_active,
+            "market_id": str(hub.market_id),
+            "market_name": market.name if market else None,
+            "shopkeeper_name": user.full_name if user else None,
+            "shopkeeper_phone": user.phone if user else None,
+            "orders_at_hub": counts.get(hub.id, 0),
+            "created_at": hub.created_at.isoformat() if hub.created_at else None,
+        }
+        for hub, market, user in rows
+    ]
+
+
+async def update_hub(
+    db: AsyncSession, *, hub_id: uuid.UUID, name: str | None, is_active: bool | None
+) -> Hub:
+    """Rename a hub (its name is what an agent picks from when a market has
+    several) or switch it off/on. Switching off only stops NEW drop-offs
+    going there - orders already at the hub carry on through it."""
+    hub = (await db.execute(select(Hub).where(Hub.id == hub_id))).scalar_one_or_none()
+    if hub is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Hub not found")
+    if name is not None:
+        name = name.strip()
+        if not name:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A hub needs a name")
+        hub.name = name
+    if is_active is not None:
+        hub.is_active = is_active
+    await db.flush()
+    return hub
+
+
+async def release_rider(db: AsyncSession, *, order_id: uuid.UUID) -> Order:
+    """Put an order a rider claimed but never collected back in the pool.
+
+    Only before the goods have left the hub: once they're out for delivery
+    they're physically with the rider, and the fix is a call, then (if they're
+    truly lost) the existing cancel-and-refund.
+    """
+    order = (await db.execute(select(Order).where(Order.id == order_id))).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
+    if order.status is not OrderStatus.READY_FOR_PICKUP or order.rider_id is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Only an order a rider has claimed but not collected can be released"
+        )
+    order.rider_id = None
+    order.rider_claimed_at = None
+    order.pickup_code = None
+    await db.flush()
+    return order
