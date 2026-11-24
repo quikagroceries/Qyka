@@ -27,7 +27,7 @@ const POLL_MS = 15000;
 // already out with the goods (DELIVERED) is past the point of a clean cancel.
 const ADMIN_CANCELLABLE = new Set([
   "draft", "proposed", "agent_assigned", "shopping",
-  "awaiting_payment", "paid", "packed", "out_for_delivery",
+  "awaiting_payment", "paid", "dropped_at_hub", "received_by_hub", "ready_for_pickup", "packed", "out_for_delivery",
 ]);
 
 export function OrderDetailPanel({ orderId, markets, agents, onBack, onAssigned }: any) {

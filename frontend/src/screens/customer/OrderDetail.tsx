@@ -51,7 +51,12 @@ const UNPRICED_STATUSES = new Set(["draft", "proposed", "agent_assigned", "shopp
 // nothing's been bought-for-real yet either). Also exactly the range the
 // status/tracking screen covers - packaging starts the moment it's paid, so
 // there's no gap where the customer is left without a status screen.
-const PAID_OR_LATER = new Set(["paid", "packed", "out_for_delivery", "delivered", "closed"]);
+const PAID_OR_LATER = new Set([
+  "paid", "dropped_at_hub", "received_by_hub", "ready_for_pickup", "packed", "out_for_delivery", "delivered", "closed",
+]);
+const ON_THE_MOVE = new Set([
+  "paid", "dropped_at_hub", "received_by_hub", "ready_for_pickup", "packed", "out_for_delivery",
+]);
 
 
 // On return from a Paystack redirect, the URL carries one of these,
@@ -469,7 +474,7 @@ function OrderDetail({ orderId, onBack, onTopUpWallet }: any) {
   // per the app's no-dark-surfaces rule. Text over this hero is dark ink,
   // not white, to match.
   const heroBody = isPaidOrLater
-    ? "Live delivery status below — packaging, handover code, and confirm on arrival."
+    ? "Live delivery status below — the hub, your rider, the handover code, and confirm on arrival."
     : "Your agent is on it — items and any approvals needed appear below as they come in.";
 
   // State-aware hero art: the illustration should show what's actually
@@ -478,7 +483,7 @@ function OrderDetail({ orderId, onBack, onTopUpWallet }: any) {
   const heroIllustration =
     order.status === "delivered" || order.status === "closed"
       ? orderHandoff
-      : order.status === "out_for_delivery" || order.status === "packed" || order.status === "paid"
+      : ON_THE_MOVE.has(order.status)
         ? riderScooter
         : order.status === "shopping" || order.status === "awaiting_payment"
           ? agentCustomerConversation

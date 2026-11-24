@@ -7,7 +7,7 @@ import Notifications from "@/screens/shared/Notifications";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
-import PackagingPanel from "@/components/order/PackagingPanel";
+import DropAtHubPanel from "@/components/order/DropAtHubPanel";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Icon from "@/components/ui/Icon";
 import { isChatAvailable } from "@/lib/orderStatus";
@@ -353,7 +353,9 @@ function Shopping({ orderId, onBack }: any) {
   const heroHeadline =
     order.status === "agent_assigned" ? "Ready to shop"
     : order.status === "shopping" ? `${boughtCount} of ${items.length} bought`
-    : order.status === "paid" ? "Pack & dispatch"
+    : order.status === "paid" ? "Take it to the hub"
+    : order.status === "dropped_at_hub" ? "Dropped — waiting for check-in"
+    : order.status === "received_by_hub" || order.status === "ready_for_pickup" ? "At the hub — a rider is next"
     : order.status === "packed" ? "Packed — awaiting pickup"
     : order.status === "out_for_delivery" ? "Out for delivery"
     : order.status === "delivered" || order.status === "closed" ? "Delivered"
@@ -370,7 +372,11 @@ function Shopping({ orderId, onBack }: any) {
       : order.status === "shopping"
         ? "Tick items as you buy them and pay each stall directly below."
         : order.status === "paid"
-          ? "Pack this order and hand it to the courier."
+          ? "Carry everything to the hub in the market and drop it with the shopkeeper."
+          : order.status === "dropped_at_hub"
+            ? "The shopkeeper will check it in against the list."
+            : order.status === "received_by_hub" || order.status === "ready_for_pickup"
+              ? "You're done here — the hub hands it to a rider."
           : order.status === "cancelled_unpaid"
             ? "The balance window lapsed — return any goods you already bought."
             : "Live status for this order.";
@@ -445,7 +451,7 @@ function Shopping({ orderId, onBack }: any) {
 
       <div>
         {/* Phase 5: the balance window lapsed — deposit forfeited, no
-            packaging/courier for an unpaid order. Only thing left to do. */}
+            a hub drop-off for an unpaid order. Only thing left to do. */}
         {order.status === "cancelled_unpaid" && (
           <div className="mb-4 rounded-xl border-2 border-red-400 bg-red-50 p-4">
             <p className="font-bold text-red-700">Balance not paid in time</p>
@@ -467,21 +473,24 @@ function Shopping({ orderId, onBack }: any) {
             </div>
           )}
 
-          {/* Phase 2+3: once the balance is paid, packaging is the next
-              action — packing never starts before this (backend enforces
-              PAID as the precondition for /pack). */}
+          {/* Once the balance is paid, the next action is taking the goods to
+              the hub - never before (backend enforces PAID as the
+              precondition for drop-at-hub). */}
           {order.status === "paid" && (
             <div className="mb-4">
-              <PackagingPanel order={order} onPacked={refresh} />
+              <DropAtHubPanel order={order} onDropped={refresh} />
             </div>
           )}
 
-          {["packed", "out_for_delivery", "delivered", "closed"].includes(order.status) &&
-            order.courier_reference && (
-              <div className="mb-4 rounded-xl bg-brand-green/10 px-4 py-3 text-sm font-semibold text-brand-green">
-                Handed to courier — reference {order.courier_reference}
-              </div>
-            )}
+          {["dropped_at_hub", "received_by_hub", "ready_for_pickup", "out_for_delivery", "delivered", "closed"].includes(order.status) && (
+            <div className="mb-4 rounded-xl bg-brand-green/10 px-4 py-3 text-sm font-semibold text-brand-green">
+              {order.status === "dropped_at_hub" && "Dropped at the hub — waiting for the shopkeeper to check it in."}
+              {order.status === "received_by_hub" && "The hub has checked your drop-off in."}
+              {order.status === "ready_for_pickup" && "Ready at the hub — waiting for a rider."}
+              {order.status === "out_for_delivery" && "A rider has collected it and is on the way."}
+              {(order.status === "delivered" || order.status === "closed") && "Delivered."}
+            </div>
+          )}
 
           {/* Stall not in the system yet — register it on the fly. Live
               immediately, no approval gate; just makes it findable going

@@ -20,6 +20,7 @@ export default function SetupPage() {
             const role = (u.role || "").toUpperCase();
             if (role === "ADMIN") router.replace("/admin");
             else if (role === "SHOPKEEPER") router.replace("/shopkeeper");
+            else if (role === "RIDER") router.replace("/rider");
             else if (role === "AGENT") router.replace(onDuty ? "/agent" : "/shop");
             else router.replace("/shop");
           }}

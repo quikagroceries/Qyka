@@ -20,6 +20,9 @@ function isReadyToShop(o) {
 function isInProgress(o) {
   return o.status === "shopping";
 }
+function isNeedsDrop(o) {
+  return o.status === "paid";
+}
 function isNeedsAttention(o) {
   return o.status === "cancelled_unpaid";
 }
@@ -93,7 +96,8 @@ export default function AgentHomePage() {
   }, [handleLogout]);
 
   const marketName = (id) => markets.find((m) => m.id === id)?.name;
-  const actionable = orders.filter((o) => o.status === "agent_assigned" || o.status === "shopping");
+  const needsDrop = orders.filter(isNeedsDrop);
+  const actionable = orders.filter((o) => o.status === "agent_assigned" || o.status === "shopping" || isNeedsDrop(o));
   const readyToShop = actionable.filter(isReadyToShop);
   const inProgress = actionable.filter(isInProgress);
   const needsAttention = orders.filter(isNeedsAttention);
@@ -109,7 +113,9 @@ export default function AgentHomePage() {
             ? "Loading your tasks…"
             : needsAttention.length > 0
               ? "Something needs your attention."
-              : readyToShop.length > 0
+              : needsDrop.length > 0
+                ? "Goods are waiting to go to the hub."
+                : readyToShop.length > 0
                 ? "A list is waiting for you."
                 : inProgress.length > 0
                   ? "You're mid-run. Keep going."
@@ -119,7 +125,8 @@ export default function AgentHomePage() {
         illustration={readyToShop.length + inProgress.length > 0 ? agentScene : cartVendor}
         illustrationAlt="An agent shopping the market"
       >
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile label="To the hub" value={needsDrop.length} />
           <StatTile label="Ready to shop" value={readyToShop.length} />
           <StatTile label="In progress" value={inProgress.length} />
           <StatTile label="Needs attention" value={needsAttention.length} />
@@ -145,6 +152,14 @@ export default function AgentHomePage() {
         subtitle="The customer didn't pay the balance in time — the deposit is forfeited. Return the goods you already bought."
         orders={needsAttention}
         tone="attention"
+        marketName={marketName}
+        onOpen={(id) => router.push(`/agent/orders/${id}`)}
+      />
+      <TaskSection
+        title="Take to the hub"
+        subtitle="Paid and bought — drop these at the hub in the market."
+        orders={needsDrop}
+        tone="ready"
         marketName={marketName}
         onOpen={(id) => router.push(`/agent/orders/${id}`)}
       />

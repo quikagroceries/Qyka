@@ -13,7 +13,7 @@ import HeroBanner from "@/components/layout/HeroBanner";
 import OtpInput from "@/components/auth/OtpInput";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import handoffArt from "@/assets/illustrations/order-handoff-vendor-customer.webp";
-import { ago, errMsg, shortId } from "./hubUtils";
+import { ago, errMsg, shortId } from "@/lib/hubUtils";
 
 // One order, one job at a time: which panel shows is decided by where the
 // order is in the hub's own custody chain, so the shopkeeper only ever sees

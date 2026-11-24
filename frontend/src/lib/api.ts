@@ -167,12 +167,11 @@ export const api = {
       method: "POST", body: { photo_ref: photoRef },
     }),
 
-  packOrder: (id) => request(`/delivery/orders/${id}/pack`, { method: "POST" }),
-  dispatchCourier: (id: string | number, courierReference?: string) =>
-    request(`/delivery/orders/${id}/dispatch-courier`, {
-      method: "POST",
-      body: courierReference ? { courier_reference: courierReference } : {},
-    }),
+  // Agent: drop a paid order's goods at a hub in its market. `hubId` is only
+  // needed when the market has more than one.
+  getHubsForMarket: (marketId: string) => request(`/hubs?market_id=${marketId}`),
+  dropAtHub: (id: string, hubId?: string) =>
+    request(`/delivery/orders/${id}/drop-at-hub`, { method: "POST", body: hubId ? { hub_id: hubId } : {} }),
   addPackingPhotos: (id, refs) =>
     request(`/delivery/orders/${id}/packing-photos`, { method: "POST", body: { refs } }),
   confirmDelivery: (id) =>
@@ -190,6 +189,16 @@ export const api = {
   handoverHubOrder: (id: string, code: string) =>
     request(`/hubs/orders/${id}/handover`, { method: "POST", body: { code } }),
   getHubEarnings: () => request("/hubs/earnings"),
+
+  // Rider: claim a job from the pool, collect it from the hub with a code
+  // the shopkeeper enters, then confirm drop-off with the customer's PIN.
+  getRiderJobs: () => request("/riders/jobs"),
+  getMyRiderJobs: () => request("/riders/jobs/mine"),
+  claimRiderJob: (id: string) => request(`/riders/jobs/${id}/claim`, { method: "POST" }),
+  releaseRiderJob: (id: string) => request(`/riders/jobs/${id}/release`, { method: "POST" }),
+  deliverRiderJob: (id: string, code: string) =>
+    request(`/riders/jobs/${id}/deliver`, { method: "POST", body: { code } }),
+  getRiderEarnings: () => request("/riders/earnings"),
   uploadHubPhoto: (file) => uploadToCloudinary(file),
 
   applyAsAgent: (body) => request("/agent-applications", { method: "POST", body }),

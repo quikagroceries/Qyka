@@ -6,12 +6,13 @@ import { api } from "@/lib/api";
 import { usePolling } from "@/lib/usePolling";
 import Card from "@/components/ui/Card";
 import HeroBanner from "@/components/layout/HeroBanner";
+import Notifications from "@/screens/shared/Notifications";
 import SectionHeader from "@/components/ui/SectionHeader";
 import EmptyState from "@/components/ui/EmptyState";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import hubArt from "@/assets/illustrations/map-pin-storefront.webp";
 import emptyArt from "@/assets/illustrations/produce-crate.webp";
-import { ago, errMsg, shortId } from "./hubUtils";
+import { ago, errMsg, shortId } from "@/lib/hubUtils";
 
 // The queue is three lanes in the order work actually happens at the hub:
 // check what the agent brought, bag it, hand it to the rider who comes.
@@ -108,6 +109,9 @@ export default function HubHome() {
 
   return (
     <div>
+      {/* "An agent has dropped an order at your hub" arrives as a toast too,
+          so it's seen even when the queue below has scrolled out of view. */}
+      <Notifications />
       <HeroBanner
         eyebrow={hub?.name || "Hub"}
         live={riderWaiting > 0 || toCheckIn > 0}

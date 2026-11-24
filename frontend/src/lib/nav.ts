@@ -37,6 +37,12 @@ export const SHOPKEEPER_NAV = [
   { key: "settings", label: "Settings", icon: "settings", href: "/shopkeeper/settings" },
 ];
 
+export const RIDER_NAV = [
+  { key: "jobs", label: "Jobs", icon: "bike", href: "/rider" },
+  { key: "earnings", label: "Earnings", icon: "wallet", href: "/rider/earnings" },
+  { key: "settings", label: "Settings", icon: "settings", href: "/rider/settings" },
+];
+
 export const ADMIN_NAV = [
   { key: "dashboard", label: "Dashboard", icon: "chart", href: "/admin" },
   { key: "orders", label: "Orders", icon: "basket", href: "/admin/orders" },
