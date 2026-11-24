@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.admin.guards import require_admin
 from app.auth.models import User
 from app.core.database import get_db
 from app.core.enums import UserRole
@@ -28,7 +29,7 @@ router = APIRouter()
 async def create_market(
     body: CreateMarketIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("market.create", owner_only=True)),
 ) -> Market:
     return await service.create_market(
         db, name=body.name, city=body.city, state=body.state,
@@ -46,7 +47,7 @@ async def update_market(
     market_id: uuid.UUID,
     body: UpdateMarketIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("market.update")),
 ) -> Market:
     return await service.update_market(db, market_id=market_id, **body.model_dump())
 

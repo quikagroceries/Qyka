@@ -4,6 +4,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.admin.guards import require_admin
 from app.auth.models import User
 from app.core.database import get_db
 from app.core.etag import json_with_etag
@@ -165,7 +166,7 @@ async def assign_agent(
     order_id: uuid.UUID,
     body: AssignAgentIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("order.assign_agent")),
 ) -> OrderOut:
     return await service.assign_agent(
         db, order_id=order_id, agent_id=body.agent_id

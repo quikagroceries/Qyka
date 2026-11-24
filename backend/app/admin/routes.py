@@ -7,14 +7,16 @@ left, what's in flight, who to watch. All admin-gated.
 import uuid
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.admin import audit
 from app.admin import service as admin_service
 from app.admin.schemas import (
     AdminCancelOrderIn,
     AdminCreateIn,
+    AdminLevelIn,
     AdminLoginIn,
     AdminPasswordChangeIn,
     DeliveryFeesIn,
@@ -24,6 +26,7 @@ from app.admin.schemas import (
     VendorTransferAckIn,
     WalletAdjustIn,
 )
+from app.admin.guards import require_admin
 from app.auth.models import User
 from app.auth.schemas import TokenOut
 from app.core.database import get_db
@@ -39,10 +42,27 @@ router = APIRouter()
 
 
 @router.post("/login", response_model=TokenOut)
-async def admin_login(body: AdminLoginIn, db: AsyncSession = Depends(get_db)) -> TokenOut:
+async def admin_login(
+    body: AdminLoginIn, request: Request, db: AsyncSession = Depends(get_db)
+) -> TokenOut:
     """Admin sign-in — email+password only, never phone/OTP like every other
-    role (see admin.service.authenticate_admin)."""
-    user = await admin_service.authenticate_admin(db, email=body.email, password=body.password)
+    role (see admin.service.authenticate_admin). Sign-ins, and failed
+    attempts against a real admin account, go in the audit log."""
+    email = body.email.strip().lower()
+    try:
+        user = await admin_service.authenticate_admin(db, email=body.email, password=body.password)
+    except HTTPException:
+        # Only for an email that really is an admin - so strangers guessing
+        # addresses can't fill the log. Committed here because the request
+        # is about to fail and roll back.
+        known = (await db.execute(
+            select(User).where(User.email == email, User.role == UserRole.ADMIN)
+        )).scalar_one_or_none()
+        if known is not None:
+            await audit.record(db, admin=None, email=email, action="admin.login_failed", request=request)
+            await db.commit()
+        raise
+    await audit.record(db, admin=user, action="admin.login", request=request)
     token = create_access_token(user.id, user.role)
     return TokenOut(access_token=token)
 
@@ -50,6 +70,7 @@ async def admin_login(body: AdminLoginIn, db: AsyncSession = Depends(get_db)) ->
 @router.post("/me/password", status_code=204)
 async def change_my_password(
     body: AdminPasswordChangeIn,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> None:
@@ -58,12 +79,13 @@ async def change_my_password(
     await admin_service.change_admin_password(
         db, user=user, current_password=body.current_password, new_password=body.new_password
     )
+    await audit.record(db, admin=user, action="admin.password_change", request=request)
 
 
 @router.get("/admins")
 async def list_admins(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> list[dict]:
     return await admin_service.list_admins(db)
 
@@ -72,20 +94,32 @@ async def list_admins(
 async def create_admin(
     body: AdminCreateIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("admins.create", owner_only=True)),
 ) -> dict:
     """Add an admin on a temporary password - share it with them privately;
     they must replace it at first sign-in."""
     return await admin_service.create_admin(
-        db, email=body.email, full_name=body.full_name, temporary_password=body.temporary_password
+        db, email=body.email, full_name=body.full_name,
+        temporary_password=body.temporary_password, level=body.level,
     )
+
+
+@router.patch("/admins/{user_id}")
+async def set_admin_level(
+    user_id: uuid.UUID,
+    body: AdminLevelIn,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("admins.set_level", owner_only=True)),
+) -> dict:
+    """Change an admin between owner and support."""
+    return await admin_service.set_admin_level(db, user_id=user_id, level=body.level, actor=admin)
 
 
 @router.delete("/admins/{user_id}", status_code=204)
 async def remove_admin(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("admins.remove", owner_only=True)),
 ) -> None:
     await admin_service.remove_admin(db, user_id=user_id, actor=admin)
 
@@ -102,7 +136,7 @@ _ACTIVE = [
 async def float_status(
     market_id: uuid.UUID | None = None,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> dict:
     """Working capital left in a market's pool (or the global pool if omitted).
 
@@ -144,7 +178,7 @@ def _stage_started_at(o: Order) -> str | None:
 @router.get("/orders/in-flight")
 async def in_flight_orders(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> dict:
     """Every order not yet closed/cancelled, so you can spot what's stuck.
 
@@ -182,7 +216,7 @@ async def in_flight_orders(
 @router.get("/orders/losses")
 async def order_losses(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> dict:
     """Orders where the balance payment window lapsed after the agent had
     already spent real money at the market - the deposit is forfeited (see
@@ -219,7 +253,7 @@ async def list_users(
     limit: int = 100,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> dict:
     """Every registered account, newest first - however they signed up (phone,
     email or Google). `q` matches name, email or phone; `role` narrows to one
@@ -267,7 +301,7 @@ async def list_users(
 @router.get("/users/flagged")
 async def flagged_users(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> dict:
     """Customers with non-payment history or a flagged/locked status."""
     result = await db.execute(
@@ -295,7 +329,7 @@ async def flagged_users(
 async def clear_user_flag(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("user.clear_flag")),
 ) -> dict:
     """Admin pardon - resets must_prepay/non_payment_count/FLAGGED-LOCKED
     status back to normal in one action. See admin.service.clear_user_flag."""
@@ -312,7 +346,7 @@ async def clear_user_flag(
 async def user_detail(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> dict:
     """One user's full picture for a support case: profile, wallet balance and
     recent ledger, and recent orders (as customer or agent) - everything
@@ -324,7 +358,7 @@ async def user_detail(
 async def suspend_user(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("user.suspend")),
 ) -> dict:
     """Soft-delete a user: blocks sign-in and every API call immediately, but
     keeps their orders/wallet/payment history intact and is reversible."""
@@ -336,7 +370,7 @@ async def suspend_user(
 async def reactivate_user(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("user.reactivate")),
 ) -> dict:
     user = await admin_service.reactivate_user(db, user_id=user_id)
     return {"id": str(user.id), "status": user.status.value}
@@ -347,7 +381,7 @@ async def adjust_wallet(
     user_id: uuid.UUID,
     body: WalletAdjustIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("user.wallet_adjust", owner_only=True)),
 ) -> dict:
     """Manually credit or debit a customer's wallet for a support case, with a
     mandatory note. Writes a normal WalletLedger row, same as any other
@@ -362,7 +396,7 @@ async def adjust_wallet(
 async def vendor_transfers(
     only_failed: bool = False,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> dict:
     """Every JIT vendor payout attempt, newest first (optionally failed-only) -
     visibility that previously only existed by querying the database directly."""
@@ -374,7 +408,7 @@ async def acknowledge_vendor_transfer(
     transfer_id: uuid.UUID,
     body: VendorTransferAckIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("vendor_transfer.acknowledge", owner_only=True)),
 ) -> dict:
     """Record how a failed vendor payout was resolved. See
     admin.service.acknowledge_vendor_transfer for why this doesn't itself
@@ -390,7 +424,7 @@ async def admin_raise_cap(
     order_id: uuid.UUID,
     body: RaiseCapIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("order.raise_cap", owner_only=True)),
 ) -> dict:
     """Admin-side mirror of the customer's own cap-raise (jit/routes.py) - for
     when they've approved an overage by phone or chat instead of in-app."""
@@ -403,7 +437,7 @@ async def admin_cancel_order(
     order_id: uuid.UUID,
     body: AdminCancelOrderIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("order.cancel", owner_only=True)),
 ) -> dict:
     """Cancel a stuck or disputed order from any state up to (not including)
     DELIVERED, refunding a specific admin-entered amount to the customer's
@@ -418,7 +452,7 @@ async def admin_cancel_order(
 @router.get("/agents")
 async def list_agents(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> list[dict]:
     """Every agent, market + availability + lifetime earnings - the roster
     behind the Agents admin screen."""
@@ -428,7 +462,7 @@ async def list_agents(
 @router.get("/riders")
 async def list_riders(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> list[dict]:
     """Approved riders - area, vehicle, status - behind the Riders screen.
     Pending rider applications come from GET /agent-applications?kind=rider."""
@@ -440,7 +474,7 @@ async def set_rider_status(
     rider_id: uuid.UUID,
     body: RiderStatusIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("rider.set_status")),
 ) -> dict:
     """Suspend or reactivate a rider."""
     return await admin_service.set_rider_status(db, rider_id=rider_id, status_=body.status)
@@ -450,7 +484,7 @@ async def set_rider_status(
 async def analytics(
     days: int = 30,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> dict:
     """Order volume/revenue over the last `days`, lifetime agent/market
     activity, and completion/cancellation/non-payment rates - computed only
@@ -473,7 +507,7 @@ def _fees_out(rider_fee, hub_fee, *, market_id=None, market_name=None) -> dict:
 @router.get("/fees")
 async def get_delivery_fees(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> dict:
     """The global rider/hub pay plus every per-market override. Orders copy
     the figures when they are created, so changes only affect new orders."""
@@ -501,7 +535,7 @@ async def get_delivery_fees(
 async def set_default_delivery_fees(
     body: DeliveryFeesIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("fees.set_default", owner_only=True)),
 ) -> dict:
     """Set the global rider/hub pay (applies to new orders in every market
     without its own override)."""
@@ -516,7 +550,7 @@ async def set_market_delivery_fees(
     market_id: uuid.UUID,
     body: DeliveryFeesIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("fees.set_market", owner_only=True)),
 ) -> dict:
     """Override the rider/hub pay for one market."""
     market = (await db.execute(select(Market).where(Market.id == market_id))).scalar_one_or_none()
@@ -532,7 +566,7 @@ async def set_market_delivery_fees(
 async def clear_market_delivery_fees(
     market_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("fees.clear_market", owner_only=True)),
 ) -> None:
     """Drop a market's override so it follows the global default again."""
     row = (await db.execute(
@@ -545,7 +579,7 @@ async def clear_market_delivery_fees(
 @router.get("/hubs")
 async def list_hubs(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin()),
 ) -> list[dict]:
     """Every hub: market, shopkeeper, active flag, and orders sitting in it.
     Pending shopkeeper applications come from GET /agent-applications?kind=shopkeeper."""
@@ -557,7 +591,7 @@ async def update_hub(
     hub_id: uuid.UUID,
     body: HubUpdateIn,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("hub.update")),
 ) -> dict:
     """Rename a hub or switch it off/on (off = no NEW drop-offs)."""
     await admin_service.update_hub(db, hub_id=hub_id, name=body.name, is_active=body.is_active)
@@ -568,7 +602,7 @@ async def update_hub(
 async def release_rider(
     order_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("order.release_rider")),
 ) -> dict:
     """Return an order a rider claimed but never collected to the pool."""
     order = await admin_service.release_rider(db, order_id=order_id)
@@ -579,7 +613,49 @@ async def release_rider(
 async def link_rider_account(
     rider_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("rider.link_account")),
 ) -> dict:
     """Give a rider approved before rider logins existed a login."""
     return await admin_service.link_rider_account(db, rider_id=rider_id)
+
+
+@router.get("/audit")
+async def audit_log(
+    admin_id: uuid.UUID | None = None,
+    action: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin(owner_only=True)),
+) -> dict:
+    """Every state-changing admin action, newest first. `action` matches a
+    whole name ("user.suspend") or a group ("user." / "fees.")."""
+    limit = max(1, min(limit, 500))
+    stmt = select(audit.AdminAuditLog)
+    if admin_id is not None:
+        stmt = stmt.where(audit.AdminAuditLog.admin_id == admin_id)
+    if action:
+        stmt = stmt.where(
+            audit.AdminAuditLog.action.like(action + "%") if action.endswith(".") else audit.AdminAuditLog.action == action
+        )
+    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+    rows = (await db.execute(
+        stmt.order_by(audit.AdminAuditLog.created_at.desc()).limit(limit).offset(offset)
+    )).scalars().all()
+    return {
+        "total": total,
+        "entries": [
+            {
+                "id": str(r.id),
+                "admin_id": str(r.admin_id) if r.admin_id else None,
+                "admin_email": r.admin_email,
+                "admin_level": r.admin_level,
+                "action": r.action,
+                "target": r.target,
+                "detail": r.detail,
+                "ip": r.ip,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }

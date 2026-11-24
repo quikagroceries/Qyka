@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
 from app.core.config import settings
-from app.core.enums import OrderStatus, RiderStatus, TransactionStatus, UserRole, UserStatus
+from app.core.enums import AdminLevel, OrderStatus, RiderStatus, TransactionStatus, UserRole, UserStatus
 from app.core.security import hash_password, verify_password
 from app.float.models import FloatLedger
 from app.hubs.models import Hub
@@ -40,6 +40,7 @@ async def bootstrap_admin(db: AsyncSession, email: str | None, password: str | N
                 email=email,
                 password_hash=hash_password(password),
                 role=UserRole.ADMIN,
+                admin_level=AdminLevel.OWNER,
                 status=UserStatus.ACTIVE,
                 is_email_verified=True,
                 basket_cap_kobo=settings.default_basket_cap_kobo,
@@ -47,6 +48,7 @@ async def bootstrap_admin(db: AsyncSession, email: str | None, password: str | N
         )
     else:
         user.role = UserRole.ADMIN
+        user.admin_level = AdminLevel.OWNER
         user.password_hash = hash_password(password)
         user.must_change_password = False
     await db.commit()
@@ -68,6 +70,7 @@ def _admin_out(user: User) -> dict:
         # Can sign in at POST /admin/login at all (legacy phone-only admins can't).
         "has_password": user.password_hash is not None,
         "is_bootstrap": _is_bootstrap_admin(user),
+        "level": (user.admin_level or AdminLevel.SUPPORT).value,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }
 
@@ -80,7 +83,8 @@ async def list_admins(db: AsyncSession) -> list[dict]:
 
 
 async def create_admin(
-    db: AsyncSession, *, email: str, full_name: str | None, temporary_password: str
+    db: AsyncSession, *, email: str, full_name: str | None, temporary_password: str,
+    level: AdminLevel = AdminLevel.SUPPORT,
 ) -> dict:
     """A brand-new admin account on a temporary password they must replace
     at first sign-in. Never promotes an existing customer/agent account -
@@ -103,6 +107,7 @@ async def create_admin(
         password_hash=hash_password(temporary_password),
         must_change_password=True,
         role=UserRole.ADMIN,
+        admin_level=level,
         status=UserStatus.ACTIVE,
         is_email_verified=True,
         basket_cap_kobo=settings.default_basket_cap_kobo,
@@ -110,6 +115,33 @@ async def create_admin(
     db.add(user)
     await db.flush()
     await db.refresh(user)
+    return _admin_out(user)
+
+
+async def _owner_count(db: AsyncSession) -> int:
+    admins = (await db.execute(select(User).where(User.role == UserRole.ADMIN))).scalars().all()
+    return sum(1 for a in admins if a.admin_level is AdminLevel.OWNER)
+
+
+async def set_admin_level(
+    db: AsyncSession, *, user_id: uuid.UUID, level: AdminLevel, actor: User
+) -> dict:
+    """Promote support to owner or demote an owner. You can't change your own
+    level (nobody should be able to quietly demote themselves out of
+    accountability, or promote themselves), and the last owner can't go."""
+    user = await _get_user(db, user_id)
+    if user.role is not UserRole.ADMIN:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Admin not found")
+    if user.id == actor.id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "You can't change your own level")
+    if _is_bootstrap_admin(user) and level is not AdminLevel.OWNER:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "The account from BOOTSTRAP_ADMIN_EMAIL is always an owner"
+        )
+    if user.admin_level is AdminLevel.OWNER and level is not AdminLevel.OWNER and await _owner_count(db) <= 1:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "There must always be at least one owner")
+    user.admin_level = level
+    await db.flush()
     return _admin_out(user)
 
 
@@ -127,7 +159,10 @@ async def remove_admin(db: AsyncSession, *, user_id: uuid.UUID, actor: User) -> 
             status.HTTP_400_BAD_REQUEST,
             "This is the owner account from the server's BOOTSTRAP_ADMIN_EMAIL - change it there instead",
         )
+    if user.admin_level is AdminLevel.OWNER and await _owner_count(db) <= 1:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "There must always be at least one owner")
     user.role = UserRole.CUSTOMER
+    user.admin_level = None
     user.password_hash = None
     user.must_change_password = False
     await db.flush()

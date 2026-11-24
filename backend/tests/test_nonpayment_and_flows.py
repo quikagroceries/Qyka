@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
+from app.core.enums import AdminLevel
 from sqlalchemy import select
 from tests.conftest import pay_deposit
 
@@ -32,6 +33,7 @@ async def _setup(client, db_session_factory):
         agent.role = UserRole.AGENT
         cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
         cust.role = UserRole.ADMIN
+        cust.admin_level = AdminLevel.OWNER
         market = Market(name="M", city="PH", state="Rivers")
         s.add(market); await s.flush()
         s.add(Agent(user_id=agent.id, assigned_market_id=market.id, is_available=True))

@@ -11,6 +11,15 @@ class UserRole(str, enum.Enum):
     ADMIN = "admin"
 
 
+class AdminLevel(str, enum.Enum):
+    """What an admin may do. OWNER can do everything, including money rules,
+    other admins and the audit log. SUPPORT runs day-to-day operations (orders,
+    people, hubs) but can't touch money settings or who else is an admin."""
+
+    OWNER = "owner"
+    SUPPORT = "support"
+
+
 class UserStatus(str, enum.Enum):
     ACTIVE = "active"
     FLAGGED = "flagged"

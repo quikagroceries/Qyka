@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
-from app.core.enums import RiderStatus
+from app.core.enums import AdminLevel, RiderStatus
 
 
 class AdminLoginIn(BaseModel):
@@ -18,6 +18,13 @@ class AdminCreateIn(BaseModel):
     email: str = Field(..., examples=["ops@qyka.com"])
     full_name: str | None = Field(None, max_length=120)
     temporary_password: str = Field(..., min_length=_MIN_PASSWORD)
+    # Support by default: owner is the level that can touch money rules,
+    # other admins and the audit log, so it has to be asked for.
+    level: AdminLevel = AdminLevel.SUPPORT
+
+
+class AdminLevelIn(BaseModel):
+    level: AdminLevel
 
 
 class AdminPasswordChangeIn(BaseModel):

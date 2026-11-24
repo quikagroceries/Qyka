@@ -6,6 +6,7 @@ import uuid
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.admin.guards import require_admin
 from app.auth.models import User
 from app.core.config import settings
 from app.core.database import get_db
@@ -81,7 +82,7 @@ async def paystack_webhook(
 @router.post("/expire-stale")
 async def expire_stale(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(require_role(UserRole.ADMIN)),
+    admin: User = Depends(require_admin("orders.expire_stale", owner_only=True)),
 ) -> dict[str, int]:
     """Manually trigger auto-cancel of lapsed unpaid orders (also run on cron)."""
     count = await service.expire_stale_orders(db)

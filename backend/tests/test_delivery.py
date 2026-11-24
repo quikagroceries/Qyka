@@ -5,6 +5,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from app.core.enums import AdminLevel
 from sqlalchemy import select
 
 from app.core.config import settings
@@ -54,6 +55,7 @@ async def test_full_delivery_and_payout(client, db_session_factory, monkeypatch)
         rider.role = UserRole.RIDER
         cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
         cust.role = UserRole.ADMIN
+        cust.admin_level = AdminLevel.OWNER
         await s.commit()
         agent_id, rider_id = agent.id, rider.id
         market_id = uuid.uuid4()
@@ -175,6 +177,7 @@ async def test_cannot_pack_unpaid_order(client, db_session_factory):
         agent.role = UserRole.AGENT
         cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
         cust.role = UserRole.ADMIN
+        cust.admin_level = AdminLevel.OWNER
         await s.commit()
         agent_id = agent.id
         market_id = uuid.uuid4()

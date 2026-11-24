@@ -4,6 +4,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from app.core.enums import AdminLevel
 from sqlalchemy import select
 from tests.conftest import pay_deposit
 
@@ -30,6 +31,7 @@ async def _setup(client, db_session_factory):
         agent.role = UserRole.AGENT
         cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
         cust.role = UserRole.ADMIN
+        cust.admin_level = AdminLevel.OWNER
         await s.commit()
         agent_id, cust_id = agent.id, cust.id
         market_id = uuid.uuid4()

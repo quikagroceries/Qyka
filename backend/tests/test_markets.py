@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 import pytest
+from app.core.enums import AdminLevel
 
 from app.auth.models import User
 from app.core.enums import UserRole, UserStatus
@@ -30,6 +31,7 @@ async def _login_admin(client, db_session_factory, email):
                 email=email,
                 password_hash=hash_password(_ADMIN_PASSWORD),
                 role=UserRole.ADMIN,
+                admin_level=AdminLevel.OWNER,
                 status=UserStatus.ACTIVE,
                 is_email_verified=True,
             )

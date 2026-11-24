@@ -5,6 +5,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from app.core.enums import AdminLevel
 from sqlalchemy import select
 
 from tests.conftest import make_hub, pay_deposit
@@ -39,6 +40,7 @@ async def _paid_order(client, db_session_factory, monkeypatch, descriptions=("pe
         agent.role = UserRole.AGENT
         cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
         cust.role = UserRole.ADMIN
+        cust.admin_level = AdminLevel.OWNER
         await s.commit()
         agent_id = agent.id
         market_id = uuid.uuid4()

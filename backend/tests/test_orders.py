@@ -2,6 +2,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from app.core.enums import AdminLevel
 from sqlalchemy import select
 from tests.conftest import pay_deposit
 
@@ -46,6 +47,7 @@ async def test_full_order_lifecycle(client, db_session_factory, seed_float, monk
             await s.execute(select(User).where(User.phone == PHONE_CUST))
         ).scalar_one()
         cust_user.role = UserRole.ADMIN  # reuse customer as admin for assign step
+        cust_user.admin_level = AdminLevel.OWNER
         await s.commit()
         agent_user_id = agent_user.id
 
@@ -225,6 +227,7 @@ async def test_itemized_prices_drive_estimate_deposit_and_cap(client, db_session
             await s.execute(select(User).where(User.phone == PHONE_CUST))
         ).scalar_one()
         cust_user.role = UserRole.ADMIN  # reuse customer as admin for assign step
+        cust_user.admin_level = AdminLevel.OWNER
         await s.commit()
         agent_user_id = agent_user.id
 

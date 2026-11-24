@@ -2,6 +2,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from app.core.enums import AdminLevel
 from sqlalchemy import select
 
 from app.auth.models import User
@@ -33,6 +34,7 @@ async def _login_admin(client, db_session_factory, email):
                 email=email,
                 password_hash=hash_password(_ADMIN_PASSWORD),
                 role=UserRole.ADMIN,
+                admin_level=AdminLevel.OWNER,
                 status=UserStatus.ACTIVE,
                 is_email_verified=True,
             )
@@ -517,7 +519,7 @@ async def test_admin_removes_admin_but_not_self_or_bootstrap_owner(client, db_se
 @pytest.mark.asyncio
 async def test_existing_admin_cannot_sign_in_with_otp(client, db_session_factory):
     async with db_session_factory() as s:
-        s.add(User(phone="+2348040000099", role=UserRole.ADMIN, status=UserStatus.ACTIVE))
+        s.add(User(phone="+2348040000099", role=UserRole.ADMIN, admin_level=AdminLevel.OWNER, status=UserStatus.ACTIVE))
         await s.commit()
     r = await client.post("/auth/request-otp", json={"identifier": "+2348040000099"})
     r = await client.post("/auth/verify-otp", json={"identifier": "+2348040000099", "code": r.json()["dev_otp"]})
