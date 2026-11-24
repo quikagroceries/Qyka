@@ -71,7 +71,7 @@ export const LANDING = {
       {
         number: 4,
         title: "Pay and receive",
-        body: "Pay for what's actually bought. Overage refunded. Rider brings it to your door.",
+        body: "Pay for what's actually bought. Overage refunded. A rider collects it from the market hub and brings it to your door.",
         fragment: "receipt-delivery",
       },
     ],
@@ -142,6 +142,7 @@ export const LANDING = {
       "Photo proof of every purchase",
       "Live chat during shopping",
       "Refund of unspent deposit",
+      "A check-in against your list at a market hub",
     ],
     notIncluded: [
       "Markup on grocery prices",
@@ -171,8 +172,8 @@ export const LANDING = {
         icon: "camera",
       },
       {
-        title: "Vetted delivery riders",
-        body: "Live tracking with handoff confirmation. Identity verified before first ride.",
+        title: "Checked, then handed over with codes",
+        body: "Your order is checked against your list at a market hub, and only a rider with the right code can collect it. You give the rider your own code at the door.",
         icon: "truck",
       },
       {
@@ -234,12 +235,12 @@ export const LANDING = {
     },
     riders: {
       headline: "Become a rider",
-      pitch: "Pick up packed orders at the market gate. Deliver and earn per trip.",
+      pitch: "Claim a delivery, collect it from the market hub, and ride it to the door. A fixed fee for every trip.",
       cta: { label: "Apply as a rider", href: "/for-riders" },
       steps: [
         "Apply with your vehicle details",
         "Pass the verification check",
-        "Start delivering",
+        "Claim your first delivery",
       ],
     },
   },
@@ -253,7 +254,7 @@ export const LANDING = {
         name: "Ordering",
         questions: [
           { q: "How do I place an order?", a: "Write a free-text list of what you need — just like you'd text a friend. Choose a market or supermarket, set your delivery address, and deposit to start. Your agent picks up from there." },
-          { q: "Can I add items after placing my order?", a: "Yes, for a ₦500 add-item fee per addition. Your agent will confirm availability and price before purchasing." },
+          { q: "Can I add items after placing my order?", a: "Yes, for a small flat add-item fee per addition (the amount is on the Pricing page). Your agent will confirm availability and price before purchasing." },
           { q: "What if something on my list isn't available?", a: "Your agent chats with you in real time. They'll suggest substitutions, send photos, and wait for your approval before buying anything different." },
         ],
       },
@@ -262,13 +263,14 @@ export const LANDING = {
         questions: [
           { q: "How does payment work?", a: "You deposit upfront based on your estimated list. Your agent pays vendors by bank transfer — never cash. After shopping, you pay only for what was actually bought. Unspent funds are refunded to your wallet within 24 hours." },
           { q: "What if the price is higher than my budget?", a: "Your agent will contact you before exceeding your deposit. You can approve the extra spend, reduce quantities, or skip items — you're always in control." },
-          { q: "What are the fees?", a: "Groceries at market cost (no markup), a service fee, a delivery fee, and a ₦500 fee only if you add items after the run starts. That's it — no hidden charges." },
+          { q: "What are the fees?", a: "Groceries at market cost (no markup), a service fee, a delivery fee, and a small flat fee only if you add items after the run starts. The current amounts are always on the Pricing page. That's it — no hidden charges." },
         ],
       },
       {
         name: "Delivery",
         questions: [
-          { q: "How long does delivery take?", a: "Typically 45-90 minutes depending on the market size and your distance. You can track your order in real time from agent assignment to doorstep." },
+          { q: "How long does delivery take?", a: "Typically 45-90 minutes depending on the market size and your distance. You can follow your order step by step in the app, from your agent shopping, to the market hub, to your rider at your door." },
+          { q: "How does my order get from the market to me?", a: "Once your agent has bought everything and you've paid, they drop it at a hub in the market. The shopkeeper there checks it against your list, and a Qyka rider collects it and brings it to your door. You'll get a 4-digit code to give the rider when they arrive, so it only ever goes to you." },
           { q: "Can I schedule a delivery?", a: "Not yet — orders are fulfilled as soon as an agent is matched. Scheduled orders are coming soon." },
           { q: "What if I'm not home when the rider arrives?", a: "The rider will call you. You can designate a neighbour, gateman, or safe spot for drop-off in your delivery instructions." },
         ],

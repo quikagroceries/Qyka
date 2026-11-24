@@ -178,3 +178,15 @@ async def test_system_status_reports_without_leaking_secrets(client, db_session_
     blob = str(body).lower()
     assert "sk_" not in blob and "secret_key" not in blob
     assert (await client.get("/admin/system", headers=await _support(client, db_session_factory, "sys-support@qyka.com"))).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_public_pricing_quotes_what_workers_really_earn(client, db_session_factory):
+    from decimal import Decimal as D
+    h = await _owner(client, db_session_factory, "pay-owner@qyka.com")
+    base = (await client.get("/pricing")).json()
+    assert (base["agent_base_pay"], base["rider_pay"], base["hub_pay"]) == ("1000.00", "1000.00", "500.00")
+    await _set(client, h, "agent_base_share", "1400")
+    await client.put("/admin/fees", headers=h, json={"rider_fee": "900", "hub_fee": "350"})
+    now = (await client.get("/pricing")).json()
+    assert (now["agent_base_pay"], now["rider_pay"], now["hub_pay"]) == ("1400.00", "900.00", "350.00")

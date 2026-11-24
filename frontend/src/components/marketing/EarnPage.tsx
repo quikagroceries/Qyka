@@ -1,5 +1,6 @@
 "use client";
 
+import { usePricing } from "@/lib/usePricing";
 import { useEffect, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { api } from "@/lib/api";
@@ -35,7 +36,8 @@ export type EarnConfig = {
     fields: { key: "full_name" | "phone" | "market_id" | "area" | "vehicle"; label: string; required?: boolean; type?: "text" | "tel" | "market" }[];
     art: StaticImageData;
   };
-  estimator?: { perUnit: number; unit: string; min: number; max: number; start: number };
+  // Earnings estimate: `pay` picks which live figure (set by Qyka, see Admin > Platform and Delivery pay) it multiplies.
+  estimator?: { pay: "agent" | "rider"; unit: string; min: number; max: number; start: number; footnote: string };
   other: { label: string; href: string; art: StaticImageData; blurb: string };
 };
 
@@ -52,6 +54,8 @@ function H2({ children }: { children: React.ReactNode }) {
 
 function Estimator({ cfg }: { cfg: NonNullable<EarnConfig["estimator"]> }) {
   const [n, setN] = useState(cfg.start);
+  const live = usePricing();
+  const perUnit = cfg.pay === "agent" ? live.agentBasePay : live.riderPay;
   return (
     <div className="rounded-3xl border border-line bg-surface p-6 shadow-sm sm:p-8">
       <h3 className="font-display text-xl font-extrabold text-ink">Estimate your earnings</h3>
@@ -78,10 +82,10 @@ function Estimator({ cfg }: { cfg: NonNullable<EarnConfig["estimator"]> }) {
             transition={{ type: "spring", stiffness: 400, damping: 24 }}
             className="font-display text-4xl font-extrabold text-brand-orange-dark tabular-nums"
           >
-            ₦{(n * cfg.perUnit).toLocaleString()}
+            ₦{(n * perUnit).toLocaleString()}
           </motion.p>
         </AnimatePresence>
-        <p className="mt-1 text-xs text-faint">Illustrative only. Actual earnings depend on the runs you complete.</p>
+        <p className="mt-1 text-xs text-faint">At ₦{perUnit.toLocaleString()} per {cfg.unit.toLowerCase().replace(/s$/, "")}. {cfg.footnote}</p>
       </div>
     </div>
   );

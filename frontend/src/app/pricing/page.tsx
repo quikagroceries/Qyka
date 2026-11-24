@@ -8,6 +8,7 @@ import { Section } from "@/components/marketing/Section";
 import PricingCalculator from "@/components/marketing/PricingCalculator";
 import Eyebrow from "@/components/marketing/Eyebrow";
 import { LANDING } from "@/content/landing";
+import { getLiveFees } from "@/lib/serverPricing";
 import MarketingCard from "@/components/marketing/MarketingCard";
 import { MarketingLinkButton } from "@/components/marketing/MarketingButton";
 import Image from "next/image";
@@ -20,7 +21,8 @@ export const metadata: Metadata = {
   description: "Simple, transparent pricing for grocery delivery. No hidden fees, no markup on food.",
 };
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const fees = await getLiveFees();
   const paymentFaq = LANDING.faq.groups.find(g => g.name === "Payment");
 
   return (
@@ -72,21 +74,21 @@ export default function PricingPage() {
                     </div>
                   </li>
                   <li className="flex gap-4 p-4 bg-surface rounded-2xl border border-line shadow-sm">
-                    <div className="font-bold text-lg min-w-[60px]">{LANDING.pricing.fees.serviceFeePercent}%</div>
+                    <div className="font-bold text-lg min-w-[60px]">{fees.serviceFeePercent}%</div>
                     <div>
                       <h3 className="font-bold">Service fee</h3>
                       <p className="text-sm text-muted">Covers agent effort, bargaining, and platform processing.</p>
                     </div>
                   </li>
                   <li className="flex gap-4 p-4 bg-surface rounded-2xl border border-line shadow-sm">
-                    <div className="font-bold text-lg min-w-[60px]">₦{(LANDING.pricing.fees.deliveryFee / 1000).toFixed(1)}k</div>
+                    <div className="font-bold text-lg min-w-[60px]">₦{fees.deliveryFee.toLocaleString()}</div>
                     <div>
                       <h3 className="font-bold">Delivery fee</h3>
-                      <p className="text-sm text-muted">Flat fee to get your order from the market to your door.</p>
+                      <p className="text-sm text-muted">A flat fee that pays the shopkeeper who checks your order in at the market hub and the rider who brings it to your door.</p>
                     </div>
                   </li>
                   <li className="flex gap-4 p-4 bg-surface rounded-2xl border border-line shadow-sm">
-                    <div className="font-bold text-lg min-w-[60px]">₦{LANDING.pricing.fees.addItemFee}</div>
+                    <div className="font-bold text-lg min-w-[60px]">₦{fees.addItemFee.toLocaleString()}</div>
                     <div>
                       <h3 className="font-bold">Add-item fee</h3>
                       <p className="text-sm text-muted">Only applies if you add items after the shopping run has started.</p>
@@ -108,7 +110,7 @@ export default function PricingPage() {
                   </div>
                   <div className="grid grid-cols-2 border-b border-line">
                     <div className="p-4 text-sm border-r border-line text-muted">Hidden service fees</div>
-                    <div className="p-4 text-sm font-semibold">Transparent {LANDING.pricing.fees.serviceFeePercent}%</div>
+                    <div className="p-4 text-sm font-semibold">Transparent {fees.serviceFeePercent}%</div>
                   </div>
                   <div className="grid grid-cols-2 border-b border-line">
                     <div className="p-4 text-sm border-r border-line text-muted">Algorithm pricing</div>

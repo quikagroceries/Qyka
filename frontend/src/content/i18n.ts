@@ -112,7 +112,7 @@ export const en = {
   },
   earn: {
     agent: { title: "Know the market? Shop for others and earn.", body: "Set your own hours. Get paid for every list you shop.", cta: "Become an agent" },
-    rider: { title: "Got wheels? Deliver with Qyka.", body: "Short trips from market to door, paid weekly.", cta: "Become a rider" },
+    rider: { title: "Got wheels? Deliver with Qyka.", body: "Collect from a market hub, ride to the door, paid weekly.", cta: "Become a rider" },
   },
   faq: {
     eyebrow: "FAQ",
@@ -122,12 +122,13 @@ export const en = {
     categories: ["All", "Ordering", "Shopping", "Payment", "Delivery"],
     items: [
       { q: "How do I place an order?", a: "Write a free-text list of what you need — just like you'd text a friend. Choose a market or supermarket, set your delivery address, and deposit to start. Your agent picks up from there.", category: "Ordering" },
-      { q: "Can I add items after placing my order?", a: "Yes, for a ₦500 add-item fee per addition. Your agent will confirm availability and price before purchasing.", category: "Ordering" },
+      { q: "Can I add items after placing my order?", a: "Yes, for a small flat add-item fee per addition (the amount is on the Pricing page). Your agent will confirm availability and price before purchasing.", category: "Ordering" },
       { q: "What if something on my list isn't available?", a: "Your agent chats with you in real time. They'll suggest substitutions, send photos, and wait for your approval before buying anything different.", category: "Shopping" },
       { q: "How does payment work?", a: "You deposit upfront based on your estimated list. Your agent pays vendors by bank transfer — never cash. After shopping, you pay only for what was actually bought. Unspent funds are refunded to your wallet within 24 hours.", category: "Payment" },
       { q: "What if the price is higher than my budget?", a: "Your agent will contact you before exceeding your deposit. You can approve the extra spend, reduce quantities, or skip items — you're always in control.", category: "Payment" },
-      { q: "What are the fees?", a: "Groceries at market cost (no markup), a service fee, a delivery fee, and a ₦500 fee only if you add items after the run starts. That's it — no hidden charges.", category: "Payment" },
-      { q: "How long does delivery take?", a: "Typically 45-90 minutes depending on the market size and your distance. You can track your order in real time from agent assignment to doorstep.", category: "Delivery" },
+      { q: "What are the fees?", a: "Groceries at market cost (no markup), a service fee, a delivery fee, and a small flat fee only if you add items after the run starts. The current amounts are always on the Pricing page. That's it — no hidden charges.", category: "Payment" },
+      { q: "How long does delivery take?", a: "Typically 45-90 minutes depending on the market size and your distance. You can follow your order step by step in the app, from your agent shopping, to the market hub, to your rider at your door.", category: "Delivery" },
+      { q: "How does my order get from the market to me?", a: "Once your agent has bought everything and you've paid, they drop it at a hub in the market. The shopkeeper there checks it against your list, and a Qyka rider collects it and brings it to your door. You'll get a 4-digit code to give the rider when they arrive, so it only ever goes to you.", category: "Delivery" },
     ],
   },
   cta: {
@@ -257,7 +258,7 @@ export const pcm: Dict = {
   },
   earn: {
     agent: { title: "You sabi market? Shop for people, collect money.", body: "Choose your own time. Dem go pay you for every list wey you shop.", cta: "Become an agent" },
-    rider: { title: "You get bike or keke? Deliver with Qyka.", body: "Short trips from market to door, dem go pay you every week.", cta: "Become a rider" },
+    rider: { title: "You get bike or keke? Deliver with Qyka.", body: "Collect am for market hub, ride go the door, dem go pay you every week.", cta: "Become a rider" },
   },
   faq: {
     eyebrow: "FAQ",
@@ -267,12 +268,13 @@ export const pcm: Dict = {
     categories: ["All", "Order", "Shopping", "Money", "Delivery"],
     items: [
       { q: "How I go take place order?", a: "Write wetin you need like say you dey text your padi. Choose market or supermarket, put your delivery address, then pay deposit to start. Your agent go take am from there.", category: "Order" },
-      { q: "I fit add items after I don place order?", a: "Yes, na ₦500 for each item wey you add. Your agent go confirm say e dey and the price before dem buy.", category: "Order" },
+      { q: "I fit add items after I don place order?", a: "Yes, small fixed fee dey for each item wey you add (the amount dey for Pricing page). Your agent go confirm say e dey and the price before dem buy.", category: "Order" },
       { q: "Wetin go happen if something for my list no dey?", a: "Your agent go chat with you live. Dem go suggest another one, send pictures, and wait for your yes before dem buy different thing.", category: "Shopping" },
       { q: "How payment dey work?", a: "You go pay deposit first based on your estimated list. Your agent go pay vendors by bank transfer — no cash. After shopping, you go pay only for wetin dem really buy. Any money wey remain go return to your wallet inside 24 hours.", category: "Money" },
       { q: "Wetin if the price pass my budget?", a: "Your agent go contact you before dem pass your deposit. You fit approve the extra, reduce quantity, or skip item — na you dey control.", category: "Money" },
-      { q: "Wetin be the fees?", a: "Groceries at market price (no markup), service fee, delivery fee, and ₦500 only if you add items after the run don start. That's all — no hidden charges.", category: "Money" },
-      { q: "How long delivery dey take?", a: "Normally 45 to 90 minutes, e depend on the market size and how far you dey. You fit track your order live from when agent accept am until e reach your door.", category: "Delivery" },
+      { q: "Wetin be the fees?", a: "Groceries at market price (no markup), service fee, delivery fee, and small fixed fee only if you add items after the run don start. The amounts dey for Pricing page always. That's all — no hidden charges.", category: "Money" },
+      { q: "How long delivery dey take?", a: "Normally 45 to 90 minutes, e depend on the market size and how far you dey. You fit follow your order step by step for the app, from when your agent dey shop, to the market hub, until rider reach your door.", category: "Delivery" },
+      { q: "How my order go take reach me from market?", a: "When your agent don buy everything and you don pay, dem go drop am for one hub inside the market. The shopkeeper go check am against your list, then Qyka rider go collect am bring am come your door. We go give you 4-digit code to give the rider when e reach, so e go reach only you.", category: "Delivery" },
     ],
   },
   cta: {

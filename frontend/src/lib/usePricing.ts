@@ -12,10 +12,18 @@ export type Pricing = {
   deliveryFee: number;
   depositRate: number;      // 0.3 = 30%
   addItemFee: number;
+  /** What an agent earns for a normal shop (before any time-based extra). */
+  agentBasePay: number;
+  /** Fixed pay per delivery for a rider / per order for a hub (default; a market can set its own). */
+  riderPay: number;
+  hubPay: number;
   loaded: boolean;
 };
 
-const FALLBACK: Pricing = { serviceFeeRate: 0.075, deliveryFee: 1500, depositRate: 0.3, addItemFee: 500, loaded: false };
+const FALLBACK: Pricing = {
+  serviceFeeRate: 0.075, deliveryFee: 1500, depositRate: 0.3, addItemFee: 500,
+  agentBasePay: 1000, riderPay: 1000, hubPay: 500, loaded: false,
+};
 
 let cached: Pricing | null = null;
 let inflight: Promise<Pricing> | null = null;
@@ -29,6 +37,9 @@ function load(): Promise<Pricing> {
           deliveryFee: Number(p.delivery_fee),
           depositRate: Number(p.deposit_percent) / 100,
           addItemFee: Number(p.add_item_fee),
+          agentBasePay: Number(p.agent_base_pay),
+          riderPay: Number(p.rider_pay),
+          hubPay: Number(p.hub_pay),
           loaded: true,
         };
         return cached;

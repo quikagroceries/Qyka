@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin import service as admin_service
-from app.orders import fees
+from app.orders import fee_settings, fees
 from app.admin.routes import router as admin_router
 from app.agent.routes import router as agent_router
 from app.agent_applications.routes import router as agent_applications_router
@@ -63,7 +63,20 @@ async def pricing(db: AsyncSession = Depends(get_db)) -> dict:
     """Public fee rules - what a new order would be priced by right now. The
     single source the website's pricing calculator and checkout estimates
     read from (set by an owner under Platform settings)."""
-    return fees.pricing_summary(await platform.pricing(db))
+    cfg = await platform.pricing(db)
+    summary = fees.pricing_summary(cfg)
+    # What the people who do the work earn, so the website's earnings
+    # estimators quote the real figures. Rider and hub pay are per market
+    # (Admin > Delivery pay); this is the default that applies unless a market
+    # has its own.
+    default = await fee_settings.get_global(db)
+    summary.update({
+        "agent_base_pay": str(cfg.agent_base_share),
+        "agent_included_minutes": cfg.included_minutes,
+        "rider_pay": str(default.rider_fee if default else fees.DEFAULT_RIDER_FEE),
+        "hub_pay": str(default.hub_fee if default else fees.DEFAULT_HUB_FEE),
+    })
+    return summary
 
 
 @app.get("/status")

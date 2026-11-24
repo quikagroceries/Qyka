@@ -145,6 +145,12 @@ async def test_public_pricing_endpoint_matches_the_fee_rules(client):
         "add_item_fee": "500.00",
         "emtl_per_transfer": "50.00",
         "emtl_threshold": "10000.00",
+        # What the people doing the work earn (default rider/hub pay unless a
+        # market has its own) - the website's earnings estimators read these.
+        "agent_base_pay": "1000.00",
+        "agent_included_minutes": 30,
+        "rider_pay": "1000.00",
+        "hub_pay": "500.00",
     }
 
 

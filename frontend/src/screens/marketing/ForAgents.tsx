@@ -19,7 +19,7 @@ const CFG: EarnConfig = {
   eyebrow: "For agents",
   title: "Earn shopping a market",
   titleAccent: "you already know.",
-  lede: "Customers send lists. You bargain the stalls, pay by transfer, pack with proof, and get paid when the run is done.",
+  lede: "Customers send lists. You bargain the stalls, pay by transfer with photo proof, drop the haul at the market hub, and get paid when it reaches the customer.",
   cta: "Apply as an agent",
   hero: {
     main: earnAgentEarning,
@@ -32,7 +32,7 @@ const CFG: EarnConfig = {
   },
   perks: [
     { title: "Your hours", body: "Only see and accept runs for the markets you registered for.", art: badgeHuman },
-    { title: "Paid per completed run", body: "Earnings are tracked in the app and paid to your linked account.", art: badgeLive },
+    { title: "Paid per completed run", body: "You earn when your customer confirms their order arrived. Earnings are tracked in the app and paid to your linked account.", art: badgeLive },
     { title: "No cash out of pocket", body: "You shop with transfer float authorised for that run.", art: badgeFresh },
   ],
   dayTitle: "A run, start to finish.",
@@ -40,12 +40,12 @@ const CFG: EarnConfig = {
     { title: "Accept a run", body: "A customer list lands for your market. You accept only what you can shop well.", art: phoneList },
     { title: "Bargain the stalls", body: "Shop the way you already do: weight, freshness, fair price.", art: scale },
     { title: "Transfer and prove", body: "Pay vendors by transfer and snap photo proof. No unauthorised cash.", art: conversation },
-    { title: "Pack and hand off", body: "The final bill lands in the app, the courier takes the haul, you earn.", art: handoff },
+    { title: "Drop it at the hub", body: "Once the customer has paid, take the haul to the hub in your market. The shopkeeper checks it against the list and a rider takes it from there. You're done.", art: handoff },
   ],
   fit: [
     { title: "You know the market", body: "Stalls, seasons and who sells what, not a warehouse aisle." },
     { title: "You're phone-fluent", body: "Transfers, photos and chat while you move through the market." },
-    { title: "You keep it clean", body: "No side cash. Proof on every spend. Customers trust the trail." },
+    { title: "You keep it clean", body: "No side cash. Proof on every spend, and a check-in at the hub. Customers trust the trail." },
   ],
   requirements: [
     "A smartphone with data, for chat, photos and transfers on the run",
@@ -55,7 +55,8 @@ const CFG: EarnConfig = {
   ],
   faq: [
     { q: "Do I shop with my own money?", a: "No. You shop using transfer float authorised for that run, never your own cash upfront." },
-    { q: "How am I paid?", a: "Earnings are tracked per completed run in the app and paid out to your linked account." },
+    { q: "How am I paid?", a: "Earnings are tracked per completed run in the app and paid out to your linked account. A run counts once the customer confirms their order arrived." },
+    { q: "Do I deliver the order myself?", a: "No. After shopping, you drop the haul at the market hub. The shopkeeper there checks it in and a Qyka rider delivers it." },
     { q: "Can I pick which runs I take?", a: "Yes. You only see and accept orders for the market(s) you've registered for." },
   ],
   form: {
@@ -68,12 +69,12 @@ const CFG: EarnConfig = {
     ],
     art: earnPayoutMoment,
   },
-  estimator: { perUnit: 3500, unit: "Orders", min: 5, max: 30, start: 15 },
+  estimator: { pay: "agent", unit: "Orders", min: 5, max: 30, start: 15, footnote: "That's the base pay for a normal shop; long shops pay a little more. Actual earnings depend on the runs you complete." },
   other: {
     label: "Got wheels instead? Deliver with Qyka",
     href: "/for-riders",
     art: riderBike,
-    blurb: "Short trips from the market gate to a customer's door.",
+    blurb: "Collect orders from a market hub and ride them to the customer's door.",
   },
 };
 
