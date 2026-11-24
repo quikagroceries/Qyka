@@ -178,6 +178,20 @@ export const api = {
   confirmDelivery: (id) =>
     request(`/delivery/orders/${id}/confirm-delivery`, { method: "POST" }),
 
+  // Hub (shopkeeper): check in what an agent dropped, mark it ready, and
+  // release it to the rider who shows their code. Item names only - the hub
+  // API never carries prices or the customer's address.
+  getMyHub: () => request("/hubs/me"),
+  getHubOrders: () => request("/hubs/orders"),
+  getHubOrder: (id: string) => request(`/hubs/orders/${id}`),
+  receiveHubOrder: (id: string, body: { received_item_ids?: string[]; note?: string; photos?: string[] }) =>
+    request(`/hubs/orders/${id}/receive`, { method: "POST", body }),
+  markHubOrderReady: (id: string) => request(`/hubs/orders/${id}/ready`, { method: "POST" }),
+  handoverHubOrder: (id: string, code: string) =>
+    request(`/hubs/orders/${id}/handover`, { method: "POST", body: { code } }),
+  getHubEarnings: () => request("/hubs/earnings"),
+  uploadHubPhoto: (file) => uploadToCloudinary(file),
+
   applyAsAgent: (body) => request("/agent-applications", { method: "POST", body }),
   getMyAgentApplications: () => request("/agent-applications/me"),
   raiseCap: (id, extra) =>

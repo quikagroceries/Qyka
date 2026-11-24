@@ -62,12 +62,16 @@ export default function CustomerLayout({ children }: any) {
   // Shop, which RequireAuth doesn't cover. Back to the agent app.
   const agentOnly = authed && (user.role || "").toUpperCase() === "AGENT" && user.has_customer_side === false;
 
+  // A shopkeeper has no customer side either - their app is the hub.
+  const hubOnly = authed && (user.role || "").toUpperCase() === "SHOPKEEPER";
+
   useEffect(() => {
     if (agentOnly) router.replace("/agent");
-  }, [agentOnly, router]);
+    if (hubOnly) router.replace("/shopkeeper");
+  }, [agentOnly, hubOnly, router]);
 
   // First load only: don't paint a shell before we know who the user is.
-  if (!hydrated || agentOnly) return <LoadingScreen />;
+  if (!hydrated || agentOnly || hubOnly) return <LoadingScreen />;
 
   // Signed out on a page that needs an account: no shell, just the redirect.
   if (!isShop && !authed) {

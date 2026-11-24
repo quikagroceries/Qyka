@@ -148,6 +148,7 @@ export function AuthProvider({ children }: any) {
     const r = (user.role || "").toUpperCase();
     if ((r === "CUSTOMER" || r === "AGENT") && !user.full_name) return "/setup";
     if (r === "ADMIN") return "/admin";
+    if (r === "SHOPKEEPER") return "/shopkeeper";
     if (r === "AGENT" && effectiveOnDuty) return "/agent";
     if (r === "CUSTOMER" || r === "AGENT") return "/shop";
     return "/shop";

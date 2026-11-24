@@ -31,6 +31,12 @@ export const AGENT_NAV = [
   { key: "settings", label: "Settings", icon: "settings", href: "/agent/settings" },
 ];
 
+export const SHOPKEEPER_NAV = [
+  { key: "hub", label: "Hub", icon: "store", href: "/shopkeeper" },
+  { key: "earnings", label: "Earnings", icon: "wallet", href: "/shopkeeper/earnings" },
+  { key: "settings", label: "Settings", icon: "settings", href: "/shopkeeper/settings" },
+];
+
 export const ADMIN_NAV = [
   { key: "dashboard", label: "Dashboard", icon: "chart", href: "/admin" },
   { key: "orders", label: "Orders", icon: "basket", href: "/admin/orders" },

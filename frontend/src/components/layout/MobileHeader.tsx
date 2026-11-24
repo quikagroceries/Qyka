@@ -5,17 +5,28 @@ import Link from "next/link";
 import logo from "@/assets/logo.png";
 import HeaderLocationPicker from "@/components/header/HeaderLocationPicker";
 
-export function MobileHeader({ onMenuClick }: { onMenuClick?: () => void }) {
+export function MobileHeader({
+  onMenuClick,
+  hideLocation = false,
+  homeHref = "/shop",
+}: {
+  onMenuClick?: () => void;
+  /** Delivery-address picker is a customer thing - roles with no deliveries to receive hide it. */
+  hideLocation?: boolean;
+  homeHref?: string;
+}) {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-surface/95 px-3 backdrop-blur-md transition md:hidden">
       {/* Brand logo & Delivery Location */}
       <div className="flex min-w-0 items-center gap-2">
-        <Link href="/shop" className="shrink-0" aria-label="Qyka home">
+        <Link href={homeHref} className="shrink-0" aria-label="Qyka home">
           <Image src={logo} alt="Qyka" className="h-7 w-auto object-contain" priority />
         </Link>
-        <div className="max-w-[140px] sm:max-w-[200px]">
-          <HeaderLocationPicker className="scale-90 origin-left" />
-        </div>
+        {!hideLocation && (
+          <div className="max-w-[140px] sm:max-w-[200px]">
+            <HeaderLocationPicker className="scale-90 origin-left" />
+          </div>
+        )}
       </div>
 
       {/* Right utilities: the menu button ONLY on

@@ -41,6 +41,8 @@ function AppShell({
   ctaLabel,
   ctaHref,
   shopBag = false,
+  hideLocation = false,
+  homeHref,
   children,
 }: any) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -67,7 +69,11 @@ function AppShell({
       {hasShop && <ShopHeader mobileOnly={!bare} />}
       {!bare && (
         <>
-          {!hasShop && <MobileHeader onMenuClick={bottomNav ? undefined : () => setDrawerOpen(true)} />}
+          {!hasShop && <MobileHeader
+              onMenuClick={bottomNav ? undefined : () => setDrawerOpen(true)}
+              hideLocation={hideLocation}
+              homeHref={homeHref}
+            />}
           <DesktopTopBar title={title} ctaLabel={ctaLabel} ctaHref={ctaHref} />
           {!bottomNav && (
             <MobileDrawer
