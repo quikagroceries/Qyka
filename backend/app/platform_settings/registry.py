@@ -88,6 +88,20 @@ SPECS: list[Spec] = [
     Spec("otp_fallback_after_seconds", "Sign-in codes", "Offer another way after", "How long before the app offers WhatsApp or a call instead of SMS.",
          "int", 45, 0, 600, "sec", env_attr="otp_fallback_after_seconds"),
 
+    # --- Stuck-order alerts (immediately) -------------------------------
+    Spec("stuck_after_hours", "Stuck-order alerts", "Any order, overall", "An order still in flight this long after it was placed is flagged as stuck.",
+         "int", 2, 1, 168, "hours"),
+    Spec("stuck_paid_minutes", "Stuck-order alerts", "Paid, not yet at the hub", "Flag if an agent hasn't taken a paid order to the hub within this long.",
+         "int", 45, 5, 1440, "min"),
+    Spec("stuck_dropped_minutes", "Stuck-order alerts", "Dropped, not checked in", "Flag if the shopkeeper hasn't checked a drop-off in within this long.",
+         "int", 20, 5, 1440, "min"),
+    Spec("stuck_received_minutes", "Stuck-order alerts", "Checked in, not ready", "Flag if a checked-in order isn't marked ready within this long.",
+         "int", 20, 5, 1440, "min"),
+    Spec("stuck_ready_minutes", "Stuck-order alerts", "Ready, no rider collected it", "Flag if no rider has collected a ready order within this long (unclaimed or claimed but never came).",
+         "int", 30, 5, 1440, "min"),
+    Spec("stuck_delivery_minutes", "Stuck-order alerts", "Out for delivery", "Flag if an order has been out for delivery this long without the customer confirming.",
+         "int", 120, 10, 2880, "min"),
+
     # --- Emergency ------------------------------------------------------
     Spec("orders_paused", "Emergency", "Pause new orders", "Stops customers starting new orders. Orders already in progress carry on normally.",
          "bool", False),

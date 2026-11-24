@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.admin.guards import require_admin
+from app.admin.guards import AuditedRoute, require_admin
 from app.auth.models import User
 from app.core.database import get_db
 from app.core.enums import UserRole
@@ -22,7 +22,7 @@ from app.markets.schemas import (
     VendorOut,
 )
 
-router = APIRouter()
+router = APIRouter(route_class=AuditedRoute)
 
 
 @router.post("", response_model=MarketOut, status_code=201)

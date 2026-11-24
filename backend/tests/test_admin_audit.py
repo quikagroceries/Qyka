@@ -64,6 +64,12 @@ def test_every_state_changing_admin_route_is_audited():
     ]
     assert not unlogged, f"state-changing admin routes with no audit action: {unlogged}"
 
+    # The action is only written by AuditedRoute: a guarded route on a plain
+    # router would silently log nothing.
+    from app.admin.guards import AuditedRoute
+    not_audited = [r.path for r, g in guarded if g.audit_action and not isinstance(r, AuditedRoute)]
+    assert not not_audited, f"routes that name an audit action but can't write it: {not_audited}"
+
     bare = []
     for route in app.routes:
         dependant = getattr(route, "dependant", None)
@@ -88,9 +94,11 @@ async def test_an_action_is_logged_with_who_what_and_target(client, db_session_f
     assert entry.target == {"user_id": uid}
     assert entry.method == "POST" and entry.path == f"/admin/users/{uid}/suspend"
 
-    # A request that fails changes nothing and logs nothing; neither does a read.
+    # A request that fails changes nothing and logs nothing - not a refused one,
+    # not an invalid one; neither does a read.
     before = len(await _entries(db_session_factory))
     assert (await client.post(f"/admin/users/{uuid.uuid4()}/suspend", headers=owner_h)).status_code == 404
+    assert (await client.put("/admin/fees", headers=owner_h, json={"rider_fee": "-5", "hub_fee": "1"})).status_code == 422
     assert (await client.get("/admin/users", headers=owner_h)).status_code == 200
     assert len(await _entries(db_session_factory)) == before
 

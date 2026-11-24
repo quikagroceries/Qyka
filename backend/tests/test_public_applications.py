@@ -158,58 +158,15 @@ async def test_existing_customer_approved_from_website_keeps_customer_side(clien
 
 
 @pytest.mark.asyncio
-async def test_shopkeeper_application_creates_hub_and_login(client, db_session_factory):
-    market_id = await _market(db_session_factory, "Bodija Hub Market")
-    admin_h = {"Authorization": f"Bearer {await _login_admin(client, db_session_factory, 'apps-hub@qyka.com')}"}
-
-    # A hub needs a market.
-    r = await client.post("/agent-applications/public", json={
-        "kind": "shopkeeper", "full_name": "Mama Tunde", "phone": "08035550001",
-    })
-    assert r.status_code == 422
-
+async def test_shopkeepers_cannot_apply_publicly(client, db_session_factory):
+    """Hubs hold other people's goods, so they're set up by an admin (see
+    tests/test_admin_ops.py), never by a public application."""
+    market_id = await _market(db_session_factory, "No Public Hubs Market")
     r = await client.post("/agent-applications/public", json={
         "kind": "shopkeeper", "full_name": "Mama Tunde", "phone": "08035550001",
         "market_id": str(market_id),
     })
-    assert r.status_code == 201, r.text
-    r = await client.get("/agent-applications?status=pending&kind=shopkeeper", headers=admin_h)
-    [app] = r.json()
-    r = await client.post(f"/agent-applications/{app['id']}/approve", headers=admin_h)
-    assert r.status_code == 200, r.text
-
-    token = await _login(client, "08035550001")
-    h = {"Authorization": f"Bearer {token}"}
-    assert (await client.get("/auth/me", headers=h)).json()["role"] == "shopkeeper"
-    r = await client.get("/hubs/me", headers=h)
-    assert r.status_code == 200, r.text
-    assert r.json()["market_id"] == str(market_id)
-    assert r.json()["name"] == "Bodija Hub Market Hub"
-
-    # Already a shopkeeper -> can't apply again; and /hubs/me is shopkeeper-only.
-    r = await client.post("/agent-applications/public", json={
-        "kind": "shopkeeper", "full_name": "Mama Tunde", "phone": "08035550001",
-        "market_id": str(market_id),
-    })
-    assert r.status_code == 409
-    r = await client.get("/hubs/me", headers=admin_h)
-    assert r.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_a_market_can_have_several_hubs(client, db_session_factory):
-    market_id = await _market(db_session_factory, "Two Hub Market")
-    admin_h = {"Authorization": f"Bearer {await _login_admin(client, db_session_factory, 'apps-hub2@qyka.com')}"}
-    for phone in ("08035550002", "08035550003"):
-        await client.post("/agent-applications/public", json={
-            "kind": "shopkeeper", "full_name": "Shopkeeper", "phone": phone,
-            "market_id": str(market_id),
-        })
-    r = await client.get("/agent-applications?status=pending&kind=shopkeeper", headers=admin_h)
-    assert len(r.json()) == 2
-    for app in r.json():
-        r = await client.post(f"/agent-applications/{app['id']}/approve", headers=admin_h)
-        assert r.status_code == 200, r.text
+    assert r.status_code == 422 and "set up by Qyka" in r.text
 
 
 @pytest.mark.asyncio

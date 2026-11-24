@@ -4,7 +4,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.admin.guards import require_admin
+from app.admin.guards import AuditedRoute, require_admin
 from app.auth.models import User
 from app.core.database import get_db
 from app.core.etag import json_with_etag
@@ -24,7 +24,7 @@ from app.orders.schemas import (
     UpdateDraftIn,
 )
 
-router = APIRouter()
+router = APIRouter(route_class=AuditedRoute)
 
 
 @router.post("", response_model=OrderOut, status_code=201)

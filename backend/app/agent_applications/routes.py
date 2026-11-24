@@ -10,13 +10,13 @@ from app.agent_applications.schemas import (
     PublicApplyIn,
     PublicApplyOut,
 )
-from app.admin.guards import require_admin
+from app.admin.guards import AuditedRoute, require_admin
 from app.auth.models import User
 from app.core.database import get_db
 from app.core.enums import ApplicationKind, ApplicationStatus, UserRole
 from app.core.security import get_current_user, require_role
 
-router = APIRouter()
+router = APIRouter(route_class=AuditedRoute)
 
 
 @router.post("", response_model=AgentApplicationOut, status_code=201)

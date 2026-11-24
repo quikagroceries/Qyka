@@ -1,8 +1,9 @@
+import uuid
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
-from app.core.enums import AdminLevel, RiderStatus
+from app.core.enums import AdminLevel, OrderStatus, RiderStatus
 
 
 class AdminLoginIn(BaseModel):
@@ -72,3 +73,40 @@ class SettingValueIn(BaseModel):
     # Decimals, whole numbers, yes/no and text all arrive here; the setting's
     # own type and bounds decide what's acceptable (platform_settings/registry).
     value: str | bool | int | float
+
+
+class HubCreateIn(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=120)
+    phone: str = Field(..., examples=["08012345678"])
+    market_id: uuid.UUID
+    hub_name: str | None = Field(default=None, max_length=120)
+
+
+class ShopkeeperReplaceIn(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=120)
+    phone: str
+
+
+class ReassignAgentIn(BaseModel):
+    agent_id: uuid.UUID
+    note: str = Field(..., min_length=3, max_length=300)
+
+
+class HubStageIn(BaseModel):
+    stage: OrderStatus
+    note: str = Field(..., min_length=3, max_length=300)
+
+
+class NoteIn(BaseModel):
+    note: str = Field(..., min_length=3, max_length=300)
+
+
+class MoveMarketIn(BaseModel):
+    market_id: uuid.UUID
+
+
+class UserEditIn(BaseModel):
+    full_name: str | None = Field(default=None, max_length=120)
+    phone: str | None = None
+    email: str | None = Field(default=None, max_length=255)
+    basket_cap_naira: int | None = None

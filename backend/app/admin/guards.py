@@ -6,12 +6,16 @@
 
 An endpoint that changes anything MUST name its action: that is what puts it
 in the audit log (tests/test_admin_audit.py fails for any state-changing admin
-route that doesn't). The entry is written only if the request succeeds, in the
-same transaction as the change itself.
+route that doesn't). The entry is written only when the request SUCCEEDED - a
+refused or invalid request changed nothing, so it logs nothing.
+
+How: the guard notes the action on the request; AuditedRoute (the route class
+every router with admin endpoints uses) writes the entry once the response is
+known to be a success.
 """
 
 from fastapi import Depends, HTTPException, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.routing import APIRoute
 
 from app.admin import audit
 from app.auth.models import User
@@ -27,28 +31,48 @@ def level_of(user: User) -> AdminLevel:
 def require_admin(action: str | None = None, *, owner_only: bool = False):
     base = require_role(UserRole.ADMIN)
 
-    async def checker(
-        request: Request,
-        user: User = Depends(base),
-        db: AsyncSession = Depends(get_db),  # the same session the endpoint gets (cached per request)
-    ):
+    async def checker(request: Request, user: User = Depends(base)) -> User:
         if owner_only and level_of(user) is not AdminLevel.OWNER:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Only an owner can do this")
-        try:
-            yield user
-        except Exception:
-            # The endpoint failed: nothing changed, so there's nothing to log.
-            raise
-        else:
-            if action:
-                # Same session as the endpoint's, so the entry commits - or
-                # rolls back - together with the change itself.
-                await audit.record(
-                    db, admin=user, action=action, request=request,
-                    detail=getattr(request.state, "audit_detail", None),
-                )
+        if action:
+            request.state.audit_pending = (user, action)
+        return user
 
     checker.is_admin_guard = True
     checker.audit_action = action
     checker.owner_only = owner_only
     return checker
+
+
+class AuditedRoute(APIRoute):
+    """Writes the audit entry for a guarded endpoint once it has succeeded."""
+
+    def get_route_handler(self):
+        original = super().get_route_handler()
+
+        async def handler(request: Request):
+            response = await original(request)
+            pending = getattr(request.state, "audit_pending", None)
+            if pending and response.status_code < 400:
+                admin, action = pending
+                # A session of its own (the endpoint's has already committed),
+                # obtained the way every request gets one - so tests and any
+                # future override of get_db are respected.
+                getter = request.app.dependency_overrides.get(get_db, get_db)
+                session_gen = getter()
+                db = await session_gen.__anext__()
+                try:
+                    await audit.record(
+                        db, admin=admin, action=action, request=request,
+                        detail=getattr(request.state, "audit_detail", None),
+                    )
+                    try:
+                        await session_gen.__anext__()      # get_db commits on resume
+                    except StopAsyncIteration:
+                        pass
+                except Exception:
+                    await session_gen.aclose()
+                    raise
+            return response
+
+        return handler

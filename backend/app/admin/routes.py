@@ -5,13 +5,14 @@ left, what's in flight, who to watch. All admin-gated.
 """
 
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.admin import audit
+from app.admin import audit, ops
 from app.platform_settings import service as platform
 from app.admin import service as admin_service
 from app.admin.schemas import (
@@ -21,14 +22,21 @@ from app.admin.schemas import (
     AdminLoginIn,
     AdminPasswordChangeIn,
     DeliveryFeesIn,
+    HubCreateIn,
+    HubStageIn,
     HubUpdateIn,
+    MoveMarketIn,
+    NoteIn,
+    ReassignAgentIn,
+    ShopkeeperReplaceIn,
+    UserEditIn,
     SettingValueIn,
     RaiseCapIn,
     RiderStatusIn,
     VendorTransferAckIn,
     WalletAdjustIn,
 )
-from app.admin.guards import require_admin
+from app.admin.guards import AuditedRoute, require_admin
 from app.auth.models import User
 from app.auth.schemas import TokenOut
 from app.core.database import get_db
@@ -40,7 +48,7 @@ from app.markets.models import Market
 from app.float.models import FloatLedger
 from app.orders.models import Order
 
-router = APIRouter()
+router = APIRouter(route_class=AuditedRoute)
 
 
 @router.post("/login", response_model=TokenOut)
@@ -165,8 +173,29 @@ async def float_status(
     return {"pool_balance": str(balance), "recent_movements": recent}
 
 
-def _stage_started_at(o: Order) -> str | None:
-    ts = {
+def _is_stuck(o: Order, now, limits: dict) -> bool:
+    """Has this order sat in its current stage longer than the owner allows?
+    (Thresholds are platform settings, so they're tuned without a developer.)"""
+    def aware(ts):
+        return ts if ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
+
+    if o.status is OrderStatus.AWAITING_PAYMENT and o.payment_window_expires_at:
+        return aware(o.payment_window_expires_at) < now
+    stage_limit = {
+        OrderStatus.PAID: limits["stuck_paid_minutes"],
+        OrderStatus.DROPPED_AT_HUB: limits["stuck_dropped_minutes"],
+        OrderStatus.RECEIVED_BY_HUB: limits["stuck_received_minutes"],
+        OrderStatus.READY_FOR_PICKUP: limits["stuck_ready_minutes"],
+        OrderStatus.OUT_FOR_DELIVERY: limits["stuck_delivery_minutes"],
+    }.get(o.status)
+    started = _stage_started(o)
+    if stage_limit is not None and started is not None:
+        return (now - aware(started)).total_seconds() > stage_limit * 60
+    return (now - aware(o.created_at)).total_seconds() > limits["stuck_after_hours"] * 3600
+
+
+def _stage_started(o: Order):
+    return {
         OrderStatus.PAID: o.paid_at,
         OrderStatus.DROPPED_AT_HUB: o.dropped_at_hub_at,
         OrderStatus.RECEIVED_BY_HUB: o.hub_received_at,
@@ -174,6 +203,10 @@ def _stage_started_at(o: Order) -> str | None:
         OrderStatus.READY_FOR_PICKUP: o.rider_claimed_at or o.packed_at,
         OrderStatus.OUT_FOR_DELIVERY: o.dispatched_at,
     }.get(o.status)
+
+
+def _stage_started_at(o: Order) -> str | None:
+    ts = _stage_started(o)
     return ts.isoformat() if ts else None
 
 
@@ -191,9 +224,12 @@ async def in_flight_orders(
         select(Order).where(Order.status.in_(_ACTIVE)).order_by(Order.created_at.desc())
     )
     orders = result.scalars().all()
+    now = datetime.now(timezone.utc)
+    limits = await platform.all_values(db)
     rows = [
         {
             "id": str(o.id),
+            "stuck": _is_stuck(o, now, limits),
             "status": o.status.value,
             "agent_assigned": o.agent_id is not None,
             "agent_id": str(o.agent_id) if o.agent_id else None,
@@ -212,7 +248,10 @@ async def in_flight_orders(
         for o in orders
     ]
     unassigned = sum(1 for o in orders if o.agent_id is None)
-    return {"count": len(rows), "unassigned": unassigned, "orders": rows}
+    return {
+        "count": len(rows), "unassigned": unassigned,
+        "stuck": sum(1 for r in rows if r["stuck"]), "orders": rows,
+    }
 
 
 @router.get("/orders/losses")
@@ -749,4 +788,128 @@ async def system_status(
         "migration": migration,
         "allowed_origins": cfg.allowed_origins_list,
         "checks": checks,
+    }
+
+
+# --- Hubs: shopkeepers are only ever created here -------------------------
+
+@router.post("/hubs", status_code=201)
+async def create_hub(
+    body: HubCreateIn,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("hub.create", owner_only=True)),
+) -> dict:
+    """Set up a hub and its shopkeeper in one step. The shopkeeper signs in
+    with a code sent to this phone number - there's no public application,
+    because a hub holds other people's goods."""
+    hub = await ops.create_hub(
+        db, full_name=body.full_name, phone=body.phone, market_id=body.market_id, hub_name=body.hub_name
+    )
+    return next(h for h in await admin_service.list_hubs(db) if h["id"] == str(hub.id))
+
+
+@router.post("/hubs/{hub_id}/replace-shopkeeper")
+async def replace_shopkeeper(
+    hub_id: uuid.UUID,
+    body: ShopkeeperReplaceIn,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("hub.replace_shopkeeper", owner_only=True)),
+) -> dict:
+    """Hand a hub to a different shopkeeper (only while nothing is in it)."""
+    await ops.replace_shopkeeper(db, hub_id=hub_id, full_name=body.full_name, phone=body.phone)
+    return next(h for h in await admin_service.list_hubs(db) if h["id"] == str(hub_id))
+
+
+# --- Orders: step in when something has gone wrong -------------------------
+
+@router.post("/orders/{order_id}/reassign-agent")
+async def reassign_agent(
+    order_id: uuid.UUID,
+    body: ReassignAgentIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("order.reassign_agent")),
+) -> dict:
+    """Swap the agent on an order before or during shopping."""
+    order = await ops.reassign_agent(db, order_id=order_id, agent_user_id=body.agent_id, note=body.note)
+    audit.note(request, note=body.note, agent_id=str(body.agent_id))
+    return {"id": str(order.id), "status": order.status.value, "agent_id": str(order.agent_id)}
+
+
+@router.post("/orders/{order_id}/set-hub-stage")
+async def set_hub_stage(
+    order_id: uuid.UUID,
+    body: HubStageIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("order.set_hub_stage", owner_only=True)),
+) -> dict:
+    """Correct where an order is in the hub's custody chain (dropped, checked
+    in, ready) - for a wrong tap. Not allowed once a rider has it."""
+    order = await ops.set_hub_stage(db, order_id=order_id, stage=body.stage, note=body.note)
+    audit.note(request, note=body.note, stage=body.stage.value)
+    return {"id": str(order.id), "status": order.status.value}
+
+
+@router.post("/orders/{order_id}/confirm-delivery")
+async def admin_confirm_delivery(
+    order_id: uuid.UUID,
+    body: NoteIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("order.confirm_delivery", owner_only=True)),
+) -> dict:
+    """Confirm receipt on the customer's behalf and release the payouts."""
+    split = await ops.confirm_delivery_for_customer(db, order_id=order_id, note=body.note)
+    audit.note(request, note=body.note)
+    return split
+
+
+# --- People ------------------------------------------------------------
+
+@router.post("/agents/{user_id}/move-market")
+async def move_agent_market(
+    user_id: uuid.UUID,
+    body: MoveMarketIn,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("agent.move_market")),
+) -> dict:
+    """Assign an agent to a different market (only with nothing in progress)."""
+    agent = await ops.move_agent_market(db, user_id=user_id, market_id=body.market_id)
+    return {"user_id": str(agent.user_id), "market_id": str(agent.assigned_market_id)}
+
+
+@router.post("/users/{user_id}/end-role")
+async def end_staff_role(
+    user_id: uuid.UUID,
+    body: NoteIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("user.end_role", owner_only=True)),
+) -> dict:
+    """Take an agent, rider or shopkeeper out of their job. They become an
+    ordinary customer again; nothing of theirs is deleted."""
+    user = await ops.end_staff_role(db, user_id=user_id, note=body.note)
+    audit.note(request, note=body.note)
+    return {"id": str(user.id), "role": user.role.value}
+
+
+@router.patch("/users/{user_id}")
+async def edit_user(
+    user_id: uuid.UUID,
+    body: UserEditIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("user.edit", owner_only=True)),
+) -> dict:
+    """Correct someone's name, phone, email or spending cap."""
+    changed = body.model_dump(exclude_none=True)
+    user = await ops.edit_user(
+        db, user_id=user_id, full_name=body.full_name, phone=body.phone,
+        email=body.email, basket_cap_naira=body.basket_cap_naira,
+    )
+    audit.note(request, fields=sorted(changed))
+    return {
+        "id": str(user.id), "full_name": user.full_name, "phone": user.phone,
+        "email": user.email, "basket_cap_kobo": user.basket_cap_kobo,
     }

@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.admin.guards import require_admin
+from app.admin.guards import AuditedRoute, require_admin
 from app.auth.models import User
 from app.core.database import get_db
 from app.core.enums import LedgerDirection, UserRole
@@ -11,7 +11,7 @@ from app.core.security import require_role
 from app.float import service
 from app.float.schemas import PoolBalanceOut, TopUpIn, TransferIn
 
-router = APIRouter()
+router = APIRouter(route_class=AuditedRoute)
 
 
 @router.get("/balance", response_model=PoolBalanceOut)

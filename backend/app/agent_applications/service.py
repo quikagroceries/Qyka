@@ -93,6 +93,13 @@ async def apply_public(
     """Application from the public For Agents / For Riders pages - anyone,
     no account. Keyed on the (normalized) phone: that's who approval turns
     into an agent, and who the admin calls."""
+    if kind is ApplicationKind.SHOPKEEPER:
+        # Hubs hold other people's goods, so shopkeepers are set up by an
+        # admin (Admin > Hubs > Add a hub), never by applying.
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Hubs are set up by Qyka - get in touch and we'll arrange one",
+        )
     phone = normalize_phone(phone)
     if not _PHONE_RE.fullmatch(phone):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Enter a valid phone number")
