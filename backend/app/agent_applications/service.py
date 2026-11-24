@@ -12,6 +12,7 @@ from app.auth.models import User
 from app.core.config import settings
 from app.core.enums import ApplicationKind, ApplicationStatus, UserRole, UserStatus
 from app.core.phone import normalize_phone
+from app.hubs.models import Hub
 from app.markets.models import Market
 from app.riders.models import Rider
 
@@ -57,6 +58,18 @@ async def apply(
     return application
 
 
+# The login role each kind of approved applicant ends up with.
+_ROLE_FOR_KIND = {
+    ApplicationKind.AGENT: UserRole.AGENT,
+    ApplicationKind.RIDER: UserRole.RIDER,
+    ApplicationKind.SHOPKEEPER: UserRole.SHOPKEEPER,
+}
+_ROLE_LABEL = {
+    ApplicationKind.AGENT: "an agent",
+    ApplicationKind.RIDER: "a rider",
+    ApplicationKind.SHOPKEEPER: "a shopkeeper",
+}
+
 # E.164-ish after normalize_phone: "+" then 10-15 digits.
 _PHONE_RE = re.compile(r"\+\d{10,15}")
 
@@ -84,9 +97,14 @@ async def apply_public(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Enter a valid phone number")
     full_name = full_name.strip()
     area = _clean(area)
-    if kind is ApplicationKind.AGENT:
+    if kind in (ApplicationKind.AGENT, ApplicationKind.SHOPKEEPER):
         if market_id is None:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Pick the market you'd shop in")
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Pick the market you'd shop in"
+                if kind is ApplicationKind.AGENT
+                else "Pick the market your hub is in",
+            )
         await _require_market(db, market_id)
     elif market_id is None and area is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Tell us the area you'd cover")
@@ -96,8 +114,10 @@ async def apply_public(
     user = (await db.execute(select(User).where(User.phone == phone))).scalar_one_or_none()
     if user is not None and user.role is UserRole.ADMIN:
         raise HTTPException(status.HTTP_409_CONFLICT, "This number can't be used to apply")
-    if kind is ApplicationKind.AGENT and user is not None and user.role is UserRole.AGENT:
-        raise HTTPException(status.HTTP_409_CONFLICT, "This number is already an agent")
+    if user is not None and user.role is _ROLE_FOR_KIND[kind]:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"This number is already {_ROLE_LABEL[kind]}"
+        )
     if kind is ApplicationKind.RIDER:
         rider = (await db.execute(select(Rider).where(Rider.phone == phone))).scalar_one_or_none()
         if rider is not None:
@@ -194,6 +214,14 @@ async def _account_for(db: AsyncSession, application: AgentApplication) -> User:
         await db.flush()
     if user.role is UserRole.ADMIN:
         raise HTTPException(status.HTTP_409_CONFLICT, "That number belongs to an admin account")
+    # One staff role per account: an agent can't also be a rider or run a
+    # hub, because the role is what routes them to their app.
+    target = _ROLE_FOR_KIND[application.kind]
+    if user.role not in (UserRole.CUSTOMER, target):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"That number already belongs to {_ROLE_LABEL[ApplicationKind(user.role.value)]}",
+        )
     if not user.full_name and application.full_name:
         user.full_name = application.full_name
     application.user_id = user.id
@@ -209,22 +237,36 @@ async def approve(
             status.HTTP_409_CONFLICT, "Application has already been reviewed"
         )
 
+    user = await _account_for(db, application)
     if application.kind is ApplicationKind.AGENT:
-        user = await _account_for(db, application)
         await admin_service.promote_to_agent(
             db, user_id=user.id, market_id=application.market_id
         )
-    else:
+    elif application.kind is ApplicationKind.RIDER:
         existing = await db.execute(select(Rider).where(Rider.phone == application.phone))
         if existing.scalar_one_or_none() is not None:
             raise HTTPException(status.HTTP_409_CONFLICT, "This number is already a rider")
+        user.role = UserRole.RIDER
         db.add(Rider(
+            user_id=user.id,
             full_name=application.full_name or application.phone,
             phone=application.phone,
             area=application.area,
             vehicle=application.vehicle,
             market_id=application.market_id,
             application_id=application.id,
+        ))
+    else:
+        market = (await db.execute(
+            select(Market).where(Market.id == application.market_id)
+        )).scalar_one_or_none()
+        if market is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Market not found")
+        user.role = UserRole.SHOPKEEPER
+        db.add(Hub(
+            market_id=market.id,
+            user_id=user.id,
+            name=f"{market.name} Hub",
         ))
     application.status = ApplicationStatus.APPROVED
     application.reviewed_by = admin.id

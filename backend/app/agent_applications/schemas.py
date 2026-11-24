@@ -19,7 +19,8 @@ class PublicApplyIn(BaseModel):
     kind: ApplicationKind
     full_name: str = Field(..., min_length=2, max_length=120)
     phone: str = Field(..., examples=["08012345678"])
-    # Agents: required (validated in service.apply_public). Riders: optional.
+    # Agents and shopkeepers: required (validated in service.apply_public).
+    # Riders: optional.
     market_id: uuid.UUID | None = None
     area: str | None = Field(default=None, max_length=200)
     vehicle: str | None = Field(default=None, max_length=60)

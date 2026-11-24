@@ -92,10 +92,12 @@ async def test_rider_application_approved_joins_roster_and_can_be_suspended(clie
     assert r.status_code == 200
     assert r.json()["status"] == "suspended"
 
-    # Riders aren't a login role: signing in with that number is just a customer.
+    # Approval gave them a rider login. Suspending keeps the role (so they
+    # still land in the rider app); what a suspended rider can do is gated on
+    # Rider.status in the rider endpoints, not on the role.
     token = await _login(client, "08094445555")
     r = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
-    assert r.json()["role"] == "customer"
+    assert r.json()["role"] == "rider"
 
 
 @pytest.mark.asyncio
@@ -153,3 +155,76 @@ async def test_existing_customer_approved_from_website_keeps_customer_side(clien
 
     me = (await client.get("/auth/me", headers=h)).json()
     assert (me["role"], me["has_customer_side"]) == ("agent", True)
+
+
+@pytest.mark.asyncio
+async def test_shopkeeper_application_creates_hub_and_login(client, db_session_factory):
+    market_id = await _market(db_session_factory, "Bodija Hub Market")
+    admin_h = {"Authorization": f"Bearer {await _login_admin(client, db_session_factory, 'apps-hub@qyka.com')}"}
+
+    # A hub needs a market.
+    r = await client.post("/agent-applications/public", json={
+        "kind": "shopkeeper", "full_name": "Mama Tunde", "phone": "08035550001",
+    })
+    assert r.status_code == 422
+
+    r = await client.post("/agent-applications/public", json={
+        "kind": "shopkeeper", "full_name": "Mama Tunde", "phone": "08035550001",
+        "market_id": str(market_id),
+    })
+    assert r.status_code == 201, r.text
+    r = await client.get("/agent-applications?status=pending&kind=shopkeeper", headers=admin_h)
+    [app] = r.json()
+    r = await client.post(f"/agent-applications/{app['id']}/approve", headers=admin_h)
+    assert r.status_code == 200, r.text
+
+    token = await _login(client, "08035550001")
+    h = {"Authorization": f"Bearer {token}"}
+    assert (await client.get("/auth/me", headers=h)).json()["role"] == "shopkeeper"
+    r = await client.get("/hubs/me", headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["market_id"] == str(market_id)
+    assert r.json()["name"] == "Bodija Hub Market Hub"
+
+    # Already a shopkeeper -> can't apply again; and /hubs/me is shopkeeper-only.
+    r = await client.post("/agent-applications/public", json={
+        "kind": "shopkeeper", "full_name": "Mama Tunde", "phone": "08035550001",
+        "market_id": str(market_id),
+    })
+    assert r.status_code == 409
+    r = await client.get("/hubs/me", headers=admin_h)
+    assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_a_market_can_have_several_hubs(client, db_session_factory):
+    market_id = await _market(db_session_factory, "Two Hub Market")
+    admin_h = {"Authorization": f"Bearer {await _login_admin(client, db_session_factory, 'apps-hub2@qyka.com')}"}
+    for phone in ("08035550002", "08035550003"):
+        await client.post("/agent-applications/public", json={
+            "kind": "shopkeeper", "full_name": "Shopkeeper", "phone": phone,
+            "market_id": str(market_id),
+        })
+    r = await client.get("/agent-applications?status=pending&kind=shopkeeper", headers=admin_h)
+    assert len(r.json()) == 2
+    for app in r.json():
+        r = await client.post(f"/agent-applications/{app['id']}/approve", headers=admin_h)
+        assert r.status_code == 200, r.text
+
+
+@pytest.mark.asyncio
+async def test_approved_rider_can_sign_in_as_rider(client, db_session_factory):
+    admin_h = {"Authorization": f"Bearer {await _login_admin(client, db_session_factory, 'apps-rider@qyka.com')}"}
+    r = await client.post("/agent-applications/public", json={
+        "kind": "rider", "full_name": "Kola Rider", "phone": "08035550004",
+        "area": "Bodija", "vehicle": "bike",
+    })
+    assert r.status_code == 201, r.text
+    r = await client.get("/agent-applications?status=pending&kind=rider", headers=admin_h)
+    [app] = r.json()
+    r = await client.post(f"/agent-applications/{app['id']}/approve", headers=admin_h)
+    assert r.status_code == 200, r.text
+
+    token = await _login(client, "08035550004")
+    r = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.json()["role"] == "rider"

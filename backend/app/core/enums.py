@@ -5,6 +5,9 @@ class UserRole(str, enum.Enum):
     CUSTOMER = "customer"
     AGENT = "agent"
     RIDER = "rider"
+    # Runs the hub in a market: agents drop bought goods here, and the
+    # shopkeeper hands them on to a rider (see app/hubs).
+    SHOPKEEPER = "shopkeeper"
     ADMIN = "admin"
 
 
@@ -28,6 +31,7 @@ class ApplicationStatus(str, enum.Enum):
 class ApplicationKind(str, enum.Enum):
     AGENT = "agent"
     RIDER = "rider"
+    SHOPKEEPER = "shopkeeper"
 
 
 class RiderStatus(str, enum.Enum):

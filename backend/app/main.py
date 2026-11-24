@@ -15,6 +15,7 @@ from app.core.database import AsyncSessionLocal
 from app.delivery.routes import router as delivery_router
 from app.dev.routes import router as dev_router
 from app.float.routes import router as float_router
+from app.hubs.routes import router as hubs_router
 from app.jit.routes import router as jit_router
 from app.locations.routes import router as locations_router
 from app.markets.routes import router as markets_router
@@ -84,5 +85,6 @@ app.include_router(ratings_router, prefix="/orders", tags=["ratings"])
 app.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(agent_router, prefix="/agent", tags=["agent"])
+app.include_router(hubs_router, prefix="/hubs", tags=["hubs"])
 app.include_router(calls_router, prefix="/calls", tags=["calls"])
 app.include_router(dev_router, prefix="/dev", tags=["dev"])
