@@ -9,7 +9,6 @@ Delivery confirmation is the terminal money event: it computes the payout split
 and releases the agent's and rider's shares from the float pool.
 """
 
-import secrets
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -96,53 +95,6 @@ async def drop_at_hub(
     await notif_service.send(
         db, user_id=hub.user_id, order_id=order.id, kind="hub_drop",
         message="An agent has dropped an order at your hub - check it in.",
-    )
-    return order
-
-
-async def dispatch_to_courier(
-    db: AsyncSession, *, order_id: uuid.UUID, actor: User, courier_reference: str | None = None
-) -> Order:
-    """Hand a packed order to the third-party courier (Kwik / Sendbox).
-
-    Qyka does not employ riders. The courier is only alerted AFTER payment,
-    so nobody travels for an order that might not be paid for — and the goods
-    are already packed when they arrive, so there is no paid waiting time.
-
-    TEMPORARY, admin only: the hub flow hands orders to riders instead (the
-    rider claim/pickup endpoints replace this and it goes away with them),
-    but until those exist this is the only way a ready order gets moving.
-    V1 records the handoff and
-    moves the order out for delivery, generating a placeholder tracking
-    reference if the caller doesn't supply one, so there's always something
-    for a tracking screen to show. The partner's booking API call goes here
-    once a courier partnership is live; courier_reference would then come
-    from its response instead of being generated.
-    """
-    order = await _load(db, order_id)
-    if order.status not in (OrderStatus.READY_FOR_PICKUP, OrderStatus.PACKED):
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            "Order must be ready for pickup at the hub before dispatch",
-        )
-    if actor.role is not UserRole.ADMIN:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin only")
-    order.courier_reference = courier_reference or f"QK-{order.id.hex[:8].upper()}"
-    # A short PIN the customer shares with the rider at handover - a
-    # verifiable-handoff step. secrets, not random, since it's shared as a
-    # (light) proof-of-identity even though nothing here checks it against a
-    # rider-side app yet.
-    order.handover_code = f"{secrets.randbelow(10_000):04d}"
-    order.dispatched_at = datetime.now(timezone.utc)
-    await _transition(db, order, OrderStatus.OUT_FOR_DELIVERY)
-    # Critical: in-app AND email/SMS, whatever the customer's toggles - this
-    # is the one message they need even with the app closed.
-    await notif_service.send(
-        db, user_id=order.customer_id, order_id=order.id, kind="out_for_delivery",
-        message=(
-            f"Your order is on its way (tracking {order.courier_reference}). "
-            f"Give the rider this code at handover: {order.handover_code}."
-        ),
     )
     return order
 

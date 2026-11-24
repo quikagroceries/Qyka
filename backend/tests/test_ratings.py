@@ -72,12 +72,8 @@ async def _completed_order(client, db_session_factory, monkeypatch):
     await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
     r = await client.post(f"/payments/orders/{oid}/pay-from-wallet", headers=cust_h)
     assert r.status_code == 200, r.text
-    from tests.conftest import through_hub
-    from tests.test_admin import _login_admin
-    await through_hub(client, db_session_factory, oid, market_id, agent_h)
-    admin_h = {"Authorization": f"Bearer {await _login_admin(client, db_session_factory, 'ratings-admin@qyka.com')}"}
-    r = await client.post(f"/delivery/orders/{oid}/dispatch-courier", headers=admin_h, json={})
-    assert r.status_code == 200, r.text
+    from tests.conftest import out_for_delivery
+    await out_for_delivery(client, db_session_factory, oid, market_id, agent_h)
     r = await client.post(f"/delivery/orders/{oid}/confirm-delivery", headers=cust_h)
     assert r.status_code == 200, r.text
 

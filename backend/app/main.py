@@ -23,6 +23,7 @@ from app.notifications.routes import router as notifications_router
 from app.orders.routes import router as orders_router
 from app.payments.routes import router as payments_router
 from app.ratings.routes import router as ratings_router
+from app.riders.routes import router as riders_router
 from app.wallet.routes import router as wallet_router
 
 
@@ -86,5 +87,6 @@ app.include_router(notifications_router, prefix="/notifications", tags=["notific
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(agent_router, prefix="/agent", tags=["agent"])
 app.include_router(hubs_router, prefix="/hubs", tags=["hubs"])
+app.include_router(riders_router, prefix="/riders", tags=["riders"])
 app.include_router(calls_router, prefix="/calls", tags=["calls"])
 app.include_router(dev_router, prefix="/dev", tags=["dev"])

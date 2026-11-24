@@ -136,3 +136,37 @@ async def through_hub(client, db_session_factory, order_id, market_id, agent_h):
     r = await client.post(f"/hubs/orders/{order_id}/ready", headers=hub_h)
     assert r.status_code == 200, r.text
     return hub_h
+
+
+async def make_rider(client, db_session_factory, market_id=None, phone="+2348066600001"):
+    """A rider login with an ACTIVE roster record; returns its headers."""
+    from sqlalchemy import select
+
+    from app.auth.models import User
+    from app.core.enums import UserRole
+    from app.riders.models import Rider
+
+    r = await client.post("/auth/request-otp", json={"identifier": phone})
+    code = r.json()["dev_otp"]
+    r = await client.post("/auth/verify-otp", json={"identifier": phone, "code": code})
+    token = r.json()["access_token"]
+    async with db_session_factory() as s:
+        user = (await s.execute(select(User).where(User.phone == phone))).scalar_one()
+        user.role = UserRole.RIDER
+        s.add(Rider(user_id=user.id, full_name="Test Rider", phone=phone, market_id=market_id))
+        await s.commit()
+    return {"Authorization": f"Bearer {token}"}
+
+
+async def out_for_delivery(client, db_session_factory, order_id, market_id, agent_h,
+                           rider_phone="+2348066600001"):
+    """Take a PAID order all the way out: hub custody, a rider claims it, the
+    shopkeeper releases it with the rider's code. Returns (hub_h, rider_h)."""
+    hub_h = await through_hub(client, db_session_factory, order_id, market_id, agent_h)
+    rider_h = await make_rider(client, db_session_factory, market_id, phone=rider_phone)
+    r = await client.post(f"/riders/jobs/{order_id}/claim", headers=rider_h)
+    assert r.status_code == 200, r.text
+    r = await client.post(f"/hubs/orders/{order_id}/handover", headers=hub_h,
+                          json={"code": r.json()["pickup_code"]})
+    assert r.status_code == 200, r.text
+    return hub_h, rider_h

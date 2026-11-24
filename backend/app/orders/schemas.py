@@ -121,6 +121,8 @@ class OrderOut(BaseModel):
     hub_id: uuid.UUID | None
     dropped_at_hub_at: datetime | None
     hub_received_at: datetime | None
+    rider_id: uuid.UUID | None
+    rider_delivered_at: datetime | None
     dispatched_at: datetime | None
     delivered_at: datetime | None
     courier_reference: str | None

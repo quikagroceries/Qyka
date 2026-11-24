@@ -1,6 +1,7 @@
 """Shopkeeper-side hub custody: see what's been dropped, confirm what
 actually arrived, then mark it ready for a rider."""
 
+import secrets
 import uuid
 from datetime import datetime, timezone
 
@@ -13,6 +14,7 @@ from app.auth.models import User
 from app.core.enums import OrderStatus
 from app.core.media import is_our_cloudinary_url
 from app.hubs.models import Hub
+from app.notifications import service as notif_service
 from app.orders.models import Order
 from app.orders.state_machine import IllegalTransition, assert_can_transition
 
@@ -52,10 +54,15 @@ async def _out(db: AsyncSession, order: Order) -> dict:
     agent = None
     if order.agent_id is not None:
         agent = (await db.execute(select(User).where(User.id == order.agent_id))).scalar_one_or_none()
+    rider = None
+    if order.rider_id is not None:
+        rider = (await db.execute(select(User).where(User.id == order.rider_id))).scalar_one_or_none()
     return {
         "id": order.id,
         "status": order.status,
         "agent_name": agent.full_name if agent is not None else None,
+        "rider_name": rider.full_name if rider is not None else None,
+        "rider_waiting": rider is not None and order.status is OrderStatus.READY_FOR_PICKUP,
         "items": [
             {"id": i.id, "description": i.description, "quantity": i.quantity,
              "requested_note": i.requested_note}
@@ -149,4 +156,37 @@ async def mark_ready(db: AsyncSession, *, user: User, order_id: uuid.UUID) -> di
     _transition(order, OrderStatus.READY_FOR_PICKUP)
     order.packed_at = datetime.now(timezone.utc)
     await db.flush()
+    return await _out(db, order)
+
+
+async def handover(
+    db: AsyncSession, *, user: User, order_id: uuid.UUID, code: str
+) -> dict:
+    """Shopkeeper releases the goods to the rider who claimed them, by
+    entering the pickup code that rider shows. This is the moment the order
+    goes out for delivery and the customer gets their drop-off PIN."""
+    hub = await hub_for_shopkeeper(db, user)
+    order = await _hub_order(db, hub, order_id)
+    if order.status is not OrderStatus.READY_FOR_PICKUP:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"Cannot hand over from {order.status.value}"
+        )
+    if order.rider_id is None or not order.pickup_code:
+        raise HTTPException(status.HTTP_409_CONFLICT, "No rider has claimed this order yet")
+    if not secrets.compare_digest(code.strip(), order.pickup_code):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That code doesn't match the rider's")
+
+    order.handover_code = f"{secrets.randbelow(10_000):04d}"
+    order.dispatched_at = datetime.now(timezone.utc)
+    _transition(order, OrderStatus.OUT_FOR_DELIVERY)
+    await db.flush()
+    # Critical: in-app AND email/SMS, whatever the customer's toggles - this
+    # is the one message they need even with the app closed.
+    await notif_service.send(
+        db, user_id=order.customer_id, order_id=order.id, kind="out_for_delivery",
+        message=(
+            "Your order is on its way. "
+            f"Give the rider this code at handover: {order.handover_code}."
+        ),
+    )
     return await _out(db, order)

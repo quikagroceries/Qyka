@@ -29,12 +29,21 @@ class HubOrderOut(BaseModel):
     id: uuid.UUID
     status: OrderStatus
     agent_name: str | None
+    # The rider who has claimed it (None until one does). The shopkeeper
+    # releases the goods to them by entering the code the rider shows.
+    rider_name: str | None
+    rider_waiting: bool
     items: list[HubItemOut]
     packing_photos: list[str]
     dropped_at_hub_at: datetime | None
     hub_received_at: datetime | None
     hub_missing_item_ids: list[uuid.UUID]
     hub_receipt_note: str | None
+
+
+class HandoverIn(BaseModel):
+    # The pickup code the rider shows on their phone.
+    code: str = Field(..., min_length=4, max_length=8)
 
 
 class ReceiveIn(BaseModel):

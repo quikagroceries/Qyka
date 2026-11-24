@@ -29,29 +29,6 @@ async def drop_at_hub(
     )
 
 
-@router.post("/orders/{order_id}/dispatch-courier", response_model=OrderOut)
-async def dispatch_courier(
-    order_id: uuid.UUID,
-    body: dict = {},
-    db: AsyncSession = Depends(get_db),
-    actor: User = Depends(require_role(UserRole.ADMIN)),
-) -> OrderOut:
-    """TEMPORARY admin-only stand-in for rider pickup (removed with the
-    third-party courier when riders claim jobs).
-
-    Only reachable once the order is READY_FOR_PICKUP at the hub, which
-    requires PAID — so nothing is dispatched for an unpaid order.
-
-    V1 records the handoff, generating a tracking reference if the caller
-    doesn't supply one. The Kwik/Sendbox booking call slots in here: quote at
-    order creation, book at this point, and pass its reference through
-    instead of the generated placeholder.
-    """
-    return await service.dispatch_to_courier(
-        db, order_id=order_id, actor=actor, courier_reference=body.get("courier_reference"),
-    )
-
-
 @router.post("/orders/{order_id}/confirm-delivery", response_model=PayoutOut)
 async def confirm_delivery(
     order_id: uuid.UUID,

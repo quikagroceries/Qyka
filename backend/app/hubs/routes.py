@@ -10,7 +10,7 @@ from app.core.enums import UserRole
 from app.core.security import get_current_user, require_role
 from app.hubs import service
 from app.hubs.models import Hub
-from app.hubs.schemas import HubOrderOut, HubOut, ReceiveIn
+from app.hubs.schemas import HandoverIn, HubOrderOut, HubOut, ReceiveIn
 
 router = APIRouter()
 
@@ -79,3 +79,15 @@ async def order_ready(
 ) -> dict:
     """Goods are bagged and ready for a rider."""
     return await service.mark_ready(db, user=user, order_id=order_id)
+
+
+@router.post("/orders/{order_id}/handover", response_model=HubOrderOut)
+async def handover_order(
+    order_id: uuid.UUID,
+    body: HandoverIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role(UserRole.SHOPKEEPER)),
+) -> dict:
+    """Release the goods to the rider who claimed them, using the code the
+    rider shows. The order goes out for delivery."""
+    return await service.handover(db, user=user, order_id=order_id, code=body.code)

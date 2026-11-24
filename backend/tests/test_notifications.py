@@ -154,25 +154,28 @@ async def test_provider_failure_never_breaks_the_notification(db_session_factory
 
 
 @pytest.mark.asyncio
-async def test_dispatch_to_courier_sends_the_critical_out_for_delivery_notice(db_session_factory, providers, monkeypatch):
-    from app.delivery.service import dispatch_to_courier
+async def test_hub_handover_sends_the_critical_out_for_delivery_notice(db_session_factory, providers, monkeypatch):
+    from app.hubs.models import Hub
+    from app.hubs.service import handover
     from app.orders.models import Order
 
     monkeypatch.setattr(settings, "email_api_key", "re_test")
     customer_id = await _user(db_session_factory, notify_order_updates=False)   # muted - still gets it
     async with db_session_factory() as s:
-        agent = User(phone="+2348079990001", role=UserRole.AGENT, status=UserStatus.ACTIVE)
-        s.add(agent)
+        shopkeeper = User(phone="+2348079990002", role=UserRole.SHOPKEEPER, status=UserStatus.ACTIVE)
+        rider = User(phone="+2348079990003", role=UserRole.RIDER, status=UserStatus.ACTIVE)
+        s.add_all([shopkeeper, rider])
         await s.flush()
-        admin = User(email="notif-admin@qyka.com", role=UserRole.ADMIN, status=UserStatus.ACTIVE)
-        s.add(admin)
+        hub = Hub(market_id=uuid.uuid4(), user_id=shopkeeper.id, name="H")
+        s.add(hub)
+        await s.flush()
         order = Order(
-            customer_id=customer_id, agent_id=agent.id, market_id=uuid.uuid4(),
-            status=OrderStatus.READY_FOR_PICKUP,
+            customer_id=customer_id, market_id=hub.market_id, status=OrderStatus.READY_FOR_PICKUP,
+            hub_id=hub.id, rider_id=rider.id, pickup_code="4321",
         )
         s.add(order)
         await s.flush()
-        await dispatch_to_courier(s, order_id=order.id, actor=admin)
+        await handover(s, user=shopkeeper, order_id=order.id, code="4321")
         await s.commit()
         [note] = (await s.execute(select(Notification).where(Notification.user_id == customer_id))).scalars().all()
 

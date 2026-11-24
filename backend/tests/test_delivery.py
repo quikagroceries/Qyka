@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.config import settings
-from tests.conftest import make_hub, pay_deposit, through_hub
+from tests.conftest import make_hub, out_for_delivery, pay_deposit, through_hub
 
 PHONE_CUST = "+2348010000001"
 PHONE_AGENT = "+2348020000002"
@@ -106,21 +106,21 @@ async def test_full_delivery_and_payout(client, db_session_factory, monkeypatch)
     r = await client.post(f"/delivery/orders/{oid}/drop-at-hub", headers=agent_h)
     assert r.status_code == 409
 
-    await through_hub(client, db_session_factory, oid, market_id, agent_h)
+    hub_h = await through_hub(client, db_session_factory, oid, market_id, agent_h)
     r = await client.get(f"/orders/{oid}", headers=admin_h)
     assert r.json()["status"] == "ready_for_pickup"
 
-    r = await client.post(
-        f"/delivery/orders/{oid}/dispatch-courier", headers=admin_h,
-        json={"courier_reference": "KWIK-TRACK-12345"},
-    )
+    # A rider claims it from the pool; the shopkeeper releases it with the
+    # rider's code, which is what sends it out and issues the customer's PIN.
+    from tests.conftest import make_rider
+    rider_h = await make_rider(client, db_session_factory, market_id, phone=PHONE_RIDER)
+    r = await client.post(f"/riders/jobs/{oid}/claim", headers=rider_h)
+    assert r.status_code == 200, r.text
+    pickup_code = r.json()["pickup_code"]
+    r = await client.post(f"/hubs/orders/{oid}/handover", headers=hub_h, json={"code": pickup_code})
     assert r.status_code == 200 and r.json()["status"] == "out_for_delivery"
-    assert r.json()["courier_reference"] == "KWIK-TRACK-12345"
-
-    # Confirmed it's readable back from the order itself too, not just the
-    # dispatch response - this is what a tracking screen would poll.
     r = await client.get(f"/orders/{oid}", headers=admin_h)
-    assert r.json()["courier_reference"] == "KWIK-TRACK-12345"
+    assert r.json()["status"] == "out_for_delivery" and r.json()["handover_code"]
 
     # --- customer confirms delivery -> payout split ---
     r = await client.post(f"/delivery/orders/{oid}/confirm-delivery", headers=admin_h)
@@ -193,72 +193,3 @@ async def test_cannot_pack_unpaid_order(client, db_session_factory):
     r = await client.post(f"/delivery/orders/{oid}/drop-at-hub", headers=agent_h)
     assert r.status_code == 409, "unpaid order should not be droppable at a hub"
     print("Unpaid order correctly blocked from delivery.")
-
-
-@pytest.mark.asyncio
-async def test_only_admin_can_dispatch_a_ready_order(client, db_session_factory, monkeypatch):
-    """Dispatch is a temporary admin-only stand-in until riders claim jobs:
-    no agent may do it, assigned or not. No explicit courier_reference -> one
-    is auto-generated so there's always something for a tracking screen."""
-    from app.auth.models import User
-    from app.core.enums import LedgerDirection, UserRole
-    from app.float import service as float_service
-
-    async def fake_send(*, account_number, bank_code, amount_naira, reference, reason="x"):
-        return {"reference": reference, "status": "success", "fee": 0}
-    monkeypatch.setattr("app.payments.transfers.send_transfer", fake_send)
-
-    cust_token = await _login(client, PHONE_CUST)
-    agent_token = await _login(client, PHONE_AGENT)
-    other_agent_token = await _login(client, "+2348040000004")
-    async with db_session_factory() as s:
-        agent = (await s.execute(select(User).where(User.phone == PHONE_AGENT))).scalar_one()
-        agent.role = UserRole.AGENT
-        other_agent = (await s.execute(select(User).where(User.phone == "+2348040000004"))).scalar_one()
-        other_agent.role = UserRole.AGENT
-        cust = (await s.execute(select(User).where(User.phone == PHONE_CUST))).scalar_one()
-        cust.role = UserRole.ADMIN
-        await s.commit()
-        agent_id = agent.id
-        market_id = uuid.uuid4()
-        await float_service.record_movement(
-            s, direction=LedgerDirection.CREDIT, amount=Decimal("100000.00"),
-            market_id=market_id, note="seed")
-        await s.commit()
-
-    admin_h = {"Authorization": f"Bearer {cust_token}"}
-    agent_h = {"Authorization": f"Bearer {agent_token}"}
-    other_agent_h = {"Authorization": f"Bearer {other_agent_token}"}
-
-    r = await client.post("/orders", headers=admin_h, json={
-        "market_id": str(market_id), "listed_items_total": "2000.00",
-        "items": [{"description": "500 naira pepper"}]})
-    oid = r.json()["id"]
-    await pay_deposit(client, admin_h, oid)
-    await client.post(f"/orders/{oid}/assign-agent", headers=admin_h, json={"agent_id": str(agent_id)})
-    r = await client.post(f"/orders/{oid}/start-shopping", headers=agent_h)
-    item_id = r.json()["items"][0]["id"]
-    await client.post(f"/jit/orders/{oid}/pay-vendor", headers=agent_h, json={
-        "account_number": "9012345678", "bank_code": "999992", "photo_ref": "https://res.cloudinary.com/y0vuqbu5/image/upload/v1/receipts/receipt.jpg",
-        "items": [{"item_id": item_id, "price": "500.00"}]})
-    await client.post(f"/orders/{oid}/finish-shopping", headers=agent_h)
-    r = await client.post("/wallet/fund", headers=admin_h, json={"amount": "20000.00"})
-    assert r.status_code == 200, r.text
-    r = await client.post(f"/payments/orders/{oid}/pay-from-wallet", headers=admin_h)
-    assert r.status_code == 200, r.text
-
-    await through_hub(client, db_session_factory, oid, market_id, agent_h)
-
-    # Agents no longer dispatch - not the assigned one, not anyone else's.
-    r = await client.post(f"/delivery/orders/{oid}/dispatch-courier", headers=other_agent_h)
-    assert r.status_code == 403
-    r = await client.post(f"/delivery/orders/{oid}/dispatch-courier", headers=agent_h)
-    assert r.status_code == 403
-
-    # The admin can, with no explicit reference -> one is generated.
-    r = await client.post(f"/delivery/orders/{oid}/dispatch-courier", headers=admin_h)
-    assert r.status_code == 200, r.text
-    assert r.json()["status"] == "out_for_delivery"
-    assert r.json()["courier_reference"], "a tracking reference should be auto-generated"
-
-    print("Agent-dispatch ownership check and auto-generated reference both correct.")
