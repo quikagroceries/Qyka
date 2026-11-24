@@ -55,6 +55,7 @@ export const ADMIN_NAV = [
   { key: "pay", label: "Delivery pay", icon: "send", href: "/admin/pay", ownerOnly: true },
   { key: "analytics", label: "Analytics", icon: "trending", href: "/admin/analytics" },
   { key: "admins", label: "Admins", icon: "shield", href: "/admin/admins", ownerOnly: true },
+  { key: "content", label: "Website text", icon: "chat", href: "/admin/content", ownerOnly: true },
   { key: "audit", label: "Audit log", icon: "clock", href: "/admin/audit", ownerOnly: true },
   { key: "platform", label: "Platform", icon: "star", href: "/admin/platform", ownerOnly: true },
   { key: "settings", label: "Settings", icon: "settings", href: "/admin/settings" },

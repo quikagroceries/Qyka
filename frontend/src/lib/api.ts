@@ -259,6 +259,9 @@ export const api = {
     q.set("offset", String(params.offset ?? 0));
     return request(`/admin/audit?${q}`);
   },
+  getContentOverrides: () => request("/admin/content"),
+  setContent: (key: string, value: string) => request("/admin/content", { method: "PUT", body: { key, value } }),
+  resetContent: (key: string) => request(`/admin/content?key=${encodeURIComponent(key)}`, { method: "DELETE" }),
   getPlatformSettings: () => request("/admin/platform-settings"),
   setPlatformSetting: (key: string, value: string | boolean) =>
     request(`/admin/platform-settings/${key}`, { method: "PUT", body: { value } }),

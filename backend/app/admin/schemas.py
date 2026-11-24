@@ -110,3 +110,10 @@ class UserEditIn(BaseModel):
     phone: str | None = None
     email: str | None = Field(default=None, max_length=255)
     basket_cap_naira: int | None = None
+
+
+class ContentIn(BaseModel):
+    # e.g. "en.hero.title" - where the wording lives in the site's content.
+    key: str = Field(..., min_length=3, max_length=300, pattern=r"^(en|pcm|faqs|help|landing)\.[A-Za-z0-9_.\-]+$")
+    # Plain text. To go back to the original wording, reset instead of blanking.
+    value: str = Field(..., min_length=1, max_length=2000)

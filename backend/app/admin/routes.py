@@ -13,12 +13,14 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin import audit, ops
+from app.content.models import SiteContent
 from app.platform_settings import service as platform
 from app.admin import service as admin_service
 from app.admin.schemas import (
     AdminCancelOrderIn,
     AdminCreateIn,
     AdminLevelIn,
+    ContentIn,
     AdminLoginIn,
     AdminPasswordChangeIn,
     DeliveryFeesIn,
@@ -913,3 +915,54 @@ async def edit_user(
         "id": str(user.id), "full_name": user.full_name, "phone": user.phone,
         "email": user.email, "basket_cap_kobo": user.basket_cap_kobo,
     }
+
+
+# --- Website copy ------------------------------------------------------------
+
+@router.get("/content")
+async def list_content(
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin(owner_only=True)),
+) -> list[dict]:
+    """Every wording that's been changed from the original, newest first."""
+    rows = (await db.execute(select(SiteContent).order_by(SiteContent.updated_at.desc()))).scalars().all()
+    return [
+        {"key": r.key, "value": r.value, "updated_at": r.updated_at.isoformat() if r.updated_at else None}
+        for r in rows
+    ]
+
+
+@router.put("/content")
+async def set_content(
+    body: ContentIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("content.update", owner_only=True)),
+) -> dict:
+    """Reword a piece of the website. Takes effect within a minute."""
+    value = body.value.strip()
+    if not value:
+        raise HTTPException(422, "Text can't be blank - reset it to go back to the original")
+    row = (await db.execute(select(SiteContent).where(SiteContent.key == body.key))).scalar_one_or_none()
+    old = row.value if row is not None else None
+    if row is None:
+        db.add(SiteContent(key=body.key, value=value, updated_by=admin.id))
+    else:
+        row.value, row.updated_by = value, admin.id
+    await db.flush()
+    audit.note(request, key=body.key, old=(old or "")[:200] or None, new=value[:200])
+    return {"key": body.key, "value": value}
+
+
+@router.delete("/content", status_code=204)
+async def reset_content(
+    key: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("content.reset", owner_only=True)),
+) -> None:
+    """Put the original wording back."""
+    row = (await db.execute(select(SiteContent).where(SiteContent.key == key))).scalar_one_or_none()
+    if row is not None:
+        audit.note(request, key=key, old=row.value[:200])
+        await db.delete(row)

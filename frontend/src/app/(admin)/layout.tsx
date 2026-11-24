@@ -22,6 +22,7 @@ function activeKeyFromPath(pathname) {
   if (pathname.startsWith("/admin/analytics")) return "analytics";
   if (pathname.startsWith("/admin/admins")) return "admins";
   if (pathname.startsWith("/admin/audit")) return "audit";
+  if (pathname.startsWith("/admin/content")) return "content";
   if (pathname.startsWith("/admin/platform")) return "platform";
   if (pathname.startsWith("/admin/settings")) return "settings";
   return "dashboard";
