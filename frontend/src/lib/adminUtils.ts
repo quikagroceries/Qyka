@@ -1,38 +1,12 @@
-// Shared "how old / is this stuck" heuristics for the admin Dashboard and
-// Orders screens, kept in one place so they always agree with each other.
+// Shared age formatting for the admin Dashboard and Orders screens, kept in
+// one place so they always agree with each other.
 // Pure functions only, taking `now` as an explicit argument - callers
 // compute Date.now() once per fetch (inside an effect/async handler, never
 // during render) and pass it in, same discipline as every countdown
 // elsewhere in this app (see PackagingPanel.jsx / DeliveryTracking.jsx).
 
-// Placeholder heuristic, not backend-configured: an active order sitting
-// this long without moving is worth a human look. An awaiting_payment order
-// past its own payment_window_expires_at is always flagged regardless.
-const STUCK_AFTER_MS = 2 * 60 * 60 * 1000; // 2 hours
-
-// Once an order reaches the hub, "stuck" is about how long it has sat in its
-// CURRENT stage, not how old the order is: a 3-hour-old order that reached
-// the hub a minute ago is fine; one nobody has checked in for half an hour
-// is not. (Also placeholders, not backend-configured.)
-const MIN = 60 * 1000;
-const STAGE_STUCK_MS: Record<string, number> = {
-  paid: 45 * MIN,              // paid, the agent hasn't taken it to the hub
-  dropped_at_hub: 20 * MIN,    // dropped, the shopkeeper hasn't checked it in
-  received_by_hub: 20 * MIN,   // checked in, not marked ready
-  ready_for_pickup: 30 * MIN,  // ready, no rider collected it (unclaimed OR claimed but never came)
-  out_for_delivery: 2 * 60 * MIN,
-};
-
-export function isStuckOrder(order, now) {
-  if (order.status === "awaiting_payment" && order.payment_window_expires_at) {
-    return new Date(order.payment_window_expires_at).getTime() < now;
-  }
-  const limit = STAGE_STUCK_MS[order.status];
-  if (limit && order.stage_started_at) {
-    return now - new Date(order.stage_started_at).getTime() > limit;
-  }
-  return now - new Date(order.created_at).getTime() > STUCK_AFTER_MS;
-}
+// "Stuck" is decided by the server from the owner's thresholds (Admin >
+// Platform > Stuck-order alerts); every in-flight order arrives with `stuck`.
 
 export function formatAge(ms) {
   if (ms < 0) return "just now";

@@ -12,7 +12,7 @@ import Card from "@/components/ui/Card";
 import Icon from "@/components/ui/Icon";
 import ChartTooltip from "@/components/ui/ChartTooltip";
 import { CardSkeleton } from "@/components/ui/Skeleton";
-import { isStuckOrder, LOW_FLOAT_BALANCE, CHART_CRITICAL_VS_ORANGE, CHART_GRID, CHART_AXIS_TEXT } from "@/lib/adminUtils";
+import { LOW_FLOAT_BALANCE, CHART_CRITICAL_VS_ORANGE, CHART_GRID, CHART_AXIS_TEXT } from "@/lib/adminUtils";
 import { usePolling } from "@/lib/usePolling";
 
 const ORANGE = "#EE9A5A";
@@ -51,9 +51,8 @@ function AdminDashboard() {
         api.getFlaggedUsers(),
         api.getAgentApplications("pending"),
       ]);
-      const now = Date.now();
       setMarkets(marketList);
-      setInFlight({ ...flight, stuck: flight.orders.filter((o) => isStuckOrder(o, now)).length });
+      setInFlight(flight);
       setFlagged(flag);
       setPendingApps(apps);
       setError("");

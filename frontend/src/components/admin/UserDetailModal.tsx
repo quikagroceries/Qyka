@@ -5,6 +5,7 @@ import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
+import UserAdminActions from "@/components/admin/UserAdminActions";
 
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -163,6 +164,14 @@ export default function UserDetailModal({ userId, onClose, onChanged }: { userId
                 ))}
               </div>
             </div>
+          )}
+
+          {detail.role !== "admin" && (
+            <UserAdminActions
+              key={detail.id + detail.role + (detail.phone || "")}
+              detail={detail}
+              onChanged={() => { load(); onChanged(); }}
+            />
           )}
 
           {detail.role !== "admin" && (

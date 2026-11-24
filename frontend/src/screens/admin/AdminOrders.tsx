@@ -13,8 +13,9 @@ import EmptyState from "@/components/ui/EmptyState";
 import Icon from "@/components/ui/Icon";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import Input from "@/components/ui/Input";
+import OrderInterventions from "@/components/admin/OrderInterventions";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { formatAge, isStuckOrder } from "@/lib/adminUtils";
+import { formatAge } from "@/lib/adminUtils";
 import { marketTone, TONE_COVER } from "@/lib/vendorVisuals";
 import { coverImageForMarket } from "@/lib/markets";
 import { summarizeOrderStatus } from "@/lib/orderStatus";
@@ -306,6 +307,12 @@ export function OrderDetailPanel({ orderId, markets, agents, onBack, onAssigned 
             </Card>
           )}
 
+          <OrderInterventions
+            order={order}
+            agents={agents}
+            onDone={() => { refresh(); onAssigned?.(); }}
+          />
+
           {order.status === "shopping" && (
             <Card>
               <p className="mb-2 font-bold text-ink">Spending cap</p>
@@ -417,7 +424,7 @@ function AdminOrders() {
 
   const all: any[] = data?.orders ?? [];
   const unassigned = all.filter((o) => !o.agent_id).length;
-  const stuckCount = now != null ? all.filter((o) => isStuckOrder(o, now)).length : 0;
+  const stuckCount = all.filter((o) => o.stuck).length;
   const shoppingCount = all.filter((o) => o.status === "shopping").length;
   const HUB_STATUSES = ["dropped_at_hub", "received_by_hub", "ready_for_pickup"];
   const atHub = all.filter((o) => HUB_STATUSES.includes(o.status)).length;
@@ -426,7 +433,7 @@ function AdminOrders() {
     if (filter === "unassigned" && o.agent_id) return false;
     if (filter === "at_hub" && !HUB_STATUSES.includes(o.status)) return false;
     if (filter === "needs_rider" && !(o.status === "ready_for_pickup" && !o.rider_id)) return false;
-    if (filter === "stuck" && !(now != null && isStuckOrder(o, now))) return false;
+    if (filter === "stuck" && !o.stuck) return false;
     if (!search) return true;
     return [o.status, marketName(o.market_id), o.agent_id, o.customer_id, o.id].some((v) =>
       String(v || "").toLowerCase().includes(search)
@@ -482,7 +489,7 @@ function AdminOrders() {
             </thead>
             <tbody>
               {visible.map((o) => {
-                const stuck = now != null && isStuckOrder(o, now);
+                const stuck = !!o.stuck;
                 return (
                   <tr
                     key={o.id}

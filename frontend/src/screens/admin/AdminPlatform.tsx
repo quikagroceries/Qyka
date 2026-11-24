@@ -11,12 +11,13 @@ import StatTile from "@/components/ui/StatTile";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 
-const GROUP_ORDER = ["Emergency", "Pricing", "Safety limits", "Sign-in codes"];
-const GROUP_ICON: Record<string, string> = { Emergency: "alert", Pricing: "wallet", "Safety limits": "shield", "Sign-in codes": "phone" };
+const GROUP_ORDER = ["Emergency", "Pricing", "Safety limits", "Stuck-order alerts", "Sign-in codes"];
+const GROUP_ICON: Record<string, string> = { Emergency: "alert", Pricing: "wallet", "Safety limits": "shield", "Stuck-order alerts": "alert", "Sign-in codes": "phone" };
 const GROUP_NOTE: Record<string, string> = {
   Emergency: "Use when something is wrong and you need to stop it now.",
   Pricing: "Applies to orders created from now on. An order already placed keeps the pricing it was created with.",
   "Safety limits": "Applies straight away.",
+  "Stuck-order alerts": "How long an order may sit at each step before it's flagged on the Orders page and Dashboard. Applies straight away.",
   "Sign-in codes": "Applies straight away.",
 };
 

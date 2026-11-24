@@ -14,6 +14,7 @@ import { CardSkeleton } from "@/components/ui/Skeleton";
 import { usePageSearch } from "@/components/layout/PageSearchContext";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import ApplicationCard from "@/components/admin/ApplicationCard";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 // The roster changes slowly; paused while the tab is hidden (usePolling).
 const POLL_MS = 20000;
@@ -31,7 +32,123 @@ function StatusPill({ active }: { active: boolean }) {
   );
 }
 
-function HubCard({ hub, busy, onToggle, onRename, multiple }: any) {
+function ChangeShopkeeper({ hub, onDone }: { hub: any; onDone: () => Promise<void> | void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!open) {
+    return (
+      <Button variant="neutral" className="text-sm" onClick={() => setOpen(true)}>
+        Change shopkeeper
+      </Button>
+    );
+  }
+  return (
+    <div className="mt-1 w-full space-y-2 rounded-2xl bg-sunken p-3">
+      <p className="text-sm text-muted">
+        The new person signs in with a code sent to their phone. The current shopkeeper becomes an ordinary customer.
+        This is refused while orders are sitting in the hub.
+      </p>
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="New shopkeeper's name" />
+      <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Their phone number" inputMode="tel" />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <Button variant="neutral" className="text-sm" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+        <Button
+          className="text-sm"
+          busy={busy}
+          disabled={name.trim().length < 2 || phone.trim().length < 8}
+          onClick={async () => {
+            setError(""); setBusy(true);
+            try {
+              await api.replaceShopkeeper(hub.id, { full_name: name.trim(), phone: phone.trim() });
+              setOpen(false);
+              await onDone();
+            } catch (e) {
+              setError(errMsg(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Hand over the hub
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function AddHubCard({ markets, onAdded }: { markets: any[]; onAdded: () => Promise<void> | void }) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [marketId, setMarketId] = useState("");
+  const [hubName, setHubName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [added, setAdded] = useState<any>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(""); setBusy(true);
+    try {
+      const hub = await api.createHub({
+        full_name: name.trim(), phone: phone.trim(), market_id: marketId,
+        hub_name: hubName.trim() || undefined,
+      });
+      setAdded(hub);
+      setName(""); setPhone(""); setHubName(""); setMarketId("");
+      await onAdded();
+    } catch (err) {
+      setError(errMsg(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="mb-8">
+      <SectionHeader
+        icon="plus"
+        title="Add a hub"
+        subtitle="Set up the hub and its shopkeeper together. Shopkeepers are only ever added here - there's no public application, because a hub holds other people's goods."
+        className="mb-4"
+      />
+      <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
+        <Input placeholder="Shopkeeper's full name" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Input placeholder="Their phone number" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+        <select
+          value={marketId}
+          onChange={(e) => setMarketId(e.target.value)}
+          required
+          className="min-h-[44px] rounded-xl border border-line-strong bg-surface px-4 text-base text-ink"
+        >
+          <option value="">Which market?</option>
+          {markets.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+        <Input placeholder="Hub name (optional, e.g. Main Gate)" value={hubName} onChange={(e) => setHubName(e.target.value)} maxLength={120} />
+        {error && <p className="text-sm text-red-600 sm:col-span-2">{error}</p>}
+        <div className="sm:col-span-2">
+          <Button type="submit" busy={busy} disabled={!marketId}>Add hub</Button>
+        </div>
+      </form>
+      {added && (
+        <div className="mt-4 rounded-2xl bg-brand-green/10 p-4 text-sm text-ink">
+          <p className="font-semibold">{added.name} is ready.</p>
+          <p className="mt-1 text-muted">
+            Tell {added.shopkeeper_name || "the shopkeeper"} to sign in to Qyka with {added.shopkeeper_phone} - they&apos;ll get a code by SMS and land on their hub.
+          </p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function HubCard({ hub, busy, onToggle, onRename, multiple, onChanged }: any) {
+  const { user: me } = useAuth();
+  const isOwner = me?.admin_level === "owner";
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(hub.name);
 
@@ -93,6 +210,7 @@ function HubCard({ hub, busy, onToggle, onRename, multiple }: any) {
         <Button variant="neutral" className="text-sm" busy={busy} onClick={() => onToggle(hub)}>
           {hub.is_active ? "Switch off" : "Switch on"}
         </Button>
+        {isOwner && <ChangeShopkeeper hub={hub} onDone={onChanged} />}
       </div>
       {hub.is_active === false && hub.orders_at_hub > 0 && (
         <p className="text-xs text-muted">Switched off: no new drop-offs, but the orders already here carry on.</p>
@@ -108,6 +226,8 @@ export default function AdminHubs() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const search = usePageSearch("Search hubs…");
+  const { user: me } = useAuth();
+  const isOwnerPage = me?.admin_level === "owner";
 
   async function refresh() {
     try {
@@ -165,7 +285,7 @@ export default function AdminHubs() {
         icon="pin"
         section="People"
         title="Hubs"
-        description="A hub is a drop-off point in a market run by a shopkeeper: agents leave bought goods there and the shopkeeper hands them to a rider."
+        description="A hub is a drop-off point in a market run by a shopkeeper you set up: agents leave bought goods there and the shopkeeper hands them to a rider."
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatTile label="Pending applications" value={applications?.length ?? "—"} />
@@ -177,29 +297,23 @@ export default function AdminHubs() {
 
       {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
-      <SectionHeader
-        icon="flag"
-        title="Pending applications"
-        subtitle="Call to vet them, then approve or reject. Approving creates their account and their hub."
-        className="mb-3"
-      />
-      {applications === null ? (
-        <div className="mb-8 space-y-2">{[0, 1].map((i) => <CardSkeleton key={i} />)}</div>
-      ) : applications.length === 0 ? (
+      {isOwnerPage && <AddHubCard markets={markets} onAdded={refresh} />}
+
+      {/* Shopkeepers can no longer apply publicly; this only shows any that
+          were already waiting from before that changed. */}
+      {applications && applications.length > 0 && (
         <div className="mb-8">
-          <EmptyState icon="pin" title="Nothing pending" subtitle="New shopkeeper applications will show up here." />
-        </div>
-      ) : (
-        <div className="mb-8 space-y-2">
-          {applications.map((a) => (
-            <ApplicationCard
-              key={a.id}
-              app={a}
-              place={marketName(a.market_id)}
-              busy={busyId === a.id}
-              onDecide={decide}
-            />
-          ))}
+          <SectionHeader
+            icon="flag"
+            title="Applications from before"
+            subtitle="Approve or reject these; no new ones can come in."
+            className="mb-3"
+          />
+          <div className="space-y-2">
+            {applications.map((a2) => (
+              <ApplicationCard key={a2.id} app={a2} place={marketName(a2.market_id)} busy={busyId === a2.id} onDecide={decide} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -220,6 +334,7 @@ export default function AdminHubs() {
               multiple={perMarket[h.market_id] > 1}
               onToggle={toggle}
               onRename={rename}
+              onChanged={refresh}
             />
           ))}
         </div>

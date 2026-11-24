@@ -287,6 +287,22 @@ export const api = {
     request(`/admin/riders/${riderId}/link-account`, { method: "POST" }),
   // Hubs, delivery pay, and unsticking a rider claim.
   listHubs: () => request("/admin/hubs"),
+  createHub: (body: { full_name: string; phone: string; market_id: string; hub_name?: string }) =>
+    request("/admin/hubs", { method: "POST", body }),
+  replaceShopkeeper: (hubId: string, body: { full_name: string; phone: string }) =>
+    request(`/admin/hubs/${hubId}/replace-shopkeeper`, { method: "POST", body }),
+  reassignAgent: (orderId: string, agentId: string, note: string) =>
+    request(`/admin/orders/${orderId}/reassign-agent`, { method: "POST", body: { agent_id: agentId, note } }),
+  setHubStage: (orderId: string, stage: string, note: string) =>
+    request(`/admin/orders/${orderId}/set-hub-stage`, { method: "POST", body: { stage, note } }),
+  adminConfirmDelivery: (orderId: string, note: string) =>
+    request(`/admin/orders/${orderId}/confirm-delivery`, { method: "POST", body: { note } }),
+  moveAgentMarket: (userId: string, marketId: string) =>
+    request(`/admin/agents/${userId}/move-market`, { method: "POST", body: { market_id: marketId } }),
+  endStaffRole: (userId: string, note: string) =>
+    request(`/admin/users/${userId}/end-role`, { method: "POST", body: { note } }),
+  editUser: (userId: string, body: { full_name?: string; phone?: string; email?: string; basket_cap_naira?: number }) =>
+    request(`/admin/users/${userId}`, { method: "PATCH", body }),
   updateHub: (hubId: string, body: { name?: string; is_active?: boolean }) =>
     request(`/admin/hubs/${hubId}`, { method: "PATCH", body }),
   adminReleaseRider: (orderId: string) =>
