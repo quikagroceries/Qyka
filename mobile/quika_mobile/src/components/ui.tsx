@@ -144,3 +144,21 @@ export function CodeInput({ value, onChange, length = 4 }: { value: string; onCh
     />
   );
 }
+
+const SUCCESS = new Set(['paid', 'delivered', 'closed']);
+const PROBLEM = new Set(['cancelled', 'cancelled_unpaid', 'disputed']);
+
+/** Same semantics as web's StatusBadge: green success, red problems, peach in progress. */
+export function StatusBadge({ status }: { status: string }) {
+  const problem = PROBLEM.has(status);
+  const success = SUCCESS.has(status);
+  const box = problem ? 'bg-red-50' : success ? 'bg-brand-green/10' : 'bg-brand-orange/15';
+  const text = problem ? 'text-red-700' : success ? 'text-brand-green' : 'text-brand-orange-dark';
+  const dot = problem ? 'bg-red-600' : success ? 'bg-brand-green' : 'bg-brand-orange';
+  return (
+    <View className={cx('flex-row items-center gap-1.5 self-start rounded-full px-2.5 py-1', box)}>
+      <View className={cx('h-1.5 w-1.5 rounded-full', dot)} />
+      <Text className={cx('text-xs font-bold capitalize', text)}>{status.replaceAll('_', ' ')}</Text>
+    </View>
+  );
+}

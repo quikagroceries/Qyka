@@ -61,6 +61,33 @@ export type HubOrder = {
   hub_receipt_note: string | null;
 };
 
+export type OrderItem = {
+  id: string;
+  description: string;
+  requested_note: string | null;
+  listed_price: string | null;
+  quantity: number | null;
+  preferred_stall_id: string | null;
+  availability: string;
+  confirmed_price: string | null;
+  overage_requested_price: string | null;
+  overage_decision: string | null;
+};
+
+export type AgentOrder = {
+  id: string;
+  status: string;
+  market_id: string;
+  items: OrderItem[];
+  packing_photos: string[] | null;
+  dropped_at_hub_at: string | null;
+};
+
+export type Market = { id: string; name: string; city?: string | null };
+export type Vendor = { id: string; name: string };
+export type Hub = { id: string; name: string };
+export type Purchase = { id: string; amount: string; account_number: string; photo_ref: string | null };
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -145,4 +172,31 @@ export const api = {
   hubHandover: (id: string, code: string) =>
     request<HubOrder>(`/hubs/orders/${id}/handover`, { method: 'POST', body: { code } }),
   hubEarnings: () => request<Earnings>('/hubs/earnings'),
+
+  // Agent: shop the market, pay stalls directly, then take the goods to a hub.
+  agentOrders: () => request<AgentOrder[]>('/orders/mine'),
+  order: (id: string) => request<AgentOrder>(`/orders/${id}`),
+  markets: () => request<Market[]>('/markets'),
+  marketVendors: (marketId: string) => request<Vendor[]>(`/markets/${marketId}/vendors`),
+  createVendor: (marketId: string, body: { name: string; stall_description?: string }) =>
+    request<Vendor>(`/markets/${marketId}/vendors`, { method: 'POST', body }),
+  startShopping: (id: string) => request<unknown>(`/orders/${id}/start-shopping`, { method: 'POST' }),
+  releaseOrder: (id: string) => request<unknown>(`/orders/${id}/release`, { method: 'POST' }),
+  finishShopping: (id: string) => request<unknown>(`/orders/${id}/finish-shopping`, { method: 'POST' }),
+  flagUnavailable: (id: string, itemId: string) =>
+    request<unknown>(`/orders/${id}/items/${itemId}/unavailable`, { method: 'POST' }),
+  requestOverage: (id: string, itemId: string, price: string) =>
+    request<unknown>(`/orders/${id}/items/${itemId}/request-overage`, { method: 'POST', body: { price } }),
+  payVendor: (
+    id: string,
+    body: { account_number: string; bank_code: string; items: { item_id: string; price: string }[]; photo_ref?: string },
+  ) => request<unknown>(`/jit/orders/${id}/pay-vendor`, { method: 'POST', body }),
+  purchases: (id: string) => request<Purchase[]>(`/jit/orders/${id}/purchases`),
+  attachPurchasePhoto: (id: string, transferId: string, photoRef: string) =>
+    request<unknown>(`/jit/orders/${id}/purchases/${transferId}/photo`, { method: 'POST', body: { photo_ref: photoRef } }),
+  hubsForMarket: (marketId: string) => request<Hub[]>(`/hubs?market_id=${marketId}`),
+  dropAtHub: (id: string, hubId?: string) =>
+    request<unknown>(`/delivery/orders/${id}/drop-at-hub`, { method: 'POST', body: hubId ? { hub_id: hubId } : {} }),
+  addPackingPhotos: (id: string, refs: string[]) =>
+    request<unknown>(`/delivery/orders/${id}/packing-photos`, { method: 'POST', body: { refs } }),
 };
