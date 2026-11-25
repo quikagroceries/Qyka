@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
-import { Button, Card, ErrorBanner, Hero, SafeAreaView, StatusBadge } from '@/components/ui';
+import { Button, Card, EmptyState, ErrorBanner, Hero, SafeAreaView, StatusBadge } from '@/components/ui';
 import { api, type AgentOrder, type Market } from '@/lib/api';
 import { ago, errMsg, naira, shortId } from '@/lib/format';
 import { isHistory, summarize } from '@/lib/orderStatus';
@@ -70,10 +70,11 @@ export default function Track() {
 
         <ErrorBanner message={error} />
         {orders && shown.length === 0 ? (
-          <Card className="items-center">
-            <Text className="text-base font-bold text-ink">{filter === 'active' ? 'No active orders' : 'No past orders yet'}</Text>
-            <Text className="text-center text-sm text-muted">{filter === 'active' ? 'Orders you place show up here.' : 'Delivered and cancelled orders land here.'}</Text>
-          </Card>
+          <EmptyState
+            image={filter === 'active' ? require('../../../../assets/illustrations/track.webp') : require('../../../../assets/illustrations/history.webp')}
+            title={filter === 'active' ? 'No active orders' : 'No past orders yet'}
+            subtitle={filter === 'active' ? 'Orders you place show up here.' : 'Delivered and cancelled orders land here.'}
+          />
         ) : null}
         {shown.map((o) => (
           <Pressable key={o.id} onPress={() => router.push(`/customer/orders/${o.id}`)} className="active:opacity-80">

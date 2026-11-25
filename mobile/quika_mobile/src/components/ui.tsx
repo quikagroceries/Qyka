@@ -1,5 +1,6 @@
 import { ActivityIndicator, Image, Pressable, Text, TextInput, View, type ImageSourcePropType, type TextInputProps } from 'react-native';
 import { cssInterop } from 'nativewind';
+import { illustrationForItem } from '@/lib/foodVisuals';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { ReactNode } from 'react';
 
@@ -170,5 +171,25 @@ export function Avatar({ uri, name, className }: { uri?: string | null; name?: s
     <View className={cx('h-10 w-10 items-center justify-center rounded-full bg-brand-orange/15', className)}>
       <Text className="text-base font-bold text-brand-orange-dark">{(name || '?').trim().charAt(0).toUpperCase()}</Text>
     </View>
+  );
+}
+
+/** A small illustrated tile for an item, like the web's list rows. */
+export function ItemArt({ name, className }: { name: string; className?: string }) {
+  return (
+    <View className={cx('h-9 w-9 items-center justify-center rounded-xl bg-sunken-2 p-1', className)}>
+      <Image source={illustrationForItem(name)} resizeMode="contain" className="h-full w-full" />
+    </View>
+  );
+}
+
+/** Empty states: a picture, a headline and a line of help, on a card. */
+export function EmptyState({ image, title, subtitle }: { image: ImageSourcePropType; title: string; subtitle?: string }) {
+  return (
+    <Card className="items-center py-6">
+      <Image source={image} resizeMode="contain" className="h-28 w-36" />
+      <Text className="mt-1 text-base font-bold text-ink">{title}</Text>
+      {subtitle ? <Text className="text-center text-sm text-muted">{subtitle}</Text> : null}
+    </Card>
   );
 }

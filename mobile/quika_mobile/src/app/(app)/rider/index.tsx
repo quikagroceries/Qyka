@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Alert, Linking, RefreshControl, ScrollView, Text, View } from 'react-native';
 
-import { Button, Card, CodeInput, ErrorBanner, Hero, SafeAreaView, SectionHeader } from '@/components/ui';
+import { Button, Card, CodeInput, EmptyState, ErrorBanner, Hero, SafeAreaView, SectionHeader } from '@/components/ui';
 import { api, ApiError, type RiderJob } from '@/lib/api';
 import { ago, errMsg, shortId } from '@/lib/format';
 import { usePolling } from '@/lib/usePolling';
@@ -191,6 +191,9 @@ export default function Jobs() {
             <Text className="text-center text-sm text-muted">You can take a new job as soon as the customer confirms.</Text>
           </Card>
         )}
+        {!fatal && loaded && !job && pool && pool.length === 0 ? (
+          <EmptyState image={require('../../../../assets/illustrations/rider-scooter-basket-2.webp')} title="Nothing to collect yet" subtitle="This page checks for new jobs by itself." />
+        ) : null}
         {!fatal && !job && pool && pool.length > 0 ? (
           <>
             <SectionHeader title="Available jobs" subtitle="First to claim gets it." />

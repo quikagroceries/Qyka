@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
 import PaymentChooser from '@/components/customer/PaymentChooser';
-import { Avatar, Button, Card, ErrorBanner, Field, Hero, SafeAreaView, SectionHeader, StatusBadge } from '@/components/ui';
+import { Avatar, Button, Card, ErrorBanner, Field, Hero, ItemArt, SafeAreaView, SectionHeader, StatusBadge } from '@/components/ui';
 import { api, type AgentOrder, type Market, type OrderItem, type Person, type Purchase } from '@/lib/api';
 import { errMsg, naira, shortId } from '@/lib/format';
 import { openCheckout } from '@/lib/paystack';
@@ -113,6 +113,7 @@ function ItemLine({ item, purchase, busy, onDecide, onPreview }: { item: OrderIt
         <View className={'h-7 w-7 items-center justify-center rounded-full ' + (bought ? 'bg-brand-green/10' : 'bg-sunken')}>
           {bought ? <Text className="font-extrabold text-brand-green">✓</Text> : null}
         </View>
+        <ItemArt name={item.description} />
         <View className="flex-1">
           <Text className={'font-semibold ' + (bought || dropped ? 'text-faint ' : 'text-ink ') + (dropped ? 'line-through' : '')}>
             {item.quantity ? `${item.quantity} × ` : ''}
@@ -376,9 +377,12 @@ export default function CustomerOrderScreen() {
                 <Card>
                   <SectionHeader title={`Your list (${items.length})`} />
                   {items.map((it) => (
-                    <View key={it.id} className="border-t border-dashed border-line-strong py-2.5">
-                      <Text className="text-sm font-semibold text-ink">{it.quantity ? `${it.quantity} × ` : ''}{it.description}</Text>
-                      {it.requested_note ? <Text className="text-xs text-faint">{it.requested_note}</Text> : null}
+                    <View key={it.id} className="flex-row items-center gap-3 border-t border-dashed border-line-strong py-2.5">
+                      <ItemArt name={it.description} />
+                      <View className="flex-1">
+                        <Text className="text-sm font-semibold text-ink">{it.quantity ? `${it.quantity} × ` : ''}{it.description}</Text>
+                        {it.requested_note ? <Text className="text-xs text-faint">{it.requested_note}</Text> : null}
+                      </View>
                     </View>
                   ))}
                 </Card>
@@ -461,6 +465,9 @@ export default function CustomerOrderScreen() {
             {RATEABLE.has(order.status) ? (
               <Card>
                 <SectionHeader title="Rate your agent" />
+                <View className="items-center">
+                  <Image source={require('../../../../../assets/illustrations/review-rating-bubble.webp')} resizeMode="contain" className="h-20 w-28" />
+                </View>
                 {rating ? (
                   <View className="gap-1">
                     <Text className="text-lg text-brand-orange-dark">{'★'.repeat(rating.stars)}{'☆'.repeat(5 - rating.stars)}</Text>

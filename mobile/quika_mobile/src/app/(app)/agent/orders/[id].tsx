@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 
-import { Button, Card, ErrorBanner, Field, SafeAreaView, StatusBadge } from '@/components/ui';
+import { Button, Card, ErrorBanner, Field, ItemArt, SafeAreaView, StatusBadge } from '@/components/ui';
 import { api, type AgentOrder, type Hub, type Market, type OrderItem, type Purchase, type Vendor } from '@/lib/api';
 import { errMsg, naira, shortId } from '@/lib/format';
 import { takeAndUploadPhoto } from '@/lib/upload';
@@ -175,6 +175,7 @@ function ItemRow({
             <Text className="font-extrabold text-brand-green">✓</Text>
           </View>
         ) : null}
+        <ItemArt name={item.description} />
         <View className="flex-1">
           <Text className={'font-semibold ' + (quiet ? 'text-faint line-through' : 'text-ink')}>
             {item.quantity ? `${item.quantity} × ` : ''}

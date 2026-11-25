@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Image, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 
-import { Button, Card, CodeInput, ErrorBanner, Hero, SafeAreaView, SectionHeader } from '@/components/ui';
+import { Button, Card, CodeInput, ErrorBanner, Hero, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';
 import { api, type HubOrder } from '@/lib/api';
 import { ago, errMsg, shortId } from '@/lib/format';
 import { takeAndUploadPhoto } from '@/lib/upload';
@@ -118,6 +118,7 @@ export default function HubOrderScreen() {
             const on = seen.has(it.id);
             return (
               <View key={it.id} className="flex-row items-center gap-3 border-t border-line py-3">
+                <ItemArt name={it.description} />
                 <View className="flex-1">
                   <Text className={'font-semibold ' + (on ? 'text-ink' : 'text-red-600')}>{itemLabel(it)}</Text>
                   {it.requested_note ? <Text className="text-sm text-muted">{it.requested_note}</Text> : null}
@@ -204,6 +205,7 @@ export default function HubOrderScreen() {
           <SectionHeader title="Checked in" />
           {items.map((it) => (
             <View key={it.id} className="flex-row items-center justify-between gap-3 border-t border-line py-3">
+              <ItemArt name={it.description} />
               <Text className={'flex-1 font-semibold ' + (flagged.has(it.id) ? 'text-red-600' : 'text-ink')}>{itemLabel(it)}</Text>
               {flagged.has(it.id) ? <Text className="text-xs font-bold text-red-600">Missing</Text> : null}
             </View>
@@ -248,9 +250,10 @@ export default function HubOrderScreen() {
         <Card>
           <SectionHeader title="In the bag" />
           {items.map((it) => (
-            <Text key={it.id} className="border-t border-line py-3 font-semibold text-ink">
-              {itemLabel(it)}
-            </Text>
+            <View key={it.id} className="flex-row items-center gap-3 border-t border-line py-3">
+              <ItemArt name={it.description} />
+              <Text className="flex-1 font-semibold text-ink">{itemLabel(it)}</Text>
+            </View>
           ))}
         </Card>
       </>,

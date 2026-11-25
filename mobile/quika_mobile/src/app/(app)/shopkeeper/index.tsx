@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
-import { Card, ErrorBanner, Hero, SafeAreaView, SectionHeader } from '@/components/ui';
+import { Card, EmptyState, ErrorBanner, Hero, SafeAreaView, SectionHeader } from '@/components/ui';
 import { api, type HubOrder } from '@/lib/api';
 import { ago, errMsg, shortId } from '@/lib/format';
 import { usePolling } from '@/lib/usePolling';
@@ -102,10 +102,7 @@ export default function HubHome() {
         />
         <ErrorBanner message={error} />
         {orders && orders.length === 0 ? (
-          <Card className="items-center">
-            <Text className="text-base font-bold text-ink">No orders at your hub</Text>
-            <Text className="text-center text-sm text-muted">When an agent drops an order off, it lands here.</Text>
-          </Card>
+          <EmptyState image={require('../../../../assets/illustrations/produce-crate.webp')} title="No orders at your hub" subtitle="When an agent drops an order off, it lands here." />
         ) : null}
         {orders
           ? LANES.map((lane) => {

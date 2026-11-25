@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
-import { Card, ErrorBanner, Hero, SafeAreaView, SectionHeader, StatTile, StatusBadge } from '@/components/ui';
+import { Card, EmptyState, ErrorBanner, Hero, SafeAreaView, SectionHeader, StatTile, StatusBadge } from '@/components/ui';
 import { api, ApiError, type AgentOrder, type Market } from '@/lib/api';
 import { errMsg, shortId } from '@/lib/format';
 import { useSession } from '@/lib/session';
@@ -114,10 +114,7 @@ export default function AgentHome() {
 
         <ErrorBanner message={error} />
         {orders && actionable === 0 && attention.length === 0 && !error ? (
-          <Card className="items-center">
-            <Text className="text-base font-bold text-ink">No tasks right now</Text>
-            <Text className="text-center text-sm text-muted">New assignments will show up here.</Text>
-          </Card>
+          <EmptyState image={require('../../../../assets/illustrations/shopping-cart.webp')} title="No tasks right now" subtitle="New assignments will show up here." />
         ) : null}
 
         {section('Needs attention', "The customer didn't pay the balance in time. The deposit is forfeited. Return the goods you already bought.", attention, 'attention')}

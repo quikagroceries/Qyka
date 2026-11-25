@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import FlowSteps, { type FlowStepKey } from '@/components/customer/FlowSteps';
-import { Button, Card, ErrorBanner, Field, SafeAreaView, SectionHeader } from '@/components/ui';
+import { Button, Card, ErrorBanner, Field, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';
 import { api, type Market } from '@/lib/api';
 import { errMsg, naira } from '@/lib/format';
 import { openStatus } from '@/lib/marketHours';
@@ -217,7 +217,8 @@ export default function NewOrder() {
             <Card>
               <SectionHeader title="Your list" subtitle="What your agent will shop for." />
               {filled.map((r, i) => (
-                <View key={i} className="flex-row items-center justify-between gap-3 border-t border-dashed border-line-strong py-2.5">
+                <View key={i} className="flex-row items-center gap-3 border-t border-dashed border-line-strong py-2.5">
+                  <ItemArt name={r.item} />
                   <Text className="flex-1 text-sm font-semibold text-ink" numberOfLines={1}>
                     {r.item.trim()}
                     {Number(r.qty) >= 1 ? <Text className="text-xs text-faint"> ×{r.qty}</Text> : null}

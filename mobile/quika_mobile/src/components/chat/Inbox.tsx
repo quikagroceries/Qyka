@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
-import { Avatar, Card, ErrorBanner, Hero, SafeAreaView } from '@/components/ui';
+import { Avatar, EmptyState, ErrorBanner, Hero, SafeAreaView } from '@/components/ui';
 import { api, type Conversation } from '@/lib/api';
 import { errMsg, whenLabel } from '@/lib/format';
 import { usePolling } from '@/lib/usePolling';
@@ -47,10 +47,7 @@ export default function Inbox({ chatHref, agent }: { chatHref: (orderId: string)
         />
         <ErrorBanner message={error} />
         {list && list.length === 0 ? (
-          <Card className="items-center">
-            <Text className="text-base font-bold text-ink">No conversations yet</Text>
-            <Text className="text-center text-sm text-muted">They start once an order has an agent.</Text>
-          </Card>
+          <EmptyState image={require('../../../assets/illustrations/phone-shopping-list.webp')} title="No conversations yet" subtitle="They start once an order has an agent." />
         ) : null}
         {list && list.length > 0 ? (
           <View className="overflow-hidden rounded-3xl border border-line bg-surface shadow-sm">

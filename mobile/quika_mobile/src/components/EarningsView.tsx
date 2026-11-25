@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
-import { Card, ErrorBanner, Hero, SafeAreaView, SectionHeader, StatTile } from '@/components/ui';
+import { Card, EmptyState, ErrorBanner, Hero, SafeAreaView, SectionHeader, StatTile } from '@/components/ui';
 import type { Earnings } from '@/lib/api';
 import { ago, errMsg, naira, shortId } from '@/lib/format';
 import { usePolling } from '@/lib/usePolling';
@@ -54,7 +54,7 @@ export default function EarningsView({ load, subtitle }: { load: () => Promise<E
           <>
             <SectionHeader title="Recent" />
             {data.recent.length === 0 ? (
-              <Text className="text-sm text-muted">Your fee shows up here once a customer confirms a delivery.</Text>
+              <EmptyState image={require('../../assets/illustrations/wallet.webp')} title="No earnings yet" subtitle="Your fee shows up here once a customer confirms a delivery." />
             ) : (
               data.recent.map((r) => (
                 <Card key={r.order_id + r.delivered_at} className="flex-row items-center justify-between">
