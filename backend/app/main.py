@@ -40,7 +40,55 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, lifespan=lifespan)
+API_DESCRIPTION = """
+Backend for Qyka: customers send a market list, an **agent** shops it live at the
+stalls, drops it at a market **hub** (shopkeeper), and a **rider** delivers it.
+
+## Authentication
+1. `POST /auth/request-otp` with a phone number or email.
+2. `POST /auth/verify-otp` with the code. The response holds an `access_token`.
+3. Click **Authorize** (top right) and paste the token. It is sent as
+   `Authorization: Bearer <token>`.
+
+Access depends on the account's role: customer, agent, rider, shopkeeper or admin.
+Money amounts are decimal strings in naira (e.g. `"1000.00"`).
+Errors come back as `{"detail": "..."}`.
+"""
+
+TAGS_METADATA = [
+    {"name": "auth", "description": "Sign in with a one-time code; the current user's profile."},
+    {"name": "markets", "description": "Markets, their opening hours and vendors (stalls)."},
+    {"name": "agent-applications", "description": "Applying to become an agent or rider."},
+    {"name": "float", "description": "Agent float (working money)."},
+    {"name": "orders", "description": "Create and follow orders; shopping, items and approvals."},
+    {"name": "chat", "description": "Per-order chat between customer and agent, and the inbox."},
+    {"name": "jit", "description": "Just-in-time spending: pay vendors from the customer's authorisation."},
+    {"name": "payments", "description": "Deposits, balances and wallet funding (Paystack)."},
+    {"name": "wallet", "description": "Customer wallet balance and history."},
+    {"name": "delivery", "description": "Hand-off: drop at hub, packing photos, delivery confirmation."},
+    {"name": "locations", "description": "Location data."},
+    {"name": "ratings", "description": "Rating an agent after delivery."},
+    {"name": "notifications", "description": "In-app notifications."},
+    {"name": "admin", "description": "Admin-only management and oversight."},
+    {"name": "agent", "description": "Agent-facing endpoints."},
+    {"name": "hubs", "description": "Shopkeeper hub: check in, mark ready, hand over to a rider."},
+    {"name": "content", "description": "Public site content."},
+    {"name": "investors", "description": "Investor view."},
+    {"name": "riders", "description": "Rider jobs: claim, release, deliver with the customer's code, earnings."},
+    {"name": "calls", "description": "Calls between participants."},
+    {"name": "dev", "description": "Development-only helpers. Not available in production."},
+]
+
+app = FastAPI(
+    title=settings.app_name,
+    description=API_DESCRIPTION,
+    version="1.0.0",
+    openapi_tags=TAGS_METADATA,
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
+    lifespan=lifespan,
+)
 
 from fastapi.middleware.cors import CORSMiddleware
 

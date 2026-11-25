@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     # App
     app_name: str = "Qyka Groceries"
     environment: str = "development"
+    # Serve the interactive API docs (/docs, /redoc, /openapi.json). On by default;
+    # set DOCS_ENABLED=false to hide them.
+    docs_enabled: bool = True
     debug: bool = True
 
     # Database
