@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Text } from '@/components/Text';
 
 import PaymentChooser from '@/components/customer/PaymentChooser';
 import { Avatar, Button, Card, ErrorBanner, Field, Hero, ItemArt, SafeAreaView, SectionHeader, StatusBadge } from '@/components/ui';

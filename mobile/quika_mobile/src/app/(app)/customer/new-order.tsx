@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { Text } from '@/components/Text';
 
 import FlowSteps, { type FlowStepKey } from '@/components/customer/FlowSteps';
 import { Button, Card, ErrorBanner, Field, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';

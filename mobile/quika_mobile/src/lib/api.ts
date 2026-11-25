@@ -219,10 +219,12 @@ export const api = {
       method: 'POST',
       body: { identifier, ...(channel ? { channel } : {}) },
     }),
-  verifyOtp: (identifier: string, code: string) =>
+  // `role` is only honoured by the backend outside production, for accounts that
+  // don't exist yet (a dev convenience so each role can be tried).
+  verifyOtp: (identifier: string, code: string, role?: string) =>
     request<{ access_token: string }>('/auth/verify-otp', {
       method: 'POST',
-      body: { identifier, code },
+      body: { identifier, code, ...(role ? { role } : {}) },
     }),
   me: () => request<User>('/auth/me'),
 

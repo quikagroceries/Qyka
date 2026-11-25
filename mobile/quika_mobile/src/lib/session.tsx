@@ -8,6 +8,8 @@ const TOKEN_KEY = 'qyka.token';
 type Session = {
   user: User | null;
   isLoading: boolean;
+  /** Reads who a token belongs to without signing in (used to check the role the person picked). */
+  peek: (accessToken: string) => Promise<User>;
   signIn: (accessToken: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -22,6 +24,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     await SecureStore.deleteItemAsync(TOKEN_KEY).catch(() => {});
+  }, []);
+
+  const peek = useCallback(async (accessToken: string) => {
+    setToken(accessToken);
+    try {
+      return await api.me();
+    } finally {
+      setToken(null);
+    }
   }, []);
 
   const signIn = useCallback(async (accessToken: string) => {
@@ -55,7 +66,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => setUnauthorizedHandler(null);
   }, [signOut]);
 
-  const value = useMemo(() => ({ user, isLoading, signIn, signOut }), [user, isLoading, signIn, signOut]);
+  const value = useMemo(() => ({ user, isLoading, peek, signIn, signOut }), [user, isLoading, peek, signIn, signOut]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

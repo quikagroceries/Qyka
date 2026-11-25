@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
+import { Text } from '@/components/Text';
 
 import { Card, EmptyState, ErrorBanner, Hero, SafeAreaView, SectionHeader, StatTile } from '@/components/ui';
 import type { Earnings } from '@/lib/api';

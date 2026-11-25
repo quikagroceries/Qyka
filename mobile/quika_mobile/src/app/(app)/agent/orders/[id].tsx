@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
+import { Text } from '@/components/Text';
 
 import { Button, Card, ErrorBanner, Field, ItemArt, SafeAreaView, StatusBadge } from '@/components/ui';
 import { api, type AgentOrder, type Hub, type Market, type OrderItem, type Purchase, type Vendor } from '@/lib/api';

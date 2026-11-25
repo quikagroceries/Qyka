@@ -1,5 +1,6 @@
 import { Redirect } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/components/Text';
 
 import { Button, SafeAreaView } from '@/components/ui';
 import type { Role } from '@/lib/api';

@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Text } from '@/components/Text';
 
 import { Button, Card, EmptyState, ErrorBanner, Hero, SafeAreaView, StatusBadge } from '@/components/ui';
 import { api, type AgentOrder, type Market } from '@/lib/api';

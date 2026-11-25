@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View, type ScrollViewInstance } from 'react-native';
+import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from 'react-native';
+import { Text } from '@/components/Text';
 
 import { Avatar, ErrorBanner, SafeAreaView } from '@/components/ui';
 import { api, type Conversation, type Message } from '@/lib/api';
@@ -160,7 +161,7 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
               placeholderTextColor="#9B9B9B"
               returnKeyType="send"
               onSubmitEditing={() => text.trim() && void send({ text: text.trim() }, true)}
-              className="min-h-[44px] flex-1 rounded-full border border-line-strong bg-surface px-4 text-base text-ink"
+              className="font-body min-h-[44px] flex-1 rounded-full border border-line-strong bg-surface px-4 text-base text-ink"
             />
             <Pressable onPress={() => void sendPhoto()} disabled={uploading} accessibilityLabel="Send a photo" className="h-11 w-11 items-center justify-center rounded-full bg-sunken active:bg-line-strong">
               <Text className="text-base text-muted">{uploading ? '…' : '📷'}</Text>

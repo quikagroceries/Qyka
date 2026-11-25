@@ -35,5 +35,20 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  // RN picks a font file per weight, so the weight utilities choose the family
+  // (the web's DM Sans body + Bricolage Grotesque display) instead of a weight.
+  corePlugins: { fontWeight: false },
+  plugins: [
+    require('tailwindcss/plugin')(({ addUtilities }) => {
+      addUtilities({
+        '.font-body': { fontFamily: 'DMSans_400Regular' },
+        '.font-normal': { fontFamily: 'DMSans_400Regular' },
+        '.font-medium': { fontFamily: 'DMSans_500Medium' },
+        '.font-semibold': { fontFamily: 'DMSans_600SemiBold' },
+        '.font-bold': { fontFamily: 'DMSans_700Bold' },
+        '.font-extrabold': { fontFamily: 'BricolageGrotesque_800ExtraBold' },
+        '.font-display': { fontFamily: 'BricolageGrotesque_700Bold' },
+      });
+    }),
+  ],
 };

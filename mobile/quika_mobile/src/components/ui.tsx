@@ -1,5 +1,8 @@
-import { ActivityIndicator, Image, Pressable, Text, TextInput, View, type ImageSourcePropType, type TextInputProps } from 'react-native';
+import { ActivityIndicator, Image, Pressable, TextInput, View, type ImageSourcePropType, type TextInputProps } from 'react-native';
+import { Text } from '@/components/Text';
 import { cssInterop } from 'nativewind';
+import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import { useEffect } from 'react';
 import { illustrationForItem } from '@/lib/foodVisuals';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { ReactNode } from 'react';
@@ -42,7 +45,7 @@ export function Button({
       accessibilityRole="button"
       onPress={onPress}
       disabled={off}
-      className={cx('min-h-[44px] flex-row items-center justify-center gap-2 rounded-2xl px-5', v.box, off && 'opacity-50', className)}>
+      className={cx('min-h-[54px] flex-row items-center justify-center gap-2 rounded-full px-6 active:scale-[0.98]', v.box, off && 'opacity-50', className)}>
       {busy ? <ActivityIndicator color="#1A1A1A" size="small" /> : null}
       <Text className={cx('text-base font-semibold', v.text)}>{label}</Text>
     </Pressable>
@@ -51,9 +54,9 @@ export function Button({
 
 export function Card({ children, className, accent }: { children: ReactNode; className?: string; accent?: boolean }) {
   return (
-    <View className={cx('gap-2 rounded-3xl border bg-surface p-5 shadow-sm', accent ? 'border-2 border-brand-orange' : 'border-line', className)}>
+    <Animated.View entering={FadeInDown.duration(380)} className={cx('gap-2 rounded-3xl border bg-surface p-5 shadow-sm', accent ? 'border-2 border-brand-orange' : 'border-line', className)}>
       {children}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -83,8 +86,9 @@ export function Hero({
   children?: ReactNode;
 }) {
   return (
-    <View className="overflow-hidden rounded-3xl border border-line bg-surface p-6 shadow-sm">
+    <Animated.View entering={FadeInDown.duration(450)} className="overflow-hidden rounded-3xl border border-line bg-surface p-6 shadow-sm">
       <View className="absolute -right-16 -top-16 h-72 w-72 rounded-full bg-brand-orange/10" />
+      <View className="absolute -bottom-20 left-10 h-56 w-56 rounded-full bg-[#F9E0CC]/50" />
       {eyebrow ? (
         <View className="flex-row items-center gap-2 self-start rounded-full border border-brand-orange/30 bg-brand-orange/15 px-3 py-1">
           {live ? <View className="h-2 w-2 rounded-full bg-brand-orange" /> : null}
@@ -94,12 +98,12 @@ export function Hero({
       <Text className="mt-4 text-2xl font-extrabold tracking-tight text-ink">{title}</Text>
       {body ? <Text className="mt-3 text-sm leading-relaxed text-muted">{body}</Text> : null}
       {image ? (
-        <View className="mt-4 items-center">
+        <Float className="mt-4 items-center">
           <Image source={image} resizeMode="contain" className="h-32 w-40" />
-        </View>
+        </Float>
       ) : null}
       {children ? <View className="mt-5">{children}</View> : null}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -126,7 +130,7 @@ export function Field(props: TextInputProps) {
     <TextInput
       placeholderTextColor="#9B9B9B"
       {...props}
-      className={cx('rounded-2xl border border-line bg-surface px-4 py-3.5 text-base text-ink', props.className)}
+      className={cx('font-body border border-line bg-surface px-5 py-4 text-base text-ink', props.multiline ? 'rounded-3xl' : 'rounded-full', props.className)}
     />
   );
 }
@@ -191,5 +195,19 @@ export function EmptyState({ image, title, subtitle }: { image: ImageSourcePropT
       <Text className="mt-1 text-base font-bold text-ink">{title}</Text>
       {subtitle ? <Text className="text-center text-sm text-muted">{subtitle}</Text> : null}
     </Card>
+  );
+}
+
+/** A gentle up-and-down drift, so illustrations feel alive instead of pasted on. */
+export function Float({ children, className }: { children: ReactNode; className?: string }) {
+  const y = useSharedValue(0);
+  useEffect(() => {
+    y.value = withRepeat(withSequence(withTiming(-6, { duration: 1800, easing: Easing.inOut(Easing.sin) }), withTiming(0, { duration: 1800, easing: Easing.inOut(Easing.sin) })), -1);
+  }, [y]);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
+  return (
+    <Animated.View style={style} className={className}>
+      {children}
+    </Animated.View>
   );
 }

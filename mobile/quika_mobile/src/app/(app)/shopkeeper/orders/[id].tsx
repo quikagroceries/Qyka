@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Image, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
+import { Text } from '@/components/Text';
 
 import { Button, Card, CodeInput, ErrorBanner, Hero, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';
 import { api, type HubOrder } from '@/lib/api';
@@ -152,7 +153,7 @@ export default function HubOrderScreen() {
               maxLength={500}
               placeholder="What's missing, and anything the agent told you"
               placeholderTextColor="#9B9B9B"
-              className="min-h-[64px] rounded-2xl border border-line bg-surface p-3 text-base text-ink"
+              className="font-body min-h-[64px] rounded-2xl border border-line bg-surface p-3 text-base text-ink"
             />
             <Text className="text-xs text-muted">You can still check it in. This note is kept on the order.</Text>
           </View>
