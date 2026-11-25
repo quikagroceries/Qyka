@@ -45,6 +45,22 @@ export type Earnings = {
   recent: { order_id: string; amount: string; delivered_at: string }[];
 };
 
+export type HubItem = { id: string; description: string; quantity: number | null; requested_note: string | null };
+
+export type HubOrder = {
+  id: string;
+  status: string;
+  agent_name: string | null;
+  rider_name: string | null;
+  rider_waiting: boolean;
+  items: HubItem[];
+  packing_photos: string[];
+  dropped_at_hub_at: string | null;
+  hub_received_at: string | null;
+  hub_missing_item_ids: string[];
+  hub_receipt_note: string | null;
+};
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -117,4 +133,16 @@ export const api = {
   riderDeliver: (id: string, code: string) =>
     request<RiderJob>(`/riders/jobs/${id}/deliver`, { method: 'POST', body: { code } }),
   riderEarnings: () => request<Earnings>('/riders/earnings'),
+
+  // Shopkeeper (hub): check in what an agent dropped, mark it ready, and hand
+  // it to the rider who shows their code. Item names only, no prices.
+  hub: () => request<{ id: string; name: string }>('/hubs/me'),
+  hubOrders: () => request<HubOrder[]>('/hubs/orders'),
+  hubOrder: (id: string) => request<HubOrder>(`/hubs/orders/${id}`),
+  hubReceive: (id: string, body: { received_item_ids?: string[]; note?: string; photos?: string[] }) =>
+    request<HubOrder>(`/hubs/orders/${id}/receive`, { method: 'POST', body }),
+  hubReady: (id: string) => request<HubOrder>(`/hubs/orders/${id}/ready`, { method: 'POST' }),
+  hubHandover: (id: string, code: string) =>
+    request<HubOrder>(`/hubs/orders/${id}/handover`, { method: 'POST', body: { code } }),
+  hubEarnings: () => request<Earnings>('/hubs/earnings'),
 };

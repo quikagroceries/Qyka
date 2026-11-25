@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 
-import { Body, Button, Title } from '@/components/ui';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Button, ErrorBanner, Field, SafeAreaView } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useSession } from '@/lib/session';
 
@@ -43,56 +41,55 @@ export default function SignIn() {
     });
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.body}>
-        <View style={{ gap: Spacing.two }}>
-          <Text style={styles.brand}>Qyka</Text>
-          <Title>{step === 'identify' ? 'Sign in' : 'Enter your code'}</Title>
-          <Body>
+    <SafeAreaView className="flex-1 bg-canvas">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 justify-center gap-6 p-6">
+        <View className="gap-2">
+          <Text className="text-lg font-extrabold text-brand-orange-dark">Qyka</Text>
+          <Text className="text-3xl font-extrabold tracking-tight text-ink">
+            {step === 'identify' ? 'Sign in' : 'Enter your code'}
+          </Text>
+          <Text className="text-base text-muted">
             {step === 'identify'
               ? 'Use your phone number or email. We will send you a code.'
               : `We sent a code to ${identifier.trim()}.`}
-          </Body>
+          </Text>
         </View>
 
         {step === 'identify' ? (
-          <TextInput
-            style={styles.input}
+          <Field
             value={identifier}
             onChangeText={setIdentifier}
             placeholder="Phone number or email"
-            placeholderTextColor={Colors.faint}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
             textContentType="username"
           />
         ) : (
-          <TextInput
-            style={[styles.input, styles.code]}
+          <Field
             value={code}
             onChangeText={setCode}
             placeholder="123456"
-            placeholderTextColor={Colors.faint}
             keyboardType="number-pad"
             textContentType="oneTimeCode"
             maxLength={8}
             autoFocus
+            className="text-center text-2xl tracking-[6px]"
           />
         )}
 
-        {devOtp && step === 'code' ? <Body>Dev code: {devOtp}</Body> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {devOtp && step === 'code' ? <Text className="text-sm text-muted">Dev code: {devOtp}</Text> : null}
+        <ErrorBanner message={error} />
 
-        <View style={{ gap: Spacing.two }}>
+        <View className="gap-2">
           {step === 'identify' ? (
-            <Button label="Send code" onPress={sendCode} loading={busy} disabled={!identifier.trim()} />
+            <Button label="Send code" onPress={sendCode} busy={busy} disabled={!identifier.trim()} />
           ) : (
             <>
-              <Button label="Verify" onPress={verify} loading={busy} disabled={code.trim().length < 4} />
+              <Button label="Verify" onPress={verify} busy={busy} disabled={code.trim().length < 4} />
               <Button
                 label="Use a different number"
-                variant="ghost"
+                variant="neutral"
                 onPress={() => {
                   setStep('identify');
                   setCode('');
@@ -106,21 +103,3 @@ export default function SignIn() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.canvas },
-  body: { flex: 1, padding: Spacing.four, justifyContent: 'center', gap: Spacing.four },
-  brand: { fontSize: 18, fontWeight: '800', color: Colors.primaryDark },
-  input: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.line,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 14,
-    fontSize: 17,
-    color: Colors.ink,
-  },
-  code: { fontSize: 24, letterSpacing: 6, textAlign: 'center' },
-  error: { color: Colors.danger, fontSize: 14 },
-});

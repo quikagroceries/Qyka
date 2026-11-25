@@ -1,9 +1,7 @@
 import { Redirect } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, View } from 'react-native';
 
-import { Body, Button, Title } from '@/components/ui';
-import { Colors, Spacing } from '@/constants/theme';
+import { Button, SafeAreaView } from '@/components/ui';
 import type { Role } from '@/lib/api';
 import { useSession } from '@/lib/session';
 
@@ -11,7 +9,7 @@ const HOME_COPY: Record<Role, string> = {
   customer: 'Your orders will show here.',
   agent: 'Your market orders will show here.',
   rider: '',
-  shopkeeper: 'Your hub queue will show here.',
+  shopkeeper: '',
   admin: 'Admins use the web dashboard.',
 };
 
@@ -20,21 +18,17 @@ export default function Home() {
   const { user, signOut } = useSession();
   if (!user) return null;
   if (user.role === 'rider') return <Redirect href="/rider" />;
+  if (user.role === 'shopkeeper') return <Redirect href="/shopkeeper" />;
   return (
-    <SafeAreaView style={styles.screen}>
-      <View style={styles.body}>
-        <Title>Hi{user.full_name ? `, ${user.full_name}` : ''}</Title>
-        <Body>Signed in as {user.role}.</Body>
-        <Body>{HOME_COPY[user.role]}</Body>
+    <SafeAreaView className="flex-1 bg-canvas">
+      <View className="flex-1 justify-center gap-2 p-6">
+        <Text className="text-3xl font-extrabold text-ink">Hi{user.full_name ? `, ${user.full_name}` : ''}</Text>
+        <Text className="text-base text-muted">Signed in as {user.role}.</Text>
+        <Text className="text-base text-muted">{HOME_COPY[user.role]}</Text>
       </View>
-      <View style={{ padding: Spacing.four }}>
-        <Button label="Sign out" variant="ghost" onPress={() => void signOut()} />
+      <View className="p-6">
+        <Button label="Sign out" variant="neutral" onPress={() => void signOut()} />
       </View>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.canvas },
-  body: { flex: 1, padding: Spacing.four, justifyContent: 'center', gap: Spacing.two },
-});
