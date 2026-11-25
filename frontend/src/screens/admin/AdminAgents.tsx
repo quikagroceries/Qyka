@@ -46,7 +46,11 @@ function AdminAgents() {
     setError(""); setBusyId(applicationId);
     try {
       if (decision === "approve") await api.approveAgentApplication(applicationId);
-      else await api.rejectAgentApplication(applicationId);
+      else if (decision === "approve_verify") {
+        // Approve first (it creates the agent), then record the ID check.
+        const approved: any = await api.approveAgentApplication(applicationId);
+        await api.verifyAgent(approved.user_id, "Verified when approved");
+      } else await api.rejectAgentApplication(applicationId);
       await refresh();
     } catch (e) {
       setError("Could not " + decision + ": " + e.message);
@@ -81,7 +85,7 @@ function AdminAgents() {
       ) : (
         <div className="mb-8 space-y-2">
           {applications.map((a) => (
-            <ApplicationCard key={a.id} app={a} place={marketName(a.market_id)} busy={busyId === a.id} onDecide={handleDecide} />
+            <ApplicationCard key={a.id} app={a} place={marketName(a.market_id)} busy={busyId === a.id} onDecide={handleDecide} canVerify />
           ))}
         </div>
       )}
