@@ -7,6 +7,8 @@ import { SessionProvider, useSession } from '@/lib/session';
 
 // Module scope: must run before the first render or the splash can hide early.
 SplashScreen.preventAutoHideAsync();
+// A short fade out, so the logo eases into the app instead of cutting.
+SplashScreen.setOptions({ duration: 300, fade: true });
 
 function Navigator() {
   const { user, isLoading } = useSession();
