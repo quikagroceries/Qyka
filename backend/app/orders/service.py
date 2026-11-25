@@ -507,6 +507,14 @@ async def start_shopping(
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "Not the assigned agent for this order"
         )
+    # When an owner requires it, only ID-verified agents may spend float.
+    if await platform.get(db, "require_verified_agents"):
+        agent_row = (await db.execute(select(Agent).where(Agent.user_id == agent_id))).scalar_one_or_none()
+        if agent_row is None or agent_row.verified_at is None:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Your ID hasn't been verified yet. Qyka will verify you before your first shop.",
+            )
     # THE DEPOSIT GATE: if this order required a deposit, it must be paid before
     # any company money is spent shopping. This is the fix for the leak where
     # the deposit was deducted from the bill but never actually collected.

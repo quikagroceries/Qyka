@@ -13,7 +13,8 @@ function appliedOn(iso?: string) {
 // admin screens so both read (and respond on a phone) exactly the same way.
 // `place` is the market name (agents) or area/market (riders), already
 // resolved by the caller.
-export default function ApplicationCard({ app, place, busy, onDecide }: any) {
+// `canVerify` (agents only) adds "Approve & verify": for when the ID has already been checked on the call.
+export default function ApplicationCard({ app, place, busy, onDecide, canVerify = false }: any) {
   const details = [place, app.vehicle].filter(Boolean).join(" · ");
   return (
     <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -33,10 +34,15 @@ export default function ApplicationCard({ app, place, busy, onDecide }: any) {
         {app.note && <div className="mt-1 break-words text-sm text-muted">&quot;{app.note}&quot;</div>}
         {app.created_at && <div className="mt-1 text-xs text-faint">Applied {appliedOn(app.created_at)}</div>}
       </div>
-      <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex">
+      <div className={"grid shrink-0 gap-2 sm:flex " + (canVerify ? "grid-cols-3" : "grid-cols-2")}>
         <Button variant="neutral" onClick={() => onDecide(app.id, "reject")} busy={busy} className="text-sm">
           Reject
         </Button>
+        {canVerify && (
+          <Button variant="neutral" onClick={() => onDecide(app.id, "approve_verify")} busy={busy} className="text-sm">
+            Approve &amp; verify
+          </Button>
+        )}
         <Button onClick={() => onDecide(app.id, "approve")} busy={busy} className="text-sm">
           Approve
         </Button>

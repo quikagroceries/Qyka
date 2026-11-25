@@ -267,6 +267,10 @@ async def list_agents(db: AsyncSession) -> list[dict]:
             "assigned_market_id": str(agent.assigned_market_id) if agent.assigned_market_id else None,
             "is_available": agent.is_available,
             "on_duty": agent.on_duty,
+            "account_status": user.status.value,
+            "verified": agent.verified_at is not None,
+            "verified_at": agent.verified_at.isoformat() if agent.verified_at else None,
+            "verification_note": agent.verification_note,
             "completed_orders": len(by_agent.get(user.id, [])),
             "earnings_total": str(
                 sum((o.agent_share for o in by_agent.get(user.id, [])), start=Decimal("0.00"))

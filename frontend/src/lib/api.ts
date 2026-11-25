@@ -233,6 +233,14 @@ export const api = {
   clearUserFlag: (userId) =>
     request(`/admin/users/${userId}/clear-flag`, { method: "POST" }),
   getUserDetail: (userId) => request(`/admin/users/${userId}`),
+  // Agents: the full record, ID verification, and duty control.
+  getAgentDetail: (userId: string) => request(`/admin/agents/${userId}`),
+  verifyAgent: (userId: string, note?: string) =>
+    request(`/admin/agents/${userId}/verify`, { method: "POST", body: { note: note || null } }),
+  unverifyAgent: (userId: string, note: string) =>
+    request(`/admin/agents/${userId}/unverify`, { method: "POST", body: { note } }),
+  setAgentDutyAdmin: (userId: string, onDuty: boolean) =>
+    request(`/admin/agents/${userId}/duty`, { method: "POST", body: { on_duty: onDuty } }),
   suspendUser: (userId) => request(`/admin/users/${userId}/suspend`, { method: "POST" }),
   reactivateUser: (userId) => request(`/admin/users/${userId}/reactivate`, { method: "POST" }),
   adjustWallet: (userId, body: { direction: "credit" | "debit"; amount: string; note: string }) =>

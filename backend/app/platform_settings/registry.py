@@ -102,6 +102,10 @@ SPECS: list[Spec] = [
     Spec("stuck_delivery_minutes", "Stuck-order alerts", "Out for delivery", "Flag if an order has been out for delivery this long without the customer confirming.",
          "int", 120, 10, 2880, "min"),
 
+    # --- Agents ----------------------------------------------------------
+    Spec("require_verified_agents", "Agents", "Only verified agents get work", "When on, an agent whose ID an admin hasn't verified isn't given new orders and can't start shopping. Turn it on once your existing agents have been verified.",
+         "bool", False),
+
     # --- Emergency ------------------------------------------------------
     Spec("orders_paused", "Emergency", "Pause new orders", "Stops customers starting new orders. Orders already in progress carry on normally.",
          "bool", False),
