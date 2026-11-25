@@ -70,6 +70,7 @@ export type OrderItem = {
   preferred_stall_id: string | null;
   availability: string;
   confirmed_price: string | null;
+  vendor_transfer_id: string | null;
   overage_requested_price: string | null;
   overage_decision: string | null;
 };
@@ -81,7 +82,33 @@ export type AgentOrder = {
   items: OrderItem[];
   packing_photos: string[] | null;
   dropped_at_hub_at: string | null;
+  // Customer-facing fields (money arrives as decimal strings):
+  agent_id: string | null;
+  items_total: string;
+  combined_fee: string;
+  delivery_fee: string;
+  delivery_quote: string;
+  emtl_total: string;
+  transfer_fees_total: string;
+  grand_total: string;
+  goods_estimate: string;
+  deposit_amount: string;
+  deposit_paid_at: string | null;
+  created_at: string;
+  agent_assigned_at: string | null;
+  paid_at: string | null;
+  hub_id: string | null;
+  hub_received_at: string | null;
+  packed_at: string | null;
+  rider_claimed_at: string | null;
+  rider_delivered_at: string | null;
+  dispatched_at: string | null;
+  delivered_at: string | null;
+  handover_code: string | null;
+  delivery_address: string | null;
 };
+
+export type Person = { id: string; full_name: string | null; avatar_url: string | null; phone?: string };
 
 export type Market = { id: string; name: string; city?: string | null };
 export type Vendor = { id: string; name: string };
@@ -224,4 +251,41 @@ export const api = {
     request<Message>(`/orders/${orderId}/messages`, { method: 'POST', body }),
   markChatRead: (orderId: string) => request<null>(`/orders/${orderId}/messages/read`, { method: 'POST' }),
   conversations: () => request<Conversation[]>('/chat/conversations'),
+
+  // Customer: follow an order, approve what the agent asks, and pay.
+  customerOrders: () => request<AgentOrder[]>('/orders/mine-customer'),
+  orderAgent: (id: string) => request<Person>(`/orders/${id}/agent`),
+  proposedAgent: (id: string) => request<Person>(`/orders/${id}/proposed-agent`),
+  acceptAgent: (id: string) => request<unknown>(`/orders/${id}/accept-agent`, { method: 'POST' }),
+  seeAnotherAgent: (id: string) =>
+    request<{ outcome: string; order: AgentOrder }>(`/orders/${id}/see-another-agent`, { method: 'POST' }),
+  authorization: (id: string) => request<{ cap: string; spent: string }>(`/jit/orders/${id}/authorization`),
+  raiseCap: (id: string, extra: string) =>
+    request<unknown>(`/jit/orders/${id}/authorization/raise`, { method: 'POST', body: { extra } }),
+  decideItem: (id: string, itemId: string, decision: 'buy_elsewhere' | 'dropped') =>
+    request<unknown>(`/orders/${id}/items/${itemId}/decide`, { method: 'POST', body: { decision } }),
+  decideOverage: (id: string, itemId: string, decision: 'approved' | 'declined') =>
+    request<unknown>(`/orders/${id}/items/${itemId}/overage-decide`, { method: 'POST', body: { decision } }),
+  confirmDelivery: (id: string) => request<unknown>(`/delivery/orders/${id}/confirm-delivery`, { method: 'POST' }),
+  cancelOrder: (id: string) => request<unknown>(`/orders/${id}/cancel`, { method: 'POST' }),
+  rating: (id: string) => request<{ stars: number; comment: string | null } | null>(`/orders/${id}/rating`),
+  rateAgent: (id: string, stars: number, comment: string | null) =>
+    request<unknown>(`/orders/${id}/rating`, { method: 'POST', body: { stars, comment } }),
+  walletBalance: () => request<{ balance: string }>('/wallet'),
+  // Payments. Bank transfer opens Paystack in the browser; we verify with the
+  // reference we get back, so no redirect back into the app is needed.
+  payDepositWallet: (id: string) => request<unknown>(`/payments/orders/${id}/deposit/pay-from-wallet`, { method: 'POST' }),
+  payBalanceWallet: (id: string) => request<unknown>(`/payments/orders/${id}/pay-from-wallet`, { method: 'POST' }),
+  checkoutDeposit: (id: string) =>
+    request<{ authorization_url: string | null; reference: string }>(`/payments/orders/${id}/deposit/checkout`, { method: 'POST', body: {} }),
+  checkoutBalance: (id: string) =>
+    request<{ authorization_url: string | null; reference: string }>(`/payments/orders/${id}/checkout`, { method: 'POST', body: {} }),
+  verifyDeposit: (id: string, reference: string) =>
+    request<unknown>(`/payments/orders/${id}/deposit/checkout/verify`, { method: 'POST', body: { reference } }),
+  verifyBalance: (id: string, reference: string) =>
+    request<unknown>(`/payments/orders/${id}/checkout/verify`, { method: 'POST', body: { reference } }),
+  fundWallet: (amount: string) =>
+    request<{ authorization_url: string | null; reference: string }>('/payments/wallet/fund/init', { method: 'POST', body: { amount } }),
+  verifyFunding: (reference: string) =>
+    request<unknown>('/payments/wallet/fund/verify', { method: 'POST', body: { reference } }),
 };

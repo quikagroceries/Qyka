@@ -6,7 +6,7 @@ import type { Role } from '@/lib/api';
 import { useSession } from '@/lib/session';
 
 const HOME_COPY: Record<Role, string> = {
-  customer: 'Your orders will show here.',
+  customer: '',
   agent: '',
   rider: '',
   shopkeeper: '',
@@ -17,6 +17,7 @@ const HOME_COPY: Record<Role, string> = {
 export default function Home() {
   const { user, signOut } = useSession();
   if (!user) return null;
+  if (user.role === 'customer') return <Redirect href="/customer" />;
   if (user.role === 'agent') return <Redirect href="/agent" />;
   if (user.role === 'rider') return <Redirect href="/rider" />;
   if (user.role === 'shopkeeper') return <Redirect href="/shopkeeper" />;
