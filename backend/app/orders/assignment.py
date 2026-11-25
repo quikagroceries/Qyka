@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.markets.models import Agent
+from app.platform_settings import service as platform
 
 
 async def find_available_agent(
@@ -37,6 +38,9 @@ async def find_available_agent(
         Agent.is_available.is_(True),
         Agent.on_duty.is_(True),
     )
+    # An owner can require every agent to be ID-verified before getting work.
+    if await platform.get(db, "require_verified_agents"):
+        stmt = stmt.where(Agent.verified_at.is_not(None))
     if exclude_ids:
         stmt = stmt.where(Agent.user_id.notin_(exclude_ids))
     stmt = (

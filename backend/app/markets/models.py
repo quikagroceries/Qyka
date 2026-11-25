@@ -1,8 +1,8 @@
 import re
 import uuid
-from datetime import time
+from datetime import datetime, time
 
-from sqlalchemy import JSON, Boolean, Enum, Float, String, Text, Time
+from sqlalchemy import JSON, Boolean, DateTime, Enum, Float, String, Text, Time
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -76,3 +76,9 @@ class Agent(Base):
     # nothing about which mode they're in. Defaults True: a freshly
     # promoted/seeded agent starts in their agent view.
     on_duty: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    # ID/identity check by an admin. Approval lets someone in; verification says
+    # we have actually checked them. Optionally required before an agent can be
+    # assigned or shop (platform setting "require_verified_agents").
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    verified_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    verification_note: Mapped[str | None] = mapped_column(String(300), nullable=True)

@@ -325,3 +325,115 @@ async def edit_user(
         user.basket_cap_kobo = basket_cap_naira * 100
     await db.flush()
     return user
+
+
+# --- Agents: verification and hands-on control ---------------------------
+
+async def _agent_for(db: AsyncSession, user_id: uuid.UUID) -> Agent:
+    agent = (await db.execute(select(Agent).where(Agent.user_id == user_id))).scalar_one_or_none()
+    if agent is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That person isn't an agent")
+    return agent
+
+
+async def verify_agent(db: AsyncSession, *, admin_id: uuid.UUID, user_id: uuid.UUID, note: str | None) -> Agent:
+    """Record that an admin has checked this agent's identity."""
+    agent = await _agent_for(db, user_id)
+    agent.verified_at = datetime.now(timezone.utc)
+    agent.verified_by = admin_id
+    agent.verification_note = (note or "").strip() or None
+    await db.flush()
+    await notif_service.send(
+        db, user_id=user_id, kind="agent_verified",
+        message="Your ID has been verified. You're all set to take orders.",
+    )
+    return agent
+
+
+async def unverify_agent(db: AsyncSession, *, user_id: uuid.UUID, note: str) -> Agent:
+    """Withdraw verification (a document turned out wrong, or it has expired)."""
+    _need_note(note)
+    agent = await _agent_for(db, user_id)
+    agent.verified_at = None
+    agent.verified_by = None
+    agent.verification_note = note.strip()
+    await db.flush()
+    return agent
+
+
+async def set_agent_duty(db: AsyncSession, *, user_id: uuid.UUID, on_duty: bool) -> Agent:
+    """Switch an agent on or off duty for them (a stuck toggle, or taking
+    someone off the roster for the day). Never while they hold an order."""
+    agent = await _agent_for(db, user_id)
+    if not on_duty:
+        busy = (await db.execute(
+            select(Order.id).where(Order.agent_id == user_id, Order.status.in_(_AGENT_ACTIVE)).limit(1)
+        )).first()
+        if busy is not None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "They have an order in progress - take them off duty once it's done")
+    agent.on_duty = on_duty
+    await db.flush()
+    return agent
+
+
+async def agent_detail(db: AsyncSession, *, user_id: uuid.UUID) -> dict:
+    """Everything an admin needs to judge one agent at a glance: who they are,
+    whether they're verified, how they've done, and what's on their plate."""
+    from collections import Counter
+    from decimal import Decimal
+
+    from app.agent_applications.models import AgentApplication
+    from app.core.enums import ApplicationKind
+    from app.ratings.models import AgentRating
+
+    agent = await _agent_for(db, user_id)
+    user = await _user(db, user_id)
+    orders = (await db.execute(
+        select(Order).where(Order.agent_id == user_id).order_by(Order.created_at.desc())
+    )).scalars().all()
+    delivered = [o for o in orders if o.status in (OrderStatus.DELIVERED, OrderStatus.CLOSED)]
+    ratings = (await db.execute(select(AgentRating).where(AgentRating.agent_id == user_id))).scalars().all()
+    applications = (await db.execute(
+        select(AgentApplication).where(
+            AgentApplication.user_id == user_id, AgentApplication.kind == ApplicationKind.AGENT
+        ).order_by(AgentApplication.created_at.desc())
+    )).scalars().all()
+    verifier = None
+    if agent.verified_by is not None:
+        v = (await db.execute(select(User).where(User.id == agent.verified_by))).scalar_one_or_none()
+        verifier = (v.email or v.full_name) if v else None
+    market = None
+    if agent.assigned_market_id is not None:
+        m = (await db.execute(select(Market).where(Market.id == agent.assigned_market_id))).scalar_one_or_none()
+        market = m.name if m else None
+    return {
+        "user_id": str(user.id),
+        "full_name": user.full_name,
+        "phone": user.phone,
+        "email": user.email,
+        "account_status": user.status.value,
+        "member_since": user.created_at.isoformat() if getattr(user, "created_at", None) else None,
+        "market_id": str(agent.assigned_market_id) if agent.assigned_market_id else None,
+        "market_name": market,
+        "on_duty": agent.on_duty,
+        "is_available": agent.is_available,
+        "verified": agent.verified_at is not None,
+        "verified_at": agent.verified_at.isoformat() if agent.verified_at else None,
+        "verified_by": verifier,
+        "verification_note": agent.verification_note,
+        "orders_total": len(orders),
+        "orders_by_status": dict(Counter(o.status.value for o in orders)),
+        "orders_in_progress": sum(1 for o in orders if o.status in _AGENT_ACTIVE),
+        "completed_orders": len(delivered),
+        "earnings_total": str(sum((o.agent_share for o in delivered), start=Decimal("0.00"))),
+        "rating_average": round(sum(r.stars for r in ratings) / len(ratings), 2) if ratings else None,
+        "rating_count": len(ratings),
+        "recent_orders": [
+            {"id": str(o.id), "status": o.status.value, "created_at": o.created_at.isoformat()}
+            for o in orders[:8]
+        ],
+        "applications": [
+            {"id": str(a.id), "status": a.status.value, "created_at": a.created_at.isoformat(), "note": a.note}
+            for a in applications[:5]
+        ],
+    }

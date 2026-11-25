@@ -22,6 +22,8 @@ from app.platform_settings import service as platform
 from app.admin import service as admin_service
 from app.admin.schemas import (
     AdminCancelOrderIn,
+    AgentDutyIn,
+    VerifyAgentIn,
     AdminCreateIn,
     AdminLevelIn,
     ContentIn,
@@ -884,6 +886,56 @@ async def move_agent_market(
     """Assign an agent to a different market (only with nothing in progress)."""
     agent = await ops.move_agent_market(db, user_id=user_id, market_id=body.market_id)
     return {"user_id": str(agent.user_id), "market_id": str(agent.assigned_market_id)}
+
+
+@router.get("/agents/{user_id}")
+async def agent_detail(
+    user_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin()),
+) -> dict:
+    """One agent in full: identity, verification, record and what's on their plate."""
+    return await ops.agent_detail(db, user_id=user_id)
+
+
+@router.post("/agents/{user_id}/verify")
+async def verify_agent(
+    user_id: uuid.UUID,
+    body: VerifyAgentIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("agent.verify")),
+) -> dict:
+    """Mark an agent's ID as checked."""
+    agent = await ops.verify_agent(db, admin_id=admin.id, user_id=user_id, note=body.note)
+    audit.note(request, note=body.note)
+    return {"user_id": str(agent.user_id), "verified": True, "verified_at": agent.verified_at.isoformat()}
+
+
+@router.post("/agents/{user_id}/unverify")
+async def unverify_agent(
+    user_id: uuid.UUID,
+    body: NoteIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("agent.unverify")),
+) -> dict:
+    """Withdraw an agent's verification, with the reason."""
+    agent = await ops.unverify_agent(db, user_id=user_id, note=body.note)
+    audit.note(request, note=body.note)
+    return {"user_id": str(agent.user_id), "verified": False}
+
+
+@router.post("/agents/{user_id}/duty")
+async def set_agent_duty(
+    user_id: uuid.UUID,
+    body: AgentDutyIn,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin("agent.set_duty")),
+) -> dict:
+    """Put an agent on or off duty on their behalf."""
+    agent = await ops.set_agent_duty(db, user_id=user_id, on_duty=body.on_duty)
+    return {"user_id": str(agent.user_id), "on_duty": agent.on_duty}
 
 
 @router.post("/users/{user_id}/end-role")
