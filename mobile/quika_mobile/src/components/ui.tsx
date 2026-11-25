@@ -45,7 +45,8 @@ export function Button({
       accessibilityRole="button"
       onPress={onPress}
       disabled={off}
-      className={cx('min-h-[54px] flex-row items-center justify-center gap-2 rounded-full px-6 active:scale-[0.98]', v.box, off && 'opacity-50', className)}>
+      className={cx('min-h-[54px] flex-row items-center justify-center gap-2 rounded-full px-6', v.box, off && 'opacity-50', className)}
+      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}>
       {busy ? <ActivityIndicator color="#1A1A1A" size="small" /> : null}
       <Text className={cx('text-base font-semibold', v.text)}>{label}</Text>
     </Pressable>

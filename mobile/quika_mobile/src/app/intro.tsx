@@ -70,7 +70,6 @@ export default function Intro() {
               <Float>
                 <Image source={s.image} resizeMode="contain" style={{ width: width - 56, height: Math.min(380, (width - 56) * 1.05) }} />
               </Float>
-              <View className="-mt-2 h-3 w-48 rounded-full bg-ink/10" />
             </Animated.View>
           </View>
         ))}

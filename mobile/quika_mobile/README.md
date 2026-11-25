@@ -10,7 +10,10 @@ investor view stay on the web.
 3. Open it in Expo Go or a development build on a phone on the same Wi-Fi.
 
 The app finds the backend by taking the host the Expo dev server runs on and
-using port 8000. Set `EXPO_PUBLIC_API_URL` to point somewhere else.
+using port 8000. Set `EXPO_PUBLIC_API_URL` (see `.env.example`) to point somewhere
+else, e.g. the deployed backend `https://qyka.onrender.com`. The deployed
+backend must include the hub and rider endpoints for the rider and shopkeeper
+apps to work.
 The camera (hub check-in, purchase and chat photos) needs a device.
 
 ## Sign-in

@@ -58,7 +58,8 @@ export default function Welcome() {
           <Animated.View key={r.role} entering={FadeInDown.delay(250 + i * 120).duration(500)}>
             <Pressable
               onPress={() => router.push({ pathname: '/sign-in', params: { role: r.role } })}
-              className="flex-row items-center gap-4 overflow-hidden rounded-3xl border border-line bg-surface p-4 shadow-sm active:scale-[0.98] active:bg-surface-2">
+              className="flex-row items-center gap-4 overflow-hidden rounded-3xl border border-line bg-surface p-4 shadow-sm active:bg-surface-2"
+              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}>
               <View className={`h-24 w-24 items-center justify-center rounded-2xl ${r.tint}`}>
                 <Image source={r.image} resizeMode="contain" className="h-20 w-20" />
               </View>

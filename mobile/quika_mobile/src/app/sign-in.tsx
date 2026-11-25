@@ -104,7 +104,6 @@ export default function SignIn() {
             <Float>
               <Image source={copy.art} resizeMode="contain" className="h-44 w-56" />
             </Float>
-            <View className="-mt-1 h-3 w-40 rounded-full bg-ink/10" />
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(80).duration(450)} className="items-center gap-2">
