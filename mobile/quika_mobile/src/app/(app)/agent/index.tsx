@@ -1,13 +1,11 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/Text';
 
-import { Card, EmptyState, ErrorBanner, Hero, SafeAreaView, SectionHeader, StatTile, StatusBadge } from '@/components/ui';
-import { api, ApiError, type AgentOrder, type Market } from '@/lib/api';
-import { errMsg, shortId } from '@/lib/format';
-import { useSession } from '@/lib/session';
-import { usePolling } from '@/lib/usePolling';
+import { Card, EmptyState, Hero, SafeAreaView, SectionHeader, StatTile, StatusBadge } from '@/components/ui';
+import { shortId } from '@/lib/format';
+import { ORDERS, marketName } from '@/lib/mock';
+import type { AgentOrder } from '@/lib/types';
 
 const readyToShop = (o: AgentOrder) => o.status === 'agent_assigned';
 const inProgress = (o: AgentOrder) => o.status === 'shopping';
@@ -38,35 +36,17 @@ function TaskCard({ order, market, tone, onOpen }: { order: AgentOrder; market?:
 
 export default function AgentHome() {
   const router = useRouter();
-  const { signOut } = useSession();
-  const [orders, setOrders] = useState<AgentOrder[] | null>(null);
-  const [markets, setMarkets] = useState<Market[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const orders = ORDERS.filter((o) => o.agent_id);
 
-  const load = useCallback(async () => {
-    try {
-      setOrders(await api.agentOrders());
-      setError(null);
-      api.markets().then(setMarkets).catch(() => {});
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) return void signOut();
-      setError(`Could not load your tasks. ${errMsg(e)}`);
-    }
-  }, [signOut]);
-  usePolling(load, 15_000);
-
-  const marketName = (id: string) => markets.find((m) => m.id === id)?.name;
-  const all = orders ?? [];
+  const all = orders;
   const drop = all.filter(needsDrop);
   const ready = all.filter(readyToShop);
   const going = all.filter(inProgress);
   const attention = all.filter(needsAttention);
   const actionable = drop.length + ready.length + going.length;
 
-  const title = !orders
-    ? 'Loading your tasks…'
-    : attention.length > 0
+  const title =
+    attention.length > 0
       ? 'Something needs your attention'
       : drop.length > 0
         ? 'Goods are waiting to go to the hub'
@@ -88,18 +68,7 @@ export default function AgentHome() {
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
-      <ScrollView
-        contentContainerClassName="gap-4 p-4"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={async () => {
-              setRefreshing(true);
-              await load();
-              setRefreshing(false);
-            }}
-          />
-        }>
+      <ScrollView contentContainerClassName="gap-4 p-4">
         <Hero
           eyebrow={actionable > 0 ? `${actionable} task${actionable === 1 ? '' : 's'} waiting` : 'Agent home'}
           live={actionable > 0}
@@ -113,8 +82,7 @@ export default function AgentHome() {
           </View>
         </Hero>
 
-        <ErrorBanner message={error} />
-        {orders && actionable === 0 && attention.length === 0 && !error ? (
+        {actionable === 0 && attention.length === 0 ? (
           <EmptyState image={require('../../../../assets/illustrations/shopping-cart.webp')} title="No tasks right now" subtitle="New assignments will show up here." />
         ) : null}
 

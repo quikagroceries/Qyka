@@ -20,13 +20,12 @@ SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 200, fade: true });
 
 function Navigator({ fontsReady }: { fontsReady: boolean }) {
-  const { user, isLoading } = useSession();
+  const { user } = useSession();
   const [splashDone, setSplashDone] = useState(false);
   // Signed-out people land on the role picker (welcome), never straight on a login form.
   return (
     <View style={{ flex: 1 }}>
-      {isLoading ? null : (
-        <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
+      <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
           <Stack.Protected guard={!!user}>
             <Stack.Screen name="(app)" />
           </Stack.Protected>
@@ -35,9 +34,8 @@ function Navigator({ fontsReady }: { fontsReady: boolean }) {
             <Stack.Screen name="welcome" />
             <Stack.Screen name="sign-in" />
           </Stack.Protected>
-        </Stack>
-      )}
-      {!splashDone ? <SplashOverlay ready={fontsReady && !isLoading} onDone={() => setSplashDone(true)} /> : null}
+      </Stack>
+      {!splashDone ? <SplashOverlay ready={fontsReady} onDone={() => setSplashDone(true)} /> : null}
     </View>
   );
 }

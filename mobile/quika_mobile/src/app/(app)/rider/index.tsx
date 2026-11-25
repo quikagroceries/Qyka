@@ -1,11 +1,11 @@
-import { useCallback, useState } from 'react';
-import { Alert, Linking, RefreshControl, ScrollView, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Linking, ScrollView, View } from 'react-native';
 import { Text } from '@/components/Text';
 
-import { Button, Card, CodeInput, EmptyState, ErrorBanner, Hero, SafeAreaView, SectionHeader } from '@/components/ui';
-import { api, ApiError, type RiderJob } from '@/lib/api';
-import { ago, errMsg, shortId } from '@/lib/format';
-import { usePolling } from '@/lib/usePolling';
+import { Button, Card, CodeInput, Hero, SafeAreaView, SectionHeader } from '@/components/ui';
+import { ago, shortId } from '@/lib/format';
+import { RIDER_ACTIVE, RIDER_POOL } from '@/lib/mock';
+import type { RiderJob } from '@/lib/types';
 
 // A rider does one job at a time (the backend enforces it), so this screen is
 // either "the one job you're on" or "the pool you can take from". The job moves
@@ -22,7 +22,7 @@ const mapsUrl = (j: RiderJob) =>
 
 const items = (n: number) => `${n} item${n === 1 ? '' : 's'}`;
 
-function Pickup({ job, busy, onRelease }: { job: RiderJob; busy: boolean; onRelease: () => void }) {
+function Pickup({ job, onRelease }: { job: RiderJob; onRelease: () => void }) {
   return (
     <>
       <Card accent className="items-center">
@@ -43,7 +43,6 @@ function Pickup({ job, busy, onRelease }: { job: RiderJob; busy: boolean; onRele
       <Button
         label="Can't do this one: give it back"
         variant="neutral"
-        disabled={busy}
         onPress={() =>
           Alert.alert('Give this job back?', 'It goes back to the pool for other riders.', [
             { text: 'Keep it', style: 'cancel' },
@@ -55,7 +54,7 @@ function Pickup({ job, busy, onRelease }: { job: RiderJob; busy: boolean; onRele
   );
 }
 
-function Deliver({ job, busy, error, onDeliver }: { job: RiderJob; busy: boolean; error: string | null; onDeliver: (code: string) => void }) {
+function Deliver({ job, onDeliver }: { job: RiderJob; onDeliver: () => void }) {
   const [code, setCode] = useState('');
   return (
     <>
@@ -74,14 +73,13 @@ function Deliver({ job, busy, error, onDeliver }: { job: RiderJob; busy: boolean
         <Text className="text-center font-semibold text-ink">Customer&apos;s code</Text>
         <Text className="text-center text-sm text-muted">Ask for the 4-digit code on their phone before you hand anything over.</Text>
         <CodeInput value={code} onChange={setCode} />
-        <ErrorBanner message={error} />
-        <Button label="Confirm drop-off" busy={busy} disabled={code.length < 4} onPress={() => onDeliver(code)} />
+        <Button label="Confirm drop-off" onPress={onDeliver} />
       </Card>
     </>
   );
 }
 
-function PoolCard({ job, busy, onClaim }: { job: RiderJob; busy: boolean; onClaim: () => void }) {
+function PoolCard({ job, onClaim }: { job: RiderJob; onClaim: () => void }) {
   return (
     <Card>
       <View className="flex-row items-start justify-between gap-3">
@@ -94,112 +92,64 @@ function PoolCard({ job, busy, onClaim }: { job: RiderJob; busy: boolean; onClai
       <Text className="text-muted">
         {items(job.item_count)} · #{shortId(job.id)}
       </Text>
-      <Button label="Claim this job" busy={busy} onPress={onClaim} />
+      <Button label="Claim this job" onPress={onClaim} />
     </Card>
   );
 }
 
+// UI only: claiming, collecting and delivering just step through local state.
+type Stage = 'pool' | 'pickup' | 'deliver' | 'handed';
+
 export default function Jobs() {
-  const [mine, setMine] = useState<RiderJob[] | null>(null);
-  const [pool, setPool] = useState<RiderJob[] | null>(null);
-  const [fatal, setFatal] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const m = await api.riderMine();
-      setMine(m);
-      // The pool only matters when there's no job in hand.
-      setPool(m.length === 0 ? await api.riderPool() : []);
-      setFatal(null);
-    } catch (e) {
-      // 403: no rider record or suspended, so nothing else here will work.
-      setFatal(e instanceof ApiError && e.status === 403 ? e.message : `Could not load jobs. ${errMsg(e)}`);
-    }
-  }, []);
-  usePolling(load, 10_000);
-
-  async function act(fn: () => Promise<unknown>) {
-    setError(null);
-    setBusy(true);
-    try {
-      await fn();
-      await load();
-    } catch (e) {
-      setError(errMsg(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const job = mine && mine.length > 0 ? mine[0] : null;
-  const delivering = job?.status === 'out_for_delivery';
-  const handedOver = delivering && !!job?.delivered_at;
-  const loaded = mine !== null && pool !== null;
+  const [stage, setStage] = useState<Stage>('pool');
+  const job: RiderJob | null = stage === 'pool' ? null : RIDER_ACTIVE;
+  const pool = stage === 'pool' ? RIDER_POOL : [];
+  const delivering = stage === 'deliver' || stage === 'handed';
+  const handedOver = stage === 'handed';
 
   let eyebrow = 'Jobs';
-  let title = 'Loading jobs…';
+  let title = '';
   let body = '';
-  if (loaded) {
-    if (!job) {
-      eyebrow = 'Ready to ride';
-      title = pool.length > 0 ? `${pool.length} job${pool.length === 1 ? '' : 's'} waiting` : 'No jobs right now';
-      body = pool.length > 0 ? "Claim one to get started. It's yours until you deliver it." : 'New orders show up here the moment a hub has one ready.';
-    } else if (handedOver) {
-      eyebrow = `Order #${shortId(job.id)}`;
-      title = 'Handed over';
-      body = 'Waiting for the customer to confirm. Your fee lands once they do.';
-    } else if (delivering) {
-      eyebrow = `Order #${shortId(job.id)}`;
-      title = `Deliver to ${job.customer_name || 'the customer'}`;
-      body = "Collected from the hub. Take it to the door and get the customer's code.";
-    } else {
-      eyebrow = `Order #${shortId(job.id)}`;
-      title = `Go to ${job.hub_name || 'the hub'}`;
-      body = "Show the shopkeeper your code and they'll hand you the order.";
-    }
+  if (!job) {
+    eyebrow = 'Ready to ride';
+    title = pool.length > 0 ? `${pool.length} job${pool.length === 1 ? '' : 's'} waiting` : 'No jobs right now';
+    body = pool.length > 0 ? "Claim one to get started. It's yours until you deliver it." : 'New orders show up here the moment a hub has one ready.';
+  } else if (handedOver) {
+    eyebrow = `Order #${shortId(job.id)}`;
+    title = 'Handed over';
+    body = 'Waiting for the customer to confirm. Your fee lands once they do.';
+  } else if (delivering) {
+    eyebrow = `Order #${shortId(job.id)}`;
+    title = `Deliver to ${job.customer_name || 'the customer'}`;
+    body = "Collected from the hub. Take it to the door and get the customer's code.";
+  } else {
+    eyebrow = `Order #${shortId(job.id)}`;
+    title = `Go to ${job.hub_name || 'the hub'}`;
+    body = "Show the shopkeeper your code and they'll hand you the order.";
   }
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
-      <ScrollView
-        contentContainerClassName="gap-4 p-4"
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={async () => {
-              setRefreshing(true);
-              await load();
-              setRefreshing(false);
-            }}
-          />
-        }>
+      <ScrollView contentContainerClassName="gap-4 p-4" keyboardShouldPersistTaps="handled">
         <Hero eyebrow={eyebrow} live={!!job && !handedOver} title={title} body={body} image={delivering ? routeArt : riderArt} />
 
-        <ErrorBanner message={fatal} />
-        {!fatal && !delivering ? <ErrorBanner message={error} /> : null}
-
-        {!fatal && job && !delivering && <Pickup job={job} busy={busy} onRelease={() => void act(() => api.riderRelease(job.id))} />}
-        {!fatal && job && delivering && !handedOver && (
-          <Deliver job={job} busy={busy} error={error} onDeliver={(code) => void act(() => api.riderDeliver(job.id, code))} />
+        {job && !delivering && <Pickup job={job} onRelease={() => setStage('pool')} />}
+        {job && !delivering && <Button label="I've collected it from the hub" onPress={() => setStage('deliver')} />}
+        {job && delivering && !handedOver && <Deliver job={job} onDeliver={() => setStage('handed')} />}
+        {handedOver && (
+          <>
+            <Card className="items-center">
+              <Text className="font-semibold text-brand-green">Drop-off confirmed</Text>
+              <Text className="text-center text-sm text-muted">You can take a new job as soon as the customer confirms.</Text>
+            </Card>
+            <Button label="Back to jobs" variant="neutral" onPress={() => setStage('pool')} />
+          </>
         )}
-        {!fatal && handedOver && (
-          <Card className="items-center">
-            <Text className="font-semibold text-brand-green">Drop-off confirmed</Text>
-            <Text className="text-center text-sm text-muted">You can take a new job as soon as the customer confirms.</Text>
-          </Card>
-        )}
-        {!fatal && loaded && !job && pool && pool.length === 0 ? (
-          <EmptyState image={require('../../../../assets/illustrations/rider-scooter-basket-2.webp')} title="Nothing to collect yet" subtitle="This page checks for new jobs by itself." />
-        ) : null}
-        {!fatal && !job && pool && pool.length > 0 ? (
+        {!job && pool.length > 0 ? (
           <>
             <SectionHeader title="Available jobs" subtitle="First to claim gets it." />
             {pool.map((j) => (
-              <PoolCard key={j.id} job={j} busy={busy} onClaim={() => void act(() => api.riderClaim(j.id))} />
+              <PoolCard key={j.id} job={j} onClaim={() => setStage('pickup')} />
             ))}
           </>
         ) : null}

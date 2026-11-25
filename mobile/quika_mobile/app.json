@@ -30,15 +30,6 @@
           "imageWidth": 180
         }
       ],
-      "expo-secure-store",
-      [
-        "expo-image-picker",
-        {
-          "cameraPermission": "Qyka uses the camera to photograph goods at the hub.",
-          "photosPermission": false,
-          "microphonePermission": false
-        }
-      ],
       "expo-font"
     ],
     "experiments": {

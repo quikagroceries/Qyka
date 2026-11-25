@@ -1,5 +1,5 @@
 // Mirrors frontend/src/lib/orderStatus.ts (the parts the customer app needs).
-import type { AgentOrder } from '@/lib/api';
+import type { AgentOrder } from '@/lib/types';
 
 export const HISTORY = new Set(['delivered', 'closed', 'cancelled', 'cancelled_unpaid']);
 export const EXCEPTION = new Set(['cancelled', 'cancelled_unpaid', 'disputed']);

@@ -1,20 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/Text';
 
 import PaymentChooser from '@/components/customer/PaymentChooser';
-import { Avatar, Button, Card, ErrorBanner, Field, Hero, ItemArt, SafeAreaView, SectionHeader, StatusBadge } from '@/components/ui';
-import { api, type AgentOrder, type Market, type OrderItem, type Person, type Purchase } from '@/lib/api';
-import { errMsg, naira, shortId } from '@/lib/format';
-import { openCheckout } from '@/lib/paystack';
+import { Avatar, Button, Card, Field, Hero, ItemArt, SafeAreaView, SectionHeader, StatusBadge } from '@/components/ui';
+import { naira, shortId } from '@/lib/format';
+import { PEOPLE, PURCHASES, WALLET_BALANCE, marketName, orderById } from '@/lib/mock';
 import { CHAT, EXCEPTION, ON_THE_MOVE, PAID_OR_LATER, RATEABLE, UNPRICED, summarize } from '@/lib/orderStatus';
-import { usePolling } from '@/lib/usePolling';
-
-// Statuses move every few minutes, so a slow poll is plenty, except while the
-// order is being shopped and the agent may be waiting on an approval.
-const POLL_MS = 25000;
-const POLL_MS_SHOPPING = 8000;
+import type { AgentOrder, OrderItem, Purchase } from '@/lib/types';
 
 const art = {
   shopping: require('../../../../../assets/illustrations/agent-customer-conversation.webp'),
@@ -102,7 +96,7 @@ function Timeline({ order, onPreview }: { order: AgentOrder; onPreview: (u: stri
   );
 }
 
-function ItemLine({ item, purchase, busy, onDecide, onPreview }: { item: OrderItem; purchase?: Purchase; busy: boolean; onDecide: (d: 'buy_elsewhere' | 'dropped') => void; onPreview: (u: string) => void }) {
+function ItemLine({ item, purchase, onDecide, onPreview }: { item: OrderItem; purchase?: Purchase; onDecide: (d: 'buy_elsewhere' | 'dropped') => void; onPreview: (u: string) => void }) {
   const bought = item.confirmed_price != null;
   const dropped = item.availability === 'dropped';
   const unavailable = !bought && item.availability === 'unavailable';
@@ -140,8 +134,8 @@ function ItemLine({ item, purchase, busy, onDecide, onPreview }: { item: OrderIt
         <View className="gap-2 rounded-2xl bg-brand-orange/[0.12] p-3">
           <Text className="text-sm font-semibold text-ink">Your agent couldn&apos;t find this at the stall. What now?</Text>
           <View className="flex-row gap-2">
-            <Button label="Try another stall" busy={busy} className="flex-1" onPress={() => onDecide('buy_elsewhere')} />
-            <Button label="Skip it" variant="neutral" busy={busy} className="flex-1" onPress={() => onDecide('dropped')} />
+            <Button label="Try another stall" className="flex-1" onPress={() => onDecide('buy_elsewhere')} />
+            <Button label="Skip it" variant="neutral" className="flex-1" onPress={() => onDecide('dropped')} />
           </View>
         </View>
       ) : null}
@@ -149,102 +143,32 @@ function ItemLine({ item, purchase, busy, onDecide, onPreview }: { item: OrderIt
   );
 }
 
+// UI only: every action updates this screen's local copy of the order.
 export default function CustomerOrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [order, setOrder] = useState<AgentOrder | null>(null);
-  const [market, setMarket] = useState<Market | null>(null);
-  const [agent, setAgent] = useState<Person | null>(null);
-  const [proposed, setProposed] = useState<Person | null>(null);
+  const initial = orderById(id);
+  const [status, setStatus] = useState(initial.status);
+  const [items, setItems] = useState<OrderItem[]>(initial.items);
+  const [depositPaid, setDepositPaid] = useState(!!initial.deposit_paid_at);
   const [notice, setNotice] = useState('');
-  const [auth, setAuth] = useState<{ cap: string; spent: string } | null>(null);
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [wallet, setWallet] = useState<string | null>(null);
   const [rating, setRating] = useState<{ stars: number; comment: string | null } | null>(null);
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState('');
   const [raise, setRaise] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const loaded = useRef(false);
-  const agentIdRef = useRef<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    try {
-      const o = await api.order(id);
-      setOrder(o);
-      loaded.current = true;
-      setError(null);
-      if (o.status === 'shopping') api.authorization(id).then(setAuth).catch(() => setAuth(null));
-      if (o.status === 'shopping' || o.status === 'awaiting_payment' || PAID_OR_LATER.has(o.status)) api.purchases(id).then(setPurchases).catch(() => {});
-      if (o.status === 'proposed') api.proposedAgent(id).then(setProposed).catch(() => setProposed(null));
-      // The assigned agent is fetched once per agent, not on every poll.
-      if (o.agent_id && agentIdRef.current !== o.agent_id) {
-        agentIdRef.current = o.agent_id;
-        api.orderAgent(id).then(setAgent).catch(() => {});
-      }
-      if (RATEABLE.has(o.status)) api.rating(id).then(setRating).catch(() => setRating(null));
-      api.walletBalance().then((w) => setWallet(w.balance)).catch(() => {});
-    } catch {
-      if (!loaded.current) setError('Could not load the order.');
-    }
-  }, [id]);
-  usePolling(refresh, order?.status === 'shopping' ? POLL_MS_SHOPPING : POLL_MS);
+  const order: AgentOrder = { ...initial, status, items, deposit_paid_at: depositPaid ? initial.deposit_paid_at ?? new Date().toISOString() : null };
+  const market = { name: marketName(order.market_id) };
+  const agent = order.agent_id ? PEOPLE.agent : null;
+  const proposed = status === 'proposed' ? PEOPLE.agent : null;
+  const auth = { cap: '10000.00', spent: '2800.00' };
+  const purchases: Purchase[] = PURCHASES;
+  const wallet = WALLET_BALANCE;
 
-  const marketId = order?.market_id;
-  useEffect(() => {
-    if (marketId) api.markets().then((l) => setMarket(l.find((m) => m.id === marketId) || null)).catch(() => {});
-  }, [marketId]);
+  const patchItem = (itemId: string, patch: Partial<OrderItem>) => setItems((cur) => cur.map((it) => (it.id === itemId ? { ...it, ...patch } : it)));
 
-  async function act(fn: () => Promise<unknown>, failPrefix: string, after?: () => void | Promise<void>) {
-    setError(null);
-    setBusy(true);
-    try {
-      await fn();
-      await after?.();
-      await refresh();
-    } catch (e) {
-      setError(`${failPrefix}: ${errMsg(e)}`);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Bank transfer: open Paystack, then verify with the reference we hold.
-  const payByTransfer = (kind: 'deposit' | 'balance') =>
-    act(
-      async () => {
-        const c = kind === 'deposit' ? await api.checkoutDeposit(id) : await api.checkoutBalance(id);
-        await openCheckout(c.authorization_url);
-        await (kind === 'deposit' ? api.verifyDeposit(id, c.reference) : api.verifyBalance(id, c.reference));
-      },
-      'Payment not confirmed yet. If you were charged, this will update shortly',
-    );
-
-  const topUp = () =>
-    act(async () => {
-      const c = await api.fundWallet(String(Math.max(1000, Math.ceil(amountDue - Number(wallet || 0)))));
-      await openCheckout(c.authorization_url);
-      await api.verifyFunding(c.reference);
-    }, 'Top-up not confirmed yet');
-
-  if (!order) {
-    return (
-      <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
-        <View className="gap-3 p-4">
-          <Pressable onPress={() => router.replace('/customer')}>
-            <Text className="text-sm font-semibold text-muted">← Back</Text>
-          </Pressable>
-          {error ? <ErrorBanner message={error} /> : <Text className="text-muted">Loading order…</Text>}
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const items = order.items || [];
-  const depositPaid = !!order.deposit_paid_at;
   const needsDeposit = Number(order.deposit_amount) > 0 && !depositPaid;
   const priced = !UNPRICED.has(order.status);
   const amountDue = priced ? Math.max(0, Number(order.grand_total) - (depositPaid ? Number(order.deposit_amount) : 0)) : 0;
@@ -265,7 +189,7 @@ export default function CustomerOrderScreen() {
           <Text className="text-sm font-semibold text-muted">← Back</Text>
         </Pressable>
 
-        <Hero eyebrow={`${market?.name || 'Order'} · #${shortId(order.id)}`} title={summarize(order, market?.name)} image={image}>
+        <Hero eyebrow={`${market.name || 'Order'} · #${shortId(order.id)}`} title={summarize(order, market.name)} image={image}>
           <View className="gap-3">
             <StatusBadge status={order.status} />
             {agent && !exception ? (
@@ -280,8 +204,6 @@ export default function CustomerOrderScreen() {
             {canChat ? <Button label="Chat with agent" onPress={() => router.push(`/customer/chat/${id}`)} /> : null}
           </View>
         </Hero>
-
-        <ErrorBanner message={error} />
 
         {exception ? (
           <View className="gap-1 rounded-3xl bg-red-50 p-5">
@@ -306,8 +228,8 @@ export default function CustomerOrderScreen() {
                     {naira(item.overage_requested_price ?? 0)} at the stall · {naira(extra)} over your {naira(item.listed_price ?? 0)}
                   </Text>
                   <View className="flex-row gap-2">
-                    <Button label={`Approve extra ${naira(extra)}`} busy={busy} className="flex-1" onPress={() => void act(() => api.decideOverage(id, item.id, 'approved'), 'Could not record your decision')} />
-                    <Button label="Skip this item" variant="neutral" busy={busy} className="flex-1" onPress={() => void act(() => api.decideOverage(id, item.id, 'declined'), 'Could not record your decision')} />
+                    <Button label={`Approve extra ${naira(extra)}`} className="flex-1" onPress={() => patchItem(item.id, { availability: 'available', overage_decision: 'approved' })} />
+                    <Button label="Skip this item" variant="neutral" className="flex-1" onPress={() => patchItem(item.id, { availability: 'dropped', overage_decision: 'declined' })} />
                   </View>
                 </View>
               );
@@ -325,10 +247,8 @@ export default function CustomerOrderScreen() {
                 <PaymentChooser
                   amountDue={Number(order.deposit_amount)}
                   walletBalance={wallet}
-                  busy={busy}
-                  onPayWallet={() => void act(() => api.payDepositWallet(id), 'Deposit payment failed')}
-                  onPayTransfer={() => void payByTransfer('deposit')}
-                  onTopUp={() => void topUp()}
+                  onPayWallet={() => setDepositPaid(true)}
+                  onPayTransfer={() => setDepositPaid(true)}
                 />
               </View>
             ) : null}
@@ -349,26 +269,8 @@ export default function CustomerOrderScreen() {
                 )}
                 {notice ? <Text className="rounded-lg bg-brand-orange/15 px-3 py-2 text-sm text-brand-orange-dark">{notice}</Text> : null}
                 <View className="flex-row gap-2">
-                  <Button label="Accept" busy={busy} disabled={!proposed} className="flex-1" onPress={() => void act(() => api.acceptAgent(id), 'Could not accept this agent', () => { setNotice(''); setProposed(null); })} />
-                  <Button
-                    label="See another"
-                    variant="neutral"
-                    busy={busy}
-                    disabled={!proposed}
-                    className="flex-1"
-                    onPress={() =>
-                      void act(async () => {
-                        const r = await api.seeAnotherAgent(id);
-                        setNotice(
-                          r.outcome === 'only_option'
-                            ? `No other agents available in this market. ${proposed?.full_name || 'This agent'} is your only option.`
-                            : r.outcome === 'none'
-                              ? 'No agents available for this market right now.'
-                              : '',
-                        );
-                      }, 'Could not look for another agent')
-                    }
-                  />
+                  <Button label="Accept" className="flex-1" onPress={() => { setNotice(''); setStatus('agent_assigned'); }} />
+                  <Button label="See another" variant="neutral" className="flex-1" onPress={() => setNotice(`No other agents available in this market. ${proposed?.full_name || 'This agent'} is your only option.`)} />
                 </View>
               </Card>
             ) : null}
@@ -403,14 +305,14 @@ export default function CustomerOrderScreen() {
                 <View className="flex-row justify-between"><Text className="text-muted">Cap</Text><Text className="font-semibold text-ink">{naira(auth.cap)}</Text></View>
                 <View className="flex-row justify-between"><Text className="text-muted">Spent so far</Text><Text className="font-semibold text-ink">{naira(auth.spent)}</Text></View>
                 <Field placeholder="Amount to approve (₦)" value={raise} onChangeText={setRaise} keyboardType="decimal-pad" />
-                <Button label="Approve increase" busy={busy} disabled={!raise} onPress={() => void act(() => api.raiseCap(id, raise), 'Could not approve increase', () => setRaise(''))} />
+                <Button label="Approve increase" onPress={() => setRaise('')} />
               </Card>
             ) : null}
 
             {order.status === 'awaiting_payment' ? (
               <Card>
                 <SectionHeader title="Pay balance" />
-                <PaymentChooser amountDue={amountDue} walletBalance={wallet} busy={busy} onPayWallet={() => void act(() => api.payBalanceWallet(id), 'Payment failed')} onPayTransfer={() => void payByTransfer('balance')} onTopUp={() => void topUp()} />
+                <PaymentChooser amountDue={amountDue} walletBalance={wallet} onPayWallet={() => setStatus('paid')} onPayTransfer={() => setStatus('paid')} />
               </Card>
             ) : null}
 
@@ -443,8 +345,8 @@ export default function CustomerOrderScreen() {
                   <View className="mt-4 gap-2 rounded-2xl bg-brand-orange/[0.12] p-4">
                     <Text className="text-sm font-semibold text-ink/80">This releases payment to your agent. Confirm you&apos;ve received everything?</Text>
                     <View className="flex-row gap-2">
-                      <Button label="Cancel" variant="neutral" disabled={busy} className="flex-1" onPress={() => setConfirming(false)} />
-                      <Button label="Yes, confirm" busy={busy} className="flex-1" onPress={() => void act(() => api.confirmDelivery(id), 'Could not confirm delivery', () => setConfirming(false))} />
+                      <Button label="Cancel" variant="neutral" className="flex-1" onPress={() => setConfirming(false)} />
+                      <Button label="Yes, confirm" className="flex-1" onPress={() => { setConfirming(false); setStatus('delivered'); }} />
                     </View>
                   </View>
                 ) : null}
@@ -458,7 +360,7 @@ export default function CustomerOrderScreen() {
               <Card>
                 <SectionHeader title={paidOrLater ? 'What was bought' : 'Live from the market'} />
                 {items.map((it) => (
-                  <ItemLine key={it.id} item={it} purchase={purchaseFor(it)} busy={busy} onPreview={setPreview} onDecide={(d) => void act(() => api.decideItem(id, it.id, d), 'Could not record your choice')} />
+                  <ItemLine key={it.id} item={it} purchase={purchaseFor(it)} onPreview={setPreview} onDecide={(d) => patchItem(it.id, { availability: d })} />
                 ))}
               </Card>
             ) : null}
@@ -484,7 +386,7 @@ export default function CustomerOrderScreen() {
                       ))}
                     </View>
                     <Field placeholder="Tell us how it went (optional)" value={comment} onChangeText={setComment} multiline />
-                    <Button label="Submit rating" busy={busy} disabled={stars === 0} onPress={() => void act(() => api.rateAgent(id, stars, comment.trim() || null), 'Could not submit your rating', () => { setStars(0); setComment(''); })} />
+                    <Button label="Submit rating" onPress={() => { setRating({ stars: stars || 5, comment: comment.trim() || null }); setStars(0); setComment(''); }} />
                   </>
                 )}
               </Card>

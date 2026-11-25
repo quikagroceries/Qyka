@@ -1,11 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/Text';
-import { Button, Card, ErrorBanner, Field, Hero, SafeAreaView, SectionHeader } from '@/components/ui';
-import { api, type Application, type Market } from '@/lib/api';
-import { errMsg } from '@/lib/format';
+import { Button, Card, Field, Hero, SafeAreaView, SectionHeader } from '@/components/ui';
+import { MARKETS } from '@/lib/mock';
 import { useSession } from '@/lib/session';
 
 const COPY = {
@@ -31,52 +30,12 @@ export default function Apply() {
   const copy = COPY[role];
 
   const [name, setName] = useState(user?.full_name ?? '');
-  const [markets, setMarkets] = useState<Market[] | null>(null);
   const [marketId, setMarketId] = useState('');
   const [vehicle, setVehicle] = useState('');
   const [area, setArea] = useState('');
   const [note, setNote] = useState('');
-  const [existing, setExisting] = useState<Application | null | undefined>(undefined); // undefined = loading
-  const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api.markets().then(setMarkets).catch((e) => setError(errMsg(e)));
-    api
-      .myApplications()
-      .then((list) => setExisting(list.find((a) => a.kind === role && a.status === 'pending') ?? null))
-      .catch(() => setExisting(null));
-  }, [role]);
-
   const phone = user?.phone ?? '';
-  const canSend =
-    !!name.trim() && !!phone && (role === 'agent' ? !!marketId : !!(marketId || area.trim())) && !busy;
-
-  async function submit() {
-    setError(null);
-    setBusy(true);
-    try {
-      if (role === 'agent') {
-        await api.applyAsAgent({ market_id: marketId, note: note.trim() || null });
-      } else {
-        await api.applyPublic({
-          kind: 'rider',
-          full_name: name.trim(),
-          phone,
-          ...(marketId ? { market_id: marketId } : {}),
-          ...(area.trim() ? { area: area.trim() } : {}),
-          ...(vehicle.trim() ? { vehicle: vehicle.trim() } : {}),
-          ...(note.trim() ? { note: note.trim() } : {}),
-        });
-      }
-      setSent(true);
-    } catch (e) {
-      setError(errMsg(e));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   const back = () => router.replace('/customer');
 
@@ -89,17 +48,15 @@ export default function Apply() {
 
         <Hero eyebrow="Join Qyka" title={copy.title} body={copy.body} image={copy.image} />
 
-        {sent || existing ? (
+        {sent ? (
           <Card className="items-center gap-2 py-6">
-            <Text className="text-lg font-extrabold text-ink">{sent ? 'Application received' : 'Application pending'}</Text>
+            <Text className="text-lg font-extrabold text-ink">Application received</Text>
             <Text className="text-center text-sm text-muted">
-              {sent ? "We'll call " : 'We have your application and will call '}
+              We&apos;ll call 
               <Text className="font-semibold text-ink">{phone}</Text> to verify you and get you started.
             </Text>
             <Button label="Back to my account" variant="neutral" className="mt-2" onPress={back} />
           </Card>
-        ) : existing === undefined ? (
-          <Text className="text-center text-muted">Checking…</Text>
         ) : (
           <>
             <Card>
@@ -108,7 +65,6 @@ export default function Apply() {
               <View className="rounded-full border border-line bg-sunken px-5 py-4">
                 <Text className="text-base text-muted">{phone || 'No phone on this account'}</Text>
               </View>
-              {!phone ? <Text className="text-xs text-faint">Add a phone number to your account to apply.</Text> : null}
             </Card>
 
             <Card>
@@ -116,9 +72,8 @@ export default function Apply() {
                 title={role === 'agent' ? 'Which market do you know best?' : 'Where would you ride?'}
                 subtitle={role === 'agent' ? 'You only see orders from this market.' : 'Pick a market, or describe your area below.'}
               />
-              {markets === null && !error ? <Text className="text-muted">Loading markets…</Text> : null}
               <View className="gap-2">
-                {(markets ?? []).map((m) => (
+                {MARKETS.map((m) => (
                   <Pressable
                     key={m.id}
                     onPress={() => setMarketId(marketId === m.id ? '' : m.id)}
@@ -137,8 +92,7 @@ export default function Apply() {
               <Field value={note} onChangeText={setNote} placeholder={role === 'agent' ? 'Anything we should know? (optional)' : 'Anything else? (optional)'} multiline className="min-h-[72px]" />
             </Card>
 
-            <ErrorBanner message={error} />
-            <Button label={`${copy.title} →`} busy={busy} disabled={!canSend} onPress={() => void submit()} />
+            <Button label={`${copy.title} →`} onPress={() => setSent(true)} />
           </>
         )}
       </ScrollView>

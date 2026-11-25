@@ -1,61 +1,26 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/Text';
 
-import { takeApplyIntent } from '@/lib/intent';
-import { Button, Card, EmptyState, ErrorBanner, Hero, SafeAreaView, StatusBadge } from '@/components/ui';
-import { api, type AgentOrder, type Market } from '@/lib/api';
-import { ago, errMsg, naira, shortId } from '@/lib/format';
+import { Button, Card, EmptyState, Hero, SafeAreaView, StatusBadge } from '@/components/ui';
+import { ago, naira, shortId } from '@/lib/format';
+import { ORDERS, marketName } from '@/lib/mock';
 import { isHistory, summarize } from '@/lib/orderStatus';
-import { usePolling } from '@/lib/usePolling';
 
 type Filter = 'active' | 'history';
 
 export default function Track() {
   const router = useRouter();
-  const [orders, setOrders] = useState<AgentOrder[] | null>(null);
-  const [markets, setMarkets] = useState<Market[]>([]);
   const [filter, setFilter] = useState<Filter>('active');
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
-  // Picked Agent/Rider at sign-in but not approved yet: land on the apply form.
-  useEffect(() => {
-    const role = takeApplyIntent();
-    if (role) router.push({ pathname: '/customer/apply', params: { role } });
-  }, [router]);
-
-  const load = useCallback(async () => {
-    try {
-      setOrders(await api.customerOrders());
-      setError(null);
-      api.markets().then(setMarkets).catch(() => {});
-    } catch (e) {
-      setError(`Could not load your orders. ${errMsg(e)}`);
-    }
-  }, []);
-  usePolling(load, 20_000);
-
-  const marketName = (id: string) => markets.find((m) => m.id === id)?.name;
-  const sorted = [...(orders ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const sorted = [...ORDERS].sort((a, b) => b.created_at.localeCompare(a.created_at));
   const active = sorted.filter((o) => !isHistory(o.status));
   const shown = filter === 'active' ? active : sorted.filter((o) => isHistory(o.status));
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
-      <ScrollView
-        contentContainerClassName="gap-4 p-4"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={async () => {
-              setRefreshing(true);
-              await load();
-              setRefreshing(false);
-            }}
-          />
-        }>
+      <ScrollView contentContainerClassName="gap-4 p-4">
         <Hero
           eyebrow={active.length > 0 ? `${active.length} active` : 'Track'}
           live={active.length > 0}
@@ -76,8 +41,7 @@ export default function Track() {
           ))}
         </View>
 
-        <ErrorBanner message={error} />
-        {orders && shown.length === 0 ? (
+        {shown.length === 0 ? (
           <EmptyState
             image={filter === 'active' ? require('../../../../assets/illustrations/track.webp') : require('../../../../assets/illustrations/history.webp')}
             title={filter === 'active' ? 'No active orders' : 'No past orders yet'}

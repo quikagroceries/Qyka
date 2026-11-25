@@ -29,7 +29,7 @@ export default function AccountView({ fallbackName }: { fallbackName: string }) 
             </View>
           </Card>
         ) : null}
-        <Button label="Sign out" variant="neutral" onPress={() => void signOut()} />
+        <Button label="Sign out" variant="neutral" onPress={signOut} />
       </View>
     </SafeAreaView>
   );

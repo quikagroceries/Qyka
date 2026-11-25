@@ -1,14 +1,12 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { Button, ErrorBanner, Field, Float, SafeAreaView } from '@/components/ui';
+import { Button, Field, Float, SafeAreaView } from '@/components/ui';
 import { Text } from '@/components/Text';
-import { api, type Role, type User } from '@/lib/api';
-import { setApplyIntent } from '@/lib/intent';
 import { useSession } from '@/lib/session';
+import type { Role } from '@/lib/types';
 
 const ROLE_COPY: Record<string, { label: string; headline: string; art: number }> = {
   customer: { label: 'Customer', headline: "Let's get you shopping", art: require('../../assets/illustrations/person-shopping-list.webp') },
@@ -17,106 +15,18 @@ const ROLE_COPY: Record<string, { label: string; headline: string; art: number }
   shopkeeper: { label: 'Shopkeeper', headline: "Let's open your hub", art: require('../../assets/illustrations/map-pin-storefront.webp') },
 };
 
-const LAST_KEY = 'qyka.lastIdentifier';
-
+// UI only: "Send code" and "Verify" just move through the screens, then the
+// chosen role's sample account opens.
 export default function SignIn() {
   const router = useRouter();
   const { role: roleParam } = useLocalSearchParams<{ role?: string }>();
   const picked = (roleParam && ROLE_COPY[roleParam] ? roleParam : 'customer') as Role;
   const copy = ROLE_COPY[picked];
-  const { peek, signIn } = useSession();
-
+  const { signIn } = useSession();
   const [identifier, setIdentifier] = useState('');
   const [code, setCode] = useState('');
   const [mode, setMode] = useState<'phone' | 'email'>('phone');
   const [step, setStep] = useState<'identify' | 'code'>('identify');
-  const [devOtp, setDevOtp] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [mismatch, setMismatch] = useState<User | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Pre-fill whatever you signed in with last time (a phone number is a pain to retype).
-  useEffect(() => {
-    SecureStore.getItemAsync(LAST_KEY)
-      .then((raw) => {
-        if (!raw) return;
-        const last = JSON.parse(raw) as { identifier: string; mode: 'phone' | 'email' };
-        setIdentifier((cur) => cur || last.identifier);
-        setMode(last.mode);
-      })
-      .catch(() => {});
-  }, []);
-
-  async function run(fn: () => Promise<void>) {
-    setBusy(true);
-    setError(null);
-    try {
-      await fn();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const sendCode = () =>
-    run(async () => {
-      const res = await api.requestOtp(identifier.trim());
-      setDevOtp(res.dev_otp); // only present outside production
-      setStep('code');
-    });
-
-  const verify = () =>
-    run(async () => {
-      // The role is only honoured by a development backend, for brand-new accounts.
-      const { access_token } = await api.verifyOtp(identifier.trim(), code.trim(), __DEV__ ? picked : undefined);
-      const me = await peek(access_token);
-      // Picked agent/rider/shopkeeper but this account isn't one (yet): say so
-      // instead of silently dropping them into a different app.
-      if (me.role !== picked && picked !== 'customer') {
-        setToken(access_token);
-        setMismatch(me);
-        return;
-      }
-      SecureStore.setItemAsync(LAST_KEY, JSON.stringify({ identifier: identifier.trim(), mode })).catch(() => {});
-      await signIn(access_token); // the router guard moves us into the app
-    });
-
-  if (mismatch && token) {
-    return (
-      <SafeAreaView className="flex-1 bg-canvas">
-        <View className="flex-1 justify-center gap-5 p-6">
-          <Animated.View entering={FadeInDown.duration(400)} className="gap-3 rounded-3xl border border-line bg-surface p-6 shadow-sm">
-            <Text className="text-2xl font-extrabold tracking-tight text-ink">This account isn&apos;t a {copy.label.toLowerCase()} yet</Text>
-            <Text className="text-base leading-6 text-muted">
-              {copy.label}s are approved by the Qyka team before they can start. Your account is signed up as a {mismatch.role}.{' '}
-              {picked === 'agent' || picked === 'rider' ? 'You can apply right here: your details are already filled in.' : 'Get in touch with Qyka to have a hub set up.'}
-            </Text>
-            {picked === 'agent' || picked === 'rider' ? (
-              <Button
-                label={`Apply as ${picked === 'agent' ? 'an agent' : 'a rider'}`}
-                onPress={() => {
-                  setApplyIntent(picked);
-                  void signIn(token);
-                }}
-              />
-            ) : null}
-            <Button label={`Continue as ${mismatch.role}`} variant={picked === 'agent' || picked === 'rider' ? 'neutral' : 'primary'} onPress={() => void signIn(token)} />
-            <Button
-              label="Pick a different option"
-              variant="neutral"
-              onPress={() => {
-                setMismatch(null);
-                setToken(null);
-                router.replace('/welcome');
-              }}
-            />
-          </Animated.View>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView className="flex-1 bg-canvas">
@@ -143,7 +53,7 @@ export default function SignIn() {
                 ? mode === 'phone'
                   ? "Enter your phone number and we'll text you a code."
                   : "Enter your email and we'll send you a code."
-                : `We sent a code to ${identifier.trim()}.`}
+                : `We sent a code to ${identifier.trim() || 'you'}.`}
             </Text>
           </Animated.View>
 
@@ -157,7 +67,6 @@ export default function SignIn() {
                       onPress={() => {
                         setMode(m);
                         setIdentifier('');
-                        setError(null);
                       }}
                       className={'flex-1 items-center rounded-full py-2.5 ' + (mode === m ? 'bg-surface shadow-sm' : '')}>
                       <Text className={'text-sm font-bold ' + (mode === m ? 'text-ink' : 'text-muted')}>{m === 'phone' ? 'Phone' : 'Email'}</Text>
@@ -173,33 +82,27 @@ export default function SignIn() {
                   keyboardType={mode === 'phone' ? 'phone-pad' : 'email-address'}
                   textContentType={mode === 'phone' ? 'telephoneNumber' : 'emailAddress'}
                 />
+                <Button label="Send code" onPress={() => setStep('code')} />
               </>
             ) : (
-              <Field
-                value={code}
-                onChangeText={setCode}
-                placeholder="123456"
-                keyboardType="number-pad"
-                textContentType="oneTimeCode"
-                maxLength={8}
-                autoFocus
-                className="text-center text-2xl tracking-[6px]"
-              />
-            )}
-            {devOtp && step === 'code' ? <Text className="text-center text-sm text-muted">Dev code: {devOtp}</Text> : null}
-            <ErrorBanner message={error} />
-            {step === 'identify' ? (
-              <Button label="Send code" onPress={sendCode} busy={busy} disabled={!identifier.trim()} />
-            ) : (
               <>
-                <Button label="Verify" onPress={verify} busy={busy} disabled={code.trim().length < 4} />
+                <Field
+                  value={code}
+                  onChangeText={setCode}
+                  placeholder="123456"
+                  keyboardType="number-pad"
+                  textContentType="oneTimeCode"
+                  maxLength={8}
+                  autoFocus
+                  className="text-center text-2xl tracking-[6px]"
+                />
+                <Button label="Verify" onPress={() => signIn(picked)} />
                 <Button
                   label={mode === 'phone' ? 'Use a different number' : 'Use a different email'}
                   variant="neutral"
                   onPress={() => {
                     setStep('identify');
                     setCode('');
-                    setError(null);
                   }}
                 />
               </>

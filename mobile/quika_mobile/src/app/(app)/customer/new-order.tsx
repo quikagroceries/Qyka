@@ -1,15 +1,14 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/Text';
 
 import FlowSteps, { type FlowStepKey } from '@/components/customer/FlowSteps';
-import { Button, Card, ErrorBanner, Field, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';
-import { api, type Market } from '@/lib/api';
-import { errMsg, naira } from '@/lib/format';
-import { openStatus } from '@/lib/marketHours';
+import { Button, Card, Field, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';
+import { naira } from '@/lib/format';
+import { MARKETS, ORDERS, PRICING } from '@/lib/mock';
 import { useSession } from '@/lib/session';
-import { useOrdersOpen, usePricing } from '@/lib/usePricing';
+import type { Market } from '@/lib/types';
 
 type Row = { item: string; price: string; qty: string; note: string };
 const blank = (): Row => ({ item: '', price: '', qty: '', note: '' });
@@ -19,75 +18,33 @@ const blank = (): Row => ({ item: '', price: '', qty: '', note: '' });
 export default function NewOrder() {
   const router = useRouter();
   const { user } = useSession();
-  const pricing = usePricing();
-  const ordersOpen = useOrdersOpen();
+  const pricing = PRICING;
 
   const [step, setStep] = useState<FlowStepKey>('list');
   const [rows, setRows] = useState<Row[]>([blank()]);
   const [budget, setBudget] = useState('');
-  const [markets, setMarkets] = useState<Market[] | null>(null);
   const [market, setMarket] = useState<Market | null>(null);
   const [query, setQuery] = useState('');
   const [address, setAddress] = useState(user?.default_delivery_address ?? '');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api.markets().then(setMarkets).catch((e) => setError(`Could not load markets. ${errMsg(e)}`));
-  }, []);
 
   const filled = rows.filter((r) => r.item.trim());
   const priced = filled.filter((r) => Number(r.price) > 0);
   const unpriced = filled.filter((r) => !(Number(r.price) > 0));
   const budgetTotal = unpriced.length > 0 ? Number(budget) || 0 : 0;
   const goodsTotal = priced.reduce((s, r) => s + Number(r.price), 0) + budgetTotal;
-  const listOk = filled.length > 0 && goodsTotal > 0;
-
-  const status = openStatus(market);
-  const closed = status?.open === false;
-  const paused = !ordersOpen.open;
 
   const serviceFee = goodsTotal * pricing.serviceFeeRate;
-  const mustPrepay = !!user?.must_prepay;
-  const deposit = mustPrepay ? goodsTotal + pricing.deliveryFee + serviceFee : goodsTotal * pricing.depositRate;
+  const deposit = goodsTotal * pricing.depositRate;
 
   const shownMarkets = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return (markets ?? []).filter((m) => !q || [m.name, m.city, m.state].some((v) => String(v || '').toLowerCase().includes(q)));
-  }, [markets, query]);
+    return MARKETS.filter((m) => !q || [m.name, m.city, m.state].some((v) => String(v || '').toLowerCase().includes(q)));
+  }, [query]);
 
   const setRow = (i: number, patch: Partial<Row>) => setRows((cur) => cur.map((r, k) => (k === i ? { ...r, ...patch } : r)));
 
-  async function place() {
-    if (!market) return;
-    setError(null);
-    setBusy(true);
-    try {
-      const items = filled.map((r) => ({
-        description: r.item.trim(),
-        ...(Number(r.price) > 0 ? { listed_price: String(Number(r.price)) } : {}),
-        ...(Number(r.qty) >= 1 ? { quantity: Math.floor(Number(r.qty)) } : {}),
-        ...(r.note.trim() ? { requested_note: r.note.trim() } : {}),
-      }));
-      const created = await api.createOrder({
-        market_id: market.id,
-        delivery_address: address.trim(),
-        listed_items_total: String(budgetTotal),
-        items,
-      });
-      // The list is also dropped into the order chat so the agent sees it first thing.
-      const summary = ['Market list', ...filled.map((r, i) => `${i + 1}. ${r.item.trim()}${Number(r.price) > 0 ? ` — ₦${r.price}` : ''}${Number(r.qty) >= 1 ? ` x${r.qty}` : ''}`)].join('\n');
-      await api.sendMessage(created.id, { text: summary }).catch(() => {});
-      // Remember the address for next time (best effort).
-      if (address.trim() && address.trim() !== user?.default_delivery_address) api.saveAddress(address.trim()).catch(() => {});
-      router.replace(`/customer/orders/${created.id}`);
-    } catch (e) {
-      const msg = errMsg(e);
-      setError(/market is closed/i.test(msg) ? "This market is closed right now, so the order wasn't placed." : `Could not place the order: ${msg}`);
-    } finally {
-      setBusy(false);
-    }
-  }
+  // UI only: nothing is sent anywhere, so placing an order just opens a sample one.
+  const place = () => router.replace(`/customer/orders/${ORDERS[2].id}`);
 
   const Header = (
     <View className="gap-4 rounded-3xl border border-line bg-surface p-5 shadow-sm">
@@ -106,7 +63,6 @@ export default function NewOrder() {
     <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
       <ScrollView contentContainerClassName="gap-4 p-4 pb-10" keyboardShouldPersistTaps="handled">
         {Header}
-        <ErrorBanner message={error} />
 
         {step === 'list' ? (
           <>
@@ -145,8 +101,7 @@ export default function NewOrder() {
                 <Text className="text-muted">Your estimate · {filled.length} item{filled.length === 1 ? '' : 's'}</Text>
                 <Text className="text-xl font-extrabold text-ink">{naira(goodsTotal)}</Text>
               </View>
-              {unpriced.length > 0 && !(budgetTotal > 0) && priced.length === 0 ? <Text className="text-xs text-faint">Add a price or a budget to continue.</Text> : null}
-              <Button label="Continue" disabled={!listOk} onPress={() => setStep(market ? 'address' : 'market')} />
+              <Button label="Continue" onPress={() => setStep(market ? 'address' : 'market')} />
             </Card>
           </>
         ) : null}
@@ -158,10 +113,8 @@ export default function NewOrder() {
               <Text className="text-sm text-muted">Where should your agent shop your list?</Text>
             </View>
             <Field placeholder="Search markets" value={query} onChangeText={setQuery} autoCapitalize="none" />
-            {markets === null && !error ? <Text className="text-muted">Loading markets…</Text> : null}
-            {markets && shownMarkets.length === 0 ? <Text className="text-muted">No markets match your search.</Text> : null}
+            {shownMarkets.length === 0 ? <Text className="text-muted">No markets match your search.</Text> : null}
             {shownMarkets.map((m) => {
-              const st = openStatus(m);
               const selected = market?.id === m.id;
               return (
                 <Pressable
@@ -177,11 +130,6 @@ export default function NewOrder() {
                         <Text className="text-lg font-extrabold text-ink">{m.name}</Text>
                         <Text className="text-sm text-muted">{[m.city, m.state].filter(Boolean).join(', ')}</Text>
                       </View>
-                      {st ? (
-                        <Text className={'rounded-full px-2.5 py-1 text-xs font-bold ' + (st.open ? 'bg-brand-green/10 text-brand-green' : 'bg-sunken text-muted')}>
-                          {st.open ? 'Open now' : `Opens ${st.opensAt}`}
-                        </Text>
-                      ) : null}
                     </View>
                     {m.description ? <Text className="text-sm text-muted" numberOfLines={2}>{m.description}</Text> : null}
                   </Card>
@@ -205,7 +153,7 @@ export default function NewOrder() {
             ) : null}
             <Field placeholder="Street, area, landmark" value={address} onChangeText={setAddress} multiline className="min-h-[88px]" />
             <Text className="text-xs text-faint">Include a landmark or gate colour. It helps the rider find you.</Text>
-            <Button label="Continue" disabled={address.trim().length < 5 || !market} onPress={() => setStep('quote')} />
+            <Button label="Continue" onPress={() => setStep('quote')} />
           </>
         ) : null}
 
@@ -238,20 +186,12 @@ export default function NewOrder() {
               {deposit > 0 ? (
                 <View className="rounded-2xl bg-brand-orange/[0.12] px-3 py-3">
                   <Text className="text-sm text-ink/80">
-                    {mustPrepay
-                      ? `Because a previous order wasn't paid, this order requires full payment upfront: ${naira(deposit)}.`
-                      : `A ${Math.round(pricing.depositRate * 100)}% deposit (${naira(deposit)}) is required before shopping can start.`}
+                    {`A ${Math.round(pricing.depositRate * 100)}% deposit (${naira(deposit)}) is required before shopping can start.`}
                   </Text>
                 </View>
               ) : null}
-              {closed ? (
-                <View className="rounded-2xl bg-sunken px-3 py-3">
-                  <Text className="text-sm text-ink/80">This market is closed. Opens at {status!.opensAt}. You can place the order once it opens.</Text>
-                </View>
-              ) : null}
-              {paused ? <Text className="rounded-2xl bg-brand-orange/10 px-4 py-3 text-sm font-semibold text-ink">{ordersOpen.message || "We're not taking new orders right now."}</Text> : null}
               <Text className="text-xs text-faint">Delivering to: {address}</Text>
-              <Button label="Get my quote" busy={busy} disabled={closed || paused} onPress={() => void place()} />
+              <Button label="Get my quote" onPress={place} />
             </Card>
           </>
         ) : null}

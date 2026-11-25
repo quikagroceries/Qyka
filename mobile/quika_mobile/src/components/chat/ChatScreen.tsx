@@ -1,86 +1,34 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from 'react-native';
 import { Text } from '@/components/Text';
 
-import { Avatar, ErrorBanner, SafeAreaView } from '@/components/ui';
-import { api, type Conversation, type Message } from '@/lib/api';
-import { clockTime, dayLabel, errMsg } from '@/lib/format';
+import { Avatar, SafeAreaView } from '@/components/ui';
+import { clockTime, dayLabel } from '@/lib/format';
+import { CONVERSATIONS, MESSAGES } from '@/lib/mock';
 import { useSession } from '@/lib/session';
-import { takeAndUploadPhoto } from '@/lib/upload';
-import { usePolling } from '@/lib/usePolling';
+import type { Message } from '@/lib/types';
 
-// Chat should feel live, so it polls quickly (paused while the app is in the
-// background; usePolling handles that).
-const POLL_MS = 5000;
 const QUICK_REPLIES = ['Hello', 'On it', 'Almost done', 'Thank you'];
 
-/** One order's chat. `backTo` is where the back arrow goes; `who` names the other side. */
+/** One order's chat. `backTo` is where the back arrow goes; `who` names the other side. UI only: sent messages live in this screen's state. */
 export default function ChatScreen({ orderId, backTo, who }: { orderId: string; backTo: string; who: 'Customer' | 'Your agent' }) {
   const router = useRouter();
   const { user } = useSession();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [other, setOther] = useState<Conversation['other']>(null);
+  const [messages, setMessages] = useState<Message[]>(MESSAGES);
   const [text, setText] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const scroller = useRef<ScrollViewInstance>(null);
-  const lastRead = useRef(0);
-
-  const poll = useCallback(async () => {
-    try {
-      const msgs = await api.messages(orderId);
-      setMessages(msgs);
-      // Anything that arrives while the chat is open counts as seen.
-      if (msgs.length !== lastRead.current) {
-        lastRead.current = msgs.length;
-        api.markChatRead(orderId).catch(() => {});
-      }
-    } catch {
-      // A failed poll shouldn't interrupt the screen.
-    }
-  }, [orderId]);
-  usePolling(poll, POLL_MS);
-
-  // Who you're talking to comes from the inbox row for this order.
-  useEffect(() => {
-    api
-      .conversations()
-      .then((list) => setOther(list.find((c) => c.order_id === orderId)?.other ?? null))
-      .catch(() => {});
-  }, [orderId]);
+  const other = CONVERSATIONS.find((c) => c.order_id === orderId)?.other ?? CONVERSATIONS[0].other;
 
   useEffect(() => {
     scroller.current?.scrollToEnd({ animated: true });
   }, [messages.length]);
 
-  async function send(body: { text?: string; image_url?: string }, clear = false) {
-    setError(null);
-    setBusy(true);
-    try {
-      await api.sendMessage(orderId, body);
-      if (clear) setText('');
-      await poll();
-    } catch (e) {
-      setError(`Could not send: ${errMsg(e)}`);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function sendPhoto() {
-    setError(null);
-    setUploading(true);
-    try {
-      const url = await takeAndUploadPhoto();
-      if (url) await send({ image_url: url });
-    } catch (e) {
-      setError(errMsg(e));
-    } finally {
-      setUploading(false);
-    }
+  function send(body: string) {
+    if (!body) return;
+    setMessages((cur) => [...cur, { id: `local-${cur.length}`, order_id: orderId, sender_id: user?.id ?? '', text: body, image_url: null, created_at: new Date().toISOString() }]);
+    setText('');
   }
 
   return (
@@ -141,14 +89,9 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
         </ScrollView>
 
         <View className="gap-2 border-t border-line px-4 py-3">
-          <ErrorBanner message={error} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2">
             {QUICK_REPLIES.map((r) => (
-              <Pressable
-                key={r}
-                disabled={busy}
-                onPress={() => void send({ text: r })}
-                className="rounded-full border border-line bg-surface px-3 py-1.5 active:border-brand-orange">
+              <Pressable key={r} onPress={() => send(r)} className="rounded-full border border-line bg-surface px-3 py-1.5 active:border-brand-orange">
                 <Text className="text-sm font-semibold text-muted">{r}</Text>
               </Pressable>
             ))}
@@ -160,17 +103,16 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
               placeholder="Type a message"
               placeholderTextColor="#9B9B9B"
               returnKeyType="send"
-              onSubmitEditing={() => text.trim() && void send({ text: text.trim() }, true)}
+              onSubmitEditing={() => send(text.trim())}
               className="font-body min-h-[44px] flex-1 rounded-full border border-line-strong bg-surface px-4 text-base text-ink"
             />
-            <Pressable onPress={() => void sendPhoto()} disabled={uploading} accessibilityLabel="Send a photo" className="h-11 w-11 items-center justify-center rounded-full bg-sunken active:bg-line-strong">
-              <Text className="text-base text-muted">{uploading ? '…' : '📷'}</Text>
+            <Pressable accessibilityLabel="Send a photo" className="h-11 w-11 items-center justify-center rounded-full bg-sunken active:bg-line-strong">
+              <Text className="text-base text-muted">📷</Text>
             </Pressable>
             <Pressable
-              onPress={() => void send({ text: text.trim() }, true)}
-              disabled={busy || !text.trim()}
+              onPress={() => send(text.trim())}
               accessibilityLabel="Send message"
-              className={'h-11 w-11 items-center justify-center rounded-full bg-brand-orange active:bg-brand-orange-dark ' + (busy || !text.trim() ? 'opacity-50' : '')}>
+              className="h-11 w-11 items-center justify-center rounded-full bg-brand-orange active:bg-brand-orange-dark">
               <Text className="text-lg font-extrabold text-ink">↑</Text>
             </Pressable>
           </View>

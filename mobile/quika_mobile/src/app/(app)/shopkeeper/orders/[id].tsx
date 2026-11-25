@@ -1,13 +1,12 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Image, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
 import { Text } from '@/components/Text';
 
-import { Button, Card, CodeInput, ErrorBanner, Hero, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';
-import { api, type HubOrder } from '@/lib/api';
-import { ago, errMsg, shortId } from '@/lib/format';
-import { takeAndUploadPhoto } from '@/lib/upload';
-import { usePolling } from '@/lib/usePolling';
+import { Button, Card, CodeInput, Hero, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';
+import { ago, shortId } from '@/lib/format';
+import { hubOrderById } from '@/lib/mock';
+import type { HubOrder } from '@/lib/types';
 
 // One order, one job at a time: which panel shows is decided by where the
 // order is in the hub's custody chain, so the shopkeeper only sees the next
@@ -20,59 +19,19 @@ const itemLabel = (it: HubOrder['items'][number]) => `${it.quantity ? `${it.quan
 export default function HubOrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [order, setOrder] = useState<HubOrder | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  // UI only: the order's stage lives in local state so each panel can be walked through.
+  const initial = hubOrderById(id);
+  const [status, setStatus] = useState(initial.status);
+  const order: HubOrder = initial;
 
   // Check-in form
-  const [seen, setSeen] = useState<Set<string> | null>(null); // null until the first load seeds "everything arrived"
+  const [seen, setSeen] = useState<Set<string>>(() => new Set(order.items.map((i) => i.id)));
   const [note, setNote] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
   // Handover
   const [code, setCode] = useState('');
   const [handedTo, setHandedTo] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const o = await api.hubOrder(id);
-      setOrder(o);
-      setSeen((cur) => cur ?? new Set(o.items.map((i) => i.id)));
-      setLoadError(null);
-    } catch (e) {
-      setLoadError(errMsg(e));
-    }
-  }, [id]);
-  usePolling(load, 10_000);
-
   const back = () => router.replace('/shopkeeper');
-
-  async function run(fn: () => Promise<HubOrder>, onDone?: () => void) {
-    setError(null);
-    setBusy(true);
-    try {
-      setOrder(await fn());
-      onDone?.();
-    } catch (e) {
-      setError(errMsg(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function addPhoto() {
-    setError(null);
-    setUploading(true);
-    try {
-      const url = await takeAndUploadPhoto();
-      if (url) setPhotos((cur) => [...cur, url]);
-    } catch (e) {
-      setError(errMsg(e));
-    } finally {
-      setUploading(false);
-    }
-  }
 
   const Back = (
     <Pressable onPress={back} className="self-start py-1">
@@ -80,20 +39,8 @@ export default function HubOrderScreen() {
     </Pressable>
   );
 
-  if (!order || !seen) {
-    return (
-      <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
-        <View className="gap-3 p-4">
-          {Back}
-          {loadError ? <ErrorBanner message={loadError} /> : <Text className="text-muted">Loading…</Text>}
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   const items = order.items;
   const missing = items.filter((i) => !seen.has(i.id));
-  const status = order.status;
 
   const shell = (eyebrow: string, title: string, body: string, content: React.ReactNode) => (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
@@ -107,7 +54,6 @@ export default function HubOrderScreen() {
 
   // ── Dropped: check what arrived against the list ──────────────────────
   if (status === 'dropped_at_hub') {
-    const needsNote = missing.length > 0 && !note.trim();
     return shell(
       'Dropped at hub',
       `Check in #${shortId(order.id)}`,
@@ -162,34 +108,16 @@ export default function HubOrderScreen() {
         <Card>
           <SectionHeader title="Photo of the goods" subtitle="Optional, but it protects you." />
           <View className="flex-row flex-wrap gap-2">
-            {photos.map((src, i) => (
-              <Image key={src + i} source={{ uri: src }} className="h-16 w-16 rounded-lg" />
-            ))}
-            <Pressable
-              onPress={() => void addPhoto()}
-              disabled={uploading}
-              className="h-16 w-16 items-center justify-center rounded-lg border-2 border-dashed border-line-strong">
-              <Text className="text-xs font-semibold text-faint">{uploading ? '…' : '+ Photo'}</Text>
+            <Pressable className="h-16 w-16 items-center justify-center rounded-lg border-2 border-dashed border-line-strong">
+              <Text className="text-xs font-semibold text-faint">+ Photo</Text>
             </Pressable>
           </View>
         </Card>
 
-        <ErrorBanner message={error} />
         <Button
-          busy={busy}
-          disabled={needsNote || uploading}
           label={missing.length > 0 ? `Check in with ${missing.length} missing` : "Everything's here: check in"}
-          onPress={() =>
-            void run(() =>
-              api.hubReceive(order.id, {
-                received_item_ids: missing.length > 0 ? [...seen] : undefined,
-                note: note.trim() || undefined,
-                photos,
-              }),
-            )
-          }
+          onPress={() => setStatus('received_by_hub')}
         />
-        {needsNote ? <Text className="text-center text-sm text-muted">Add a note about what&apos;s missing first.</Text> : null}
       </>,
     );
   }
@@ -215,8 +143,7 @@ export default function HubOrderScreen() {
             <Text className="mt-2 rounded-2xl bg-sunken p-3 text-sm text-muted">{order.hub_receipt_note}</Text>
           ) : null}
         </Card>
-        <ErrorBanner message={error} />
-        <Button busy={busy} label="Ready for a rider" onPress={() => void run(() => api.hubReady(order.id))} />
+        <Button label="Ready for a rider" onPress={() => setStatus('ready_for_pickup')} />
       </>,
     );
   }
@@ -234,12 +161,12 @@ export default function HubOrderScreen() {
           <Card accent className="items-stretch">
             <Text className="text-center font-semibold text-ink">Rider&apos;s code</Text>
             <CodeInput value={code} onChange={setCode} />
-            <ErrorBanner message={error} />
             <Button
-              busy={busy}
-              disabled={code.length < 4}
               label="Hand over to rider"
-              onPress={() => void run(() => api.hubHandover(order.id, code), () => setHandedTo(order.rider_name || 'the rider'))}
+              onPress={() => {
+                setHandedTo(order.rider_name || 'the rider');
+                setStatus('out_for_delivery');
+              }}
             />
             <Text className="text-center text-xs text-muted">Only hand the bag over once the code matches.</Text>
           </Card>

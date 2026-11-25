@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Text } from '@/components/Text';
 
 import { Button, SafeAreaView } from '@/components/ui';
-import type { Role } from '@/lib/api';
+import type { Role } from '@/lib/types';
 import { useSession } from '@/lib/session';
 
 const HOME_COPY: Record<Role, string> = {
@@ -30,7 +30,7 @@ export default function Home() {
         <Text className="text-base text-muted">{HOME_COPY[user.role]}</Text>
       </View>
       <View className="p-6">
-        <Button label="Sign out" variant="neutral" onPress={() => void signOut()} />
+        <Button label="Sign out" variant="neutral" onPress={signOut} />
       </View>
     </SafeAreaView>
   );
