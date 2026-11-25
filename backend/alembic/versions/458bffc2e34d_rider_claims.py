@@ -1,7 +1,7 @@
 """rider job claims: pickup code, claim and drop-off timestamps
 
-Revision ID: c9d0e1f2a3b4
-Revises: b8c9d0e1f2a3
+Revision ID: 458bffc2e34d
+Revises: 60b1ac57953f
 Create Date: 2026-11-24 00:20:00.000000
 
 """
@@ -11,8 +11,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'c9d0e1f2a3b4'
-down_revision: Union[str, None] = 'b8c9d0e1f2a3'
+revision: str = '458bffc2e34d'
+down_revision: Union[str, None] = '60b1ac57953f'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

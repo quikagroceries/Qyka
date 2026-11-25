@@ -1,7 +1,7 @@
 """order hub custody: new statuses and hub drop/receipt columns
 
-Revision ID: b8c9d0e1f2a3
-Revises: a7b8c9d0e1f2
+Revision ID: 60b1ac57953f
+Revises: 3cfb3facb0e8
 Create Date: 2026-11-24 00:10:00.000000
 
 """
@@ -11,8 +11,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'b8c9d0e1f2a3'
-down_revision: Union[str, None] = 'a7b8c9d0e1f2'
+revision: str = '60b1ac57953f'
+down_revision: Union[str, None] = '3cfb3facb0e8'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

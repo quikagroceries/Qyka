@@ -1,7 +1,7 @@
 """admin levels (owner/support) and the admin audit log
 
-Revision ID: e1f2a3b4c5d6
-Revises: d0e1f2a3b4c5
+Revision ID: db0d041bd5d6
+Revises: a229f47a1412
 Create Date: 2026-11-25 00:00:00.000000
 
 """
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = 'e1f2a3b4c5d6'
-down_revision: Union[str, None] = 'd0e1f2a3b4c5'
+revision: str = 'db0d041bd5d6'
+down_revision: Union[str, None] = 'a229f47a1412'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

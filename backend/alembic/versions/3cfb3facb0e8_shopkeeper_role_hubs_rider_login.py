@@ -1,6 +1,6 @@
 """shopkeeper role, market hubs, and riders linked to a login
 
-Revision ID: a7b8c9d0e1f2
+Revision ID: 3cfb3facb0e8
 Revises: c6d7e8f9a0b1
 Create Date: 2026-11-24 00:00:00.000000
 
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'a7b8c9d0e1f2'
+revision: str = '3cfb3facb0e8'
 down_revision: Union[str, None] = 'c6d7e8f9a0b1'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

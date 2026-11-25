@@ -1,7 +1,7 @@
 """admin-set rider/hub delivery pay, snapshotted on each order
 
-Revision ID: d0e1f2a3b4c5
-Revises: c9d0e1f2a3b4
+Revision ID: a229f47a1412
+Revises: 458bffc2e34d
 Create Date: 2026-11-24 00:30:00.000000
 
 """
@@ -11,8 +11,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'd0e1f2a3b4c5'
-down_revision: Union[str, None] = 'c9d0e1f2a3b4'
+revision: str = 'a229f47a1412'
+down_revision: Union[str, None] = '458bffc2e34d'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
