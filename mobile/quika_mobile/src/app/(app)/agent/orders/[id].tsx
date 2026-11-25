@@ -8,8 +8,7 @@ import { errMsg, naira, shortId } from '@/lib/format';
 import { takeAndUploadPhoto } from '@/lib/upload';
 import { usePolling } from '@/lib/usePolling';
 
-// Mirrors web's shared Shopping screen. Chat with the customer is not here
-// yet; it is the next piece of the agent app.
+// Mirrors web's shared Shopping screen.
 
 const POLL_MS = 8000;
 
@@ -212,6 +211,7 @@ export default function AgentOrderScreen() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [unread, setUnread] = useState(0);
   const loaded = useRef(false);
 
   // Pay-a-stall form
@@ -235,6 +235,7 @@ export default function AgentOrderScreen() {
       loaded.current = true;
       setError(null);
       if (fresh.status === 'shopping') api.purchases(id).then(setPurchases).catch(() => {});
+      api.conversations().then((l) => setUnread(l.find((c) => c.order_id === id)?.unread ?? 0)).catch(() => {});
     } catch {
       if (!loaded.current) setError('Could not load the order.');
     }
@@ -365,6 +366,20 @@ export default function AgentOrderScreen() {
           <Text className="text-2xl font-extrabold tracking-tight text-ink">{headline}</Text>
           {BODY[order.status] ? <Text className="text-sm leading-relaxed text-ink/70">{BODY[order.status]}</Text> : null}
         </View>
+
+        {/* Chat with the customer exists only while the order is being shopped. */}
+        {order.status === 'agent_assigned' || order.status === 'shopping' ? (
+          <Pressable onPress={() => router.push(`/agent/chat/${id}`)} className="flex-row items-center justify-between rounded-3xl border border-line bg-surface p-4 shadow-sm active:bg-sunken-2">
+            <Text className="text-base font-bold text-ink">Chat with customer</Text>
+            {unread > 0 ? (
+              <View className="h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1">
+                <Text className="text-[11px] font-bold text-white">{unread > 9 ? '9+' : unread}</Text>
+              </View>
+            ) : (
+              <Text className="text-xl text-faint">›</Text>
+            )}
+          </Pressable>
+        ) : null}
 
         <ErrorBanner message={error} />
 

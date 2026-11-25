@@ -9,9 +9,11 @@ export default function AgentLayout() {
   return (
     <Tabs screenOptions={tabScreenOptions}>
       <Tabs.Screen name="index" options={{ title: 'Tasks' }} />
+      <Tabs.Screen name="messages" options={{ title: 'Messages' }} />
       <Tabs.Screen name="account" options={{ title: 'Account' }} />
       {/* A detail screen, not a tab. */}
       <Tabs.Screen name="orders/[id]" options={{ href: null }} />
+      <Tabs.Screen name="chat/[orderId]" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -88,6 +88,24 @@ export type Vendor = { id: string; name: string };
 export type Hub = { id: string; name: string };
 export type Purchase = { id: string; amount: string; account_number: string; photo_ref: string | null };
 
+export type Message = {
+  id: string;
+  order_id: string;
+  sender_id: string;
+  text: string | null;
+  image_url: string | null;
+  created_at: string;
+};
+
+export type Conversation = {
+  order_id: string;
+  order_status: string;
+  market_name: string | null;
+  other: { id: string; full_name: string | null; avatar_url: string | null } | null;
+  last_message: { text: string | null; has_image: boolean; sender_id: string; created_at: string };
+  unread: number;
+};
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -199,4 +217,11 @@ export const api = {
     request<unknown>(`/delivery/orders/${id}/drop-at-hub`, { method: 'POST', body: hubId ? { hub_id: hubId } : {} }),
   addPackingPhotos: (id: string, refs: string[]) =>
     request<unknown>(`/delivery/orders/${id}/packing-photos`, { method: 'POST', body: { refs } }),
+
+  // Order chat (customer <-> agent).
+  messages: (orderId: string) => request<Message[]>(`/orders/${orderId}/messages`),
+  sendMessage: (orderId: string, body: { text?: string; image_url?: string }) =>
+    request<Message>(`/orders/${orderId}/messages`, { method: 'POST', body }),
+  markChatRead: (orderId: string) => request<null>(`/orders/${orderId}/messages/read`, { method: 'POST' }),
+  conversations: () => request<Conversation[]>('/chat/conversations'),
 };

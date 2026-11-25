@@ -162,3 +162,13 @@ export function StatusBadge({ status }: { status: string }) {
     </View>
   );
 }
+
+/** Photo, or the person's initial on a sunken disc (web's Avatar fallback). */
+export function Avatar({ uri, name, className }: { uri?: string | null; name?: string | null; className?: string }) {
+  if (uri) return <Image source={{ uri }} className={cx('h-10 w-10 rounded-full bg-sunken', className)} />;
+  return (
+    <View className={cx('h-10 w-10 items-center justify-center rounded-full bg-brand-orange/15', className)}>
+      <Text className="text-base font-bold text-brand-orange-dark">{(name || '?').trim().charAt(0).toUpperCase()}</Text>
+    </View>
+  );
+}
