@@ -3,3 +3,9 @@
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Dependencies, in every folder (frontend, mobile, anywhere else)
+node_modules/
+
+# Expo's local dev-server state
+.expo/
