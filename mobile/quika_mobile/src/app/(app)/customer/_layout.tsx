@@ -14,6 +14,7 @@ export default function CustomerLayout() {
       <Tabs.Screen name="account" options={{ title: 'Account', tabBarIcon: tabIcon(ICONS.account) }} />
       {/* Detail screens, not tabs. */}
       <Tabs.Screen name="orders/[id]" options={{ href: null }} />
+      <Tabs.Screen name="apply" options={{ href: null }} />
       <Tabs.Screen name="chat/[orderId]" options={{ href: null }} />
     </Tabs>
   );

@@ -1,11 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { useEffect, useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Button, ErrorBanner, Field, Float, SafeAreaView } from '@/components/ui';
 import { Text } from '@/components/Text';
 import { api, type Role, type User } from '@/lib/api';
+import { setApplyIntent } from '@/lib/intent';
 import { useSession } from '@/lib/session';
 
 const ROLE_COPY: Record<string, { label: string; headline: string; art: number }> = {
@@ -14,6 +16,8 @@ const ROLE_COPY: Record<string, { label: string; headline: string; art: number }
   rider: { label: 'Rider', headline: "Let's get you riding", art: require('../../assets/illustrations/char-rider-scooter.webp') },
   shopkeeper: { label: 'Shopkeeper', headline: "Let's open your hub", art: require('../../assets/illustrations/map-pin-storefront.webp') },
 };
+
+const LAST_KEY = 'qyka.lastIdentifier';
 
 export default function SignIn() {
   const router = useRouter();
@@ -31,6 +35,18 @@ export default function SignIn() {
   const [mismatch, setMismatch] = useState<User | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Pre-fill whatever you signed in with last time (a phone number is a pain to retype).
+  useEffect(() => {
+    SecureStore.getItemAsync(LAST_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const last = JSON.parse(raw) as { identifier: string; mode: 'phone' | 'email' };
+        setIdentifier((cur) => cur || last.identifier);
+        setMode(last.mode);
+      })
+      .catch(() => {});
+  }, []);
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
@@ -63,6 +79,7 @@ export default function SignIn() {
         setMismatch(me);
         return;
       }
+      SecureStore.setItemAsync(LAST_KEY, JSON.stringify({ identifier: identifier.trim(), mode })).catch(() => {});
       await signIn(access_token); // the router guard moves us into the app
     });
 
@@ -73,9 +90,19 @@ export default function SignIn() {
           <Animated.View entering={FadeInDown.duration(400)} className="gap-3 rounded-3xl border border-line bg-surface p-6 shadow-sm">
             <Text className="text-2xl font-extrabold tracking-tight text-ink">This account isn&apos;t a {copy.label.toLowerCase()} yet</Text>
             <Text className="text-base leading-6 text-muted">
-              {copy.label}s are approved by the Qyka team before they can start. Your account is signed up as a {mismatch.role}. Apply at qyka.com, or carry on as a {mismatch.role} for now.
+              {copy.label}s are approved by the Qyka team before they can start. Your account is signed up as a {mismatch.role}.{' '}
+              {picked === 'agent' || picked === 'rider' ? 'You can apply right here: your details are already filled in.' : 'Get in touch with Qyka to have a hub set up.'}
             </Text>
-            <Button label={`Continue as ${mismatch.role}`} onPress={() => void signIn(token)} />
+            {picked === 'agent' || picked === 'rider' ? (
+              <Button
+                label={`Apply as ${picked === 'agent' ? 'an agent' : 'a rider'}`}
+                onPress={() => {
+                  setApplyIntent(picked);
+                  void signIn(token);
+                }}
+              />
+            ) : null}
+            <Button label={`Continue as ${mismatch.role}`} variant={picked === 'agent' || picked === 'rider' ? 'neutral' : 'primary'} onPress={() => void signIn(token)} />
             <Button
               label="Pick a different option"
               variant="neutral"

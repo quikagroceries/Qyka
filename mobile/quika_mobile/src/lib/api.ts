@@ -163,6 +163,15 @@ export type Conversation = {
   unread: number;
 };
 
+export type Application = {
+  id: string;
+  kind: 'agent' | 'rider' | 'shopkeeper';
+  status: 'pending' | 'approved' | 'rejected';
+  market_id: string | null;
+  created_at: string;
+  note: string | null;
+};
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -326,4 +335,12 @@ export const api = {
   platformStatus: () => request<{ orders_paused: boolean; message: string | null }>('/status'),
   createOrder: (body: NewOrderBody) => request<AgentOrder>('/orders', { method: 'POST', body }),
   saveAddress: (address: string) => request<User>('/auth/me', { method: 'PATCH', body: { default_delivery_address: address } }),
+
+  // Becoming an agent or rider. Agents apply from their account; riders go through
+  // the public form (their phone and name come from the account too).
+  myApplications: () => request<Application[]>('/agent-applications/me'),
+  applyAsAgent: (body: { market_id: string; note?: string | null }) =>
+    request<Application>('/agent-applications', { method: 'POST', body }),
+  applyPublic: (body: { kind: 'agent' | 'rider'; full_name: string; phone: string; market_id?: string; area?: string; vehicle?: string; note?: string }) =>
+    request<{ detail: string }>('/agent-applications/public', { method: 'POST', body }),
 };

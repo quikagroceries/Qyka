@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Text } from '@/components/Text';
 
+import { takeApplyIntent } from '@/lib/intent';
 import { Button, Card, EmptyState, ErrorBanner, Hero, SafeAreaView, StatusBadge } from '@/components/ui';
 import { api, type AgentOrder, type Market } from '@/lib/api';
 import { ago, errMsg, naira, shortId } from '@/lib/format';
@@ -18,6 +19,12 @@ export default function Track() {
   const [filter, setFilter] = useState<Filter>('active');
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Picked Agent/Rider at sign-in but not approved yet: land on the apply form.
+  useEffect(() => {
+    const role = takeApplyIntent();
+    if (role) router.push({ pathname: '/customer/apply', params: { role } });
+  }, [router]);
 
   const load = useCallback(async () => {
     try {
