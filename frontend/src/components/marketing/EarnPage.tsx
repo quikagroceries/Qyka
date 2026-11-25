@@ -4,6 +4,7 @@ import { usePricing } from "@/lib/usePricing";
 import { useEffect, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { api } from "@/lib/api";
+import { getToken } from "@/lib/session";
 import Link from "next/link";
 import Image, { type StaticImageData } from "next/image";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
@@ -112,6 +113,25 @@ function ApplyForm({ cfg }: { cfg: EarnConfig["form"] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const needsMarkets = cfg.fields.some((f) => f.type === "market");
+  // Someone already signed in (by phone or email) shouldn't retype who they are.
+  const [signedInAs, setSignedInAs] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!getToken("customer")) return;
+    let live = true;
+    api.me()
+      .then((u: any) => {
+        if (!live) return;
+        setVals((v) => ({
+          ...v,
+          full_name: v.full_name || u.full_name || "",
+          phone: v.phone || u.phone || "",
+        }));
+        setSignedInAs(u.full_name || u.phone || u.email || "your account");
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
 
   useEffect(() => {
     if (!needsMarkets) return;
@@ -152,6 +172,11 @@ function ApplyForm({ cfg }: { cfg: EarnConfig["form"] }) {
   }
   return (
     <form onSubmit={submit} className="space-y-3">
+      {signedInAs && (
+        <p className="rounded-2xl bg-sunken-2/70 px-4 py-2.5 text-sm text-muted">
+          Signed in as <span className="font-semibold text-ink">{signedInAs}</span>. We&apos;ve filled in your details.
+        </p>
+      )}
       {cfg.fields.map((f) => (
         <div key={f.key}>
           <label htmlFor={`f-${f.key}`} className="mb-1 block text-sm font-semibold text-ink">
