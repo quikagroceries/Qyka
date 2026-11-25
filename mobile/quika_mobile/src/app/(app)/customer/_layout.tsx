@@ -8,6 +8,7 @@ export default function CustomerLayout() {
   if (user && user.role !== 'customer') return <Redirect href="/" />;
   return (
     <Tabs screenOptions={tabScreenOptions}>
+      <Tabs.Screen name="new-order" options={{ title: 'Order' }} />
       <Tabs.Screen name="index" options={{ title: 'Track' }} />
       <Tabs.Screen name="messages" options={{ title: 'Messages' }} />
       <Tabs.Screen name="account" options={{ title: 'Account' }} />

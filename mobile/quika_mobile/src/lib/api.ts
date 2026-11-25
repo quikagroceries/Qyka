@@ -9,6 +9,8 @@ export type User = {
   full_name: string | null;
   role: Role;
   status: string;
+  default_delivery_address?: string | null;
+  must_prepay?: boolean;
 };
 
 export type OtpResponse = {
@@ -110,7 +112,35 @@ export type AgentOrder = {
 
 export type Person = { id: string; full_name: string | null; avatar_url: string | null; phone?: string };
 
-export type Market = { id: string; name: string; city?: string | null };
+export type Market = {
+  id: string;
+  slug?: string;
+  name: string;
+  city?: string | null;
+  state?: string | null;
+  description?: string | null;
+  venue_type?: string;
+  image_url?: string | null;
+  categories?: string[];
+  opening_time?: string | null;
+  closing_time?: string | null;
+  timezone?: string | null;
+};
+
+export type Pricing = {
+  service_fee_percent: string;
+  delivery_fee: string;
+  deposit_percent: string;
+};
+
+export type NewOrderBody = {
+  market_id: string;
+  delivery_address: string;
+  listed_items_total: string;
+  items: { description: string; listed_price?: string; quantity?: number; requested_note?: string }[];
+  dropoff_latitude?: number | null;
+  dropoff_longitude?: number | null;
+};
 export type Vendor = { id: string; name: string };
 export type Hub = { id: string; name: string };
 export type Purchase = { id: string; amount: string; account_number: string; photo_ref: string | null };
@@ -288,4 +318,10 @@ export const api = {
     request<{ authorization_url: string | null; reference: string }>('/payments/wallet/fund/init', { method: 'POST', body: { amount } }),
   verifyFunding: (reference: string) =>
     request<unknown>('/payments/wallet/fund/verify', { method: 'POST', body: { reference } }),
+
+  // New order.
+  pricing: () => request<Pricing>('/pricing'),
+  platformStatus: () => request<{ orders_paused: boolean; message: string | null }>('/status'),
+  createOrder: (body: NewOrderBody) => request<AgentOrder>('/orders', { method: 'POST', body }),
+  saveAddress: (address: string) => request<User>('/auth/me', { method: 'PATCH', body: { default_delivery_address: address } }),
 };

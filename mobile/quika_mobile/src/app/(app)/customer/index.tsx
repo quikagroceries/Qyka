@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
-import { Card, ErrorBanner, Hero, SafeAreaView, StatusBadge } from '@/components/ui';
+import { Button, Card, ErrorBanner, Hero, SafeAreaView, StatusBadge } from '@/components/ui';
 import { api, type AgentOrder, type Market } from '@/lib/api';
 import { ago, errMsg, naira, shortId } from '@/lib/format';
 import { isHistory, summarize } from '@/lib/orderStatus';
@@ -53,8 +53,9 @@ export default function Track() {
           live={active.length > 0}
           title={active.length > 0 ? 'Your orders are on the move' : 'Nothing in progress'}
           body="Follow each order from the market stall to your door."
-          image={require('../../../../assets/illustrations/rider-scooter-basket-1.webp')}
-        />
+          image={require('../../../../assets/illustrations/rider-scooter-basket-1.webp')}>
+          <Button label="Start a new order" onPress={() => router.push('/customer/new-order')} />
+        </Hero>
 
         <View className="flex-row gap-2">
           {(['active', 'history'] as Filter[]).map((f) => (
