@@ -6,10 +6,11 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
 import { View } from 'react-native';
 
 import SplashOverlay from '@/components/SplashOverlay';
+import { LanguageProvider } from '@/lib/language';
+import { SplashProvider, useSplash } from '@/lib/splash';
 import { SessionProvider, useSession } from '@/lib/session';
 
 // Signed-out people start on the intro slides, whatever order the screens are declared in.
@@ -21,7 +22,7 @@ SplashScreen.setOptions({ duration: 200, fade: true });
 
 function Navigator({ fontsReady }: { fontsReady: boolean }) {
   const { user } = useSession();
-  const [splashDone, setSplashDone] = useState(false);
+  const { done: splashDone, finish } = useSplash();
   // Signed-out people land on the role picker (welcome), never straight on a login form.
   return (
     <View style={{ flex: 1 }}>
@@ -33,9 +34,10 @@ function Navigator({ fontsReady }: { fontsReady: boolean }) {
             <Stack.Screen name="intro" />
             <Stack.Screen name="welcome" />
             <Stack.Screen name="sign-in" />
+            <Stack.Screen name="sign-up" />
           </Stack.Protected>
       </Stack>
-      {!splashDone ? <SplashOverlay ready={fontsReady} onDone={() => setSplashDone(true)} /> : null}
+      {!splashDone ? <SplashOverlay ready={fontsReady} onDone={finish} /> : null}
     </View>
   );
 }
@@ -53,9 +55,13 @@ export default function RootLayout() {
   if (fontsReady) SplashScreen.hide();
   if (!fontsReady) return null;
   return (
-    <SessionProvider>
-      <StatusBar style="dark" />
-      <Navigator fontsReady={fontsReady} />
-    </SessionProvider>
+    <LanguageProvider>
+      <SessionProvider>
+        <SplashProvider>
+          <StatusBar style="dark" />
+          <Navigator fontsReady={fontsReady} />
+        </SplashProvider>
+      </SessionProvider>
+    </LanguageProvider>
   );
 }

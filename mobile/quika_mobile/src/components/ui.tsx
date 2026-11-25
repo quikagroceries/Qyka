@@ -2,7 +2,7 @@ import { ActivityIndicator, Image, Pressable, TextInput, View, type ImageSourceP
 import { Text } from '@/components/Text';
 import { cssInterop } from 'nativewind';
 import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { illustrationForItem } from '@/lib/foodVisuals';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { ReactNode } from 'react';
@@ -18,9 +18,10 @@ const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boo
 // reads as the web's mobile view.
 
 const VARIANTS = {
-  primary: { box: 'bg-brand-orange shadow-sm active:bg-brand-orange-dark', text: 'text-[#1A1A1A]' },
+  primary: { box: 'bg-brand-orange active:bg-brand-orange-dark', text: 'text-[#1A1A1A]' },
   secondary: { box: 'border-2 border-brand-green bg-surface active:bg-brand-green/10', text: 'text-brand-green' },
   neutral: { box: 'bg-sunken active:bg-line-strong', text: 'text-ink' },
+  outline: { box: 'border border-line-strong bg-surface active:bg-sunken', text: 'text-ink' },
 } as const;
 
 export function Button({
@@ -29,6 +30,7 @@ export function Button({
   busy,
   disabled,
   variant = 'primary',
+  icon,
   className,
 }: {
   label: string;
@@ -36,6 +38,7 @@ export function Button({
   busy?: boolean;
   disabled?: boolean;
   variant?: keyof typeof VARIANTS;
+  icon?: ReactNode;
   className?: string;
 }) {
   const v = VARIANTS[variant];
@@ -47,7 +50,7 @@ export function Button({
       disabled={off}
       className={cx('min-h-[54px] flex-row items-center justify-center gap-2 rounded-full px-6', v.box, off && 'opacity-50', className)}
       style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}>
-      {busy ? <ActivityIndicator color="#1A1A1A" size="small" /> : null}
+      {busy ? <ActivityIndicator color="#1A1A1A" size="small" /> : icon}
       <Text className={cx('text-base font-semibold', v.text)}>{label}</Text>
     </Pressable>
   );
@@ -126,12 +129,26 @@ export function ErrorBanner({ message }: { message?: string | null }) {
   );
 }
 
-export function Field(props: TextInputProps) {
+export function Field({ onFocus, onBlur, ...props }: TextInputProps) {
+  const [focused, setFocused] = useState(false);
   return (
     <TextInput
       placeholderTextColor="#9B9B9B"
       {...props}
-      className={cx('font-body border border-line bg-surface px-5 py-4 text-base text-ink', props.multiline ? 'rounded-3xl' : 'rounded-full', props.className)}
+      onFocus={(e) => {
+        setFocused(true);
+        onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        setFocused(false);
+        onBlur?.(e);
+      }}
+      className={cx(
+        'font-body border bg-surface px-5 py-4 text-base text-ink',
+        focused ? 'border-brand-orange' : 'border-line',
+        props.multiline ? 'rounded-3xl' : 'rounded-full',
+        props.className,
+      )}
     />
   );
 }

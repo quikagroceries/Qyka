@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { PanResponder, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import Animated, { Extrapolation, interpolate, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Text } from '@/components/Text';
@@ -66,7 +67,9 @@ export default function SwipeButton({ label, onComplete }: { label: string; onCo
         {...pan.panHandlers}
         style={[knob, { marginLeft: PAD }]}
         className="h-14 w-14 items-center justify-center rounded-full bg-surface shadow-sm">
-        <Text className="text-xl font-extrabold text-brand-orange-dark">»</Text>
+        <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+          <Path d="M5 12h14M13 6l6 6-6 6" stroke="#D9702F" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
       </Animated.View>
     </View>
   );

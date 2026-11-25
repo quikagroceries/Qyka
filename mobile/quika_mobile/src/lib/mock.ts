@@ -12,6 +12,8 @@ export const USERS: Record<Role, User> = {
   admin: { id: 'u-admin', phone: null, email: 'admin@qyka.test', full_name: 'Admin', role: 'admin', status: 'active' },
 };
 
+export const GUEST: User = { id: 'u-guest', phone: null, email: null, full_name: null, role: 'customer', status: 'guest' };
+
 export const MARKETS: Market[] = [
   { id: 'm-1', name: 'Mile 12 Market', city: 'Lagos', state: 'Lagos', description: 'Fresh produce, grains and provisions.' },
   { id: 'm-2', name: 'Oyingbo Market', city: 'Lagos', state: 'Lagos', description: 'Fish, meat and everyday groceries.' },

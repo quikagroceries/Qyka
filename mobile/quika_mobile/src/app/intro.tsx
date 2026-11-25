@@ -1,78 +1,108 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Image, Pressable, ScrollView, View, useWindowDimensions, type ImageSourcePropType, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
+import Animated, { Easing, cancelAnimation, FadeInDown, FadeInUp, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import IntroBackdrop from '@/components/intro/IntroBackdrop';
+import IntroSlide from '@/components/intro/IntroSlide';
+import LanguageSlide from '@/components/intro/LanguageSlide';
+import PageIndicator from '@/components/intro/PageIndicator';
+import { SLIDES } from '@/components/intro/slides';
+import { useLanguage, type LanguageCode } from '@/lib/language';
+import { useSplash } from '@/lib/splash';
 import SwipeButton from '@/components/SwipeButton';
-import { Float, SafeAreaView } from '@/components/ui';
+import { SafeAreaView } from '@/components/ui';
 import { Text } from '@/components/Text';
 
-const SLIDES: { top: string; accent: string; body: string; image: ImageSourcePropType }[] = [
-  {
-    top: 'Market-fresh,',
-    accent: 'shopped for you.',
-    body: 'Send your list and a real person walks the stalls for you.',
-    image: require('../../assets/illustrations/market-cart-vendor.webp'),
-  },
-  {
-    top: 'Real people.',
-    accent: 'Real bargains.',
-    body: 'Agents haggle live, send you photos and ask before they spend more.',
-    image: require('../../assets/illustrations/scene-agent-laptop-delivery.webp'),
-  },
-  {
-    top: 'Delivered to',
-    accent: 'your door.',
-    body: 'Collected at a trusted market hub and ridden to you, with a code only you hold.',
-    image: require('../../assets/illustrations/char-rider-scooter.webp'),
-  },
-];
+const SLIDE_MS = 4800;
+// The language page comes first (null), then the slides.
+const PAGES = [null, ...SLIDES];
+const COUNT = PAGES.length;
+const PADDED = [PAGES[COUNT - 1], ...PAGES, PAGES[0]];
+const realIndex = (paddedIndex: number) => (paddedIndex - 1 + COUNT) % COUNT;
 
-// The first screen anyone sees after the splash: three short slides, then a
-// swipe to choose how they'll use Qyka. Skip jumps straight there.
+// An endless slideshow that opens on "Choose your language". Nothing moves until a language is
+// picked; then the slides advance on their own and loop in either direction.
+// The list is padded with a copy of the last slide in front and of the first behind,
+// and the scroll jumps back to the real slide once it lands on a copy.
 export default function Intro() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const scroller = useRef<ScrollViewInstance>(null);
+  const progress = useSharedValue(0);
   const [page, setPage] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const { chosen, choose } = useLanguage();
+  const { done: splashDone } = useSplash();
 
   const go = () => router.push('/welcome');
-  const onEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => setPage(Math.round(e.nativeEvent.contentOffset.x / width));
+
+  const scrollToPadded = useCallback((i: number, animated: boolean) => scroller.current?.scrollTo({ x: i * width, animated }), [width]);
+
+  const onChoose = (code: LanguageCode) => {
+    choose(code);
+    setTimeout(() => {
+      scrollToPadded(page + 2, true);
+      setPage((page + 1) % COUNT);
+    }, 450);
+  };
+
+  useEffect(() => {
+    scrollToPadded(1, false);
+  }, [scrollToPadded]);
+
+  useEffect(() => {
+    cancelAnimation(progress);
+    progress.value = 0;
+    if (dragging || !chosen || !splashDone) return;
+    progress.value = withTiming(1, { duration: SLIDE_MS, easing: Easing.linear });
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const t = setTimeout(() => {
+      scrollToPadded(page + 2, true);
+      setPage((page + 1) % COUNT);
+      // Landed on the copy of the first slide: jump back to the real one once the slide has finished.
+      if (page === COUNT - 1) settle = setTimeout(() => scrollToPadded(1, false), 750);
+    }, SLIDE_MS);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(settle);
+    };
+  }, [page, dragging, chosen, splashDone, progress, scrollToPadded]);
+
+  const onEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const i = Math.round(e.nativeEvent.contentOffset.x / width);
+    setPage(realIndex(i));
+    if (i === 0) scrollToPadded(COUNT, false);
+    if (i === COUNT + 1) scrollToPadded(1, false);
+    setDragging(false);
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-canvas">
-      <View className="absolute -right-28 top-24 h-96 w-96 rounded-full bg-brand-orange/15" />
-      <View className="absolute -left-32 bottom-40 h-80 w-80 rounded-full bg-[#F9E0CC]/60" />
+      <IntroBackdrop />
 
       <Animated.View entering={FadeInUp.duration(450)} className="flex-row items-center justify-between px-6 pt-2">
-        <View className="flex-row items-center gap-1.5">
-          {SLIDES.map((_, i) => (
-            <View key={i} className={'h-1.5 rounded-full ' + (i === page ? 'w-6 bg-ink' : 'w-1.5 bg-line-strong')} />
-          ))}
-        </View>
+        <PageIndicator count={COUNT} page={page} progress={progress} />
         <Pressable onPress={go} hitSlop={12} className="flex-row items-center gap-1 py-2">
           <Text className="text-sm font-semibold text-muted">Skip</Text>
           <Text className="text-base text-muted">›</Text>
         </Pressable>
       </Animated.View>
 
-      <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={onEnd} contentContainerStyle={{ flexGrow: 1 }} className="flex-1">
-        {SLIDES.map((s, i) => (
-          <View key={i} style={{ width, flexGrow: 0, flexShrink: 0 }} className="gap-4 px-6 pb-4 pt-6">
-            <Animated.View entering={FadeInDown.delay(100).duration(550)} className="items-center gap-3">
-              <Text className="text-center text-[42px] font-extrabold leading-[48px] tracking-tight text-ink">
-                {s.top}
-                {'\n'}
-                <Text className="text-[42px] font-extrabold leading-[48px] tracking-tight text-brand-orange-dark">{s.accent}</Text>
-              </Text>
-              <Text className="max-w-[300px] text-center text-base leading-6 text-muted">{s.body}</Text>
-            </Animated.View>
-            <Animated.View entering={FadeInDown.delay(250).duration(600)} className="flex-1 items-center justify-center">
-              <Float>
-                <Image source={s.image} resizeMode="contain" style={{ width: width - 56, height: Math.min(380, (width - 56) * 1.05) }} />
-              </Float>
-            </Animated.View>
-          </View>
-        ))}
+      <ScrollView
+        ref={scroller}
+        horizontal
+        pagingEnabled
+        scrollEnabled={chosen}
+        showsHorizontalScrollIndicator={false}
+        onScrollBeginDrag={() => setDragging(true)}
+        onMomentumScrollEnd={onEnd}
+        contentContainerStyle={{ flexGrow: 1 }}
+        className="flex-1">
+        {PADDED.map((s, i) => {
+          const active = splashDone && realIndex(i) === page;
+          return s ? <IntroSlide key={i} slide={s} width={width} active={active} /> : <LanguageSlide key={i} width={width} active={active} onChoose={onChoose} />;
+        })}
       </ScrollView>
 
       <Animated.View entering={FadeInDown.delay(400).duration(500)} className="px-6 pb-4 pt-2">

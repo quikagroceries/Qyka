@@ -6,7 +6,7 @@ import { Button, Card, SafeAreaView } from '@/components/ui';
 import { useSession } from '@/lib/session';
 
 export default function AccountView({ fallbackName }: { fallbackName: string }) {
-  const { user, signOut } = useSession();
+  const { user, guest, signOut } = useSession();
   const router = useRouter();
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
@@ -17,9 +17,15 @@ export default function AccountView({ fallbackName }: { fallbackName: string }) 
         </View>
         <Card>
           <Text className="text-base font-bold text-ink">{user?.full_name || fallbackName}</Text>
-          <Text className="text-sm text-muted">{user?.phone || user?.email}</Text>
+          <Text className="text-sm text-muted">{guest ? 'Browsing as a guest' : user?.phone || user?.email}</Text>
         </Card>
-        {user?.role === 'customer' ? (
+        {guest ? (
+          <Card accent>
+            <Text className="text-base font-extrabold text-ink">Save your orders</Text>
+            <Text className="text-sm text-muted">Sign in or create an account to track orders, keep your address and chat with your agent.</Text>
+            <Button label="Sign in or create account" className="mt-1" onPress={signOut} />
+          </Card>
+        ) : user?.role === 'customer' ? (
           <Card>
             <Text className="text-base font-extrabold text-ink">Earn with Qyka</Text>
             <Text className="text-sm text-muted">Shop the market for customers, or deliver their orders. Your details are filled in for you.</Text>
@@ -29,7 +35,7 @@ export default function AccountView({ fallbackName }: { fallbackName: string }) 
             </View>
           </Card>
         ) : null}
-        <Button label="Sign out" variant="neutral" onPress={signOut} />
+        {guest ? null : <Button label="Sign out" variant="neutral" onPress={signOut} />}
       </View>
     </SafeAreaView>
   );
