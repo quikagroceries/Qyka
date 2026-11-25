@@ -18,6 +18,33 @@ export type OtpResponse = {
   expires_in_seconds: number;
 };
 
+export type RiderJob = {
+  id: string;
+  status: string;
+  hub_id: string | null;
+  hub_name: string | null;
+  market_name: string | null;
+  item_count: number;
+  ready_at: string | null;
+  claimed_at: string | null;
+  // Only filled in for the rider who has claimed the job:
+  pickup_code: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  delivery_address: string | null;
+  dropoff_latitude: number | null;
+  dropoff_longitude: number | null;
+  delivered_at: string | null;
+};
+
+export type Earnings = {
+  earnings_today: string;
+  earnings_week: string;
+  earnings_total: string;
+  completed_count: number;
+  recent: { order_id: string; amount: string; delivered_at: string }[];
+};
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -80,4 +107,14 @@ export const api = {
       body: { identifier, code },
     }),
   me: () => request<User>('/auth/me'),
+
+  // Rider: claim from the pool, collect at the hub with the pickup code,
+  // deliver with the customer's PIN.
+  riderPool: () => request<RiderJob[]>('/riders/jobs'),
+  riderMine: () => request<RiderJob[]>('/riders/jobs/mine'),
+  riderClaim: (id: string) => request<RiderJob>(`/riders/jobs/${id}/claim`, { method: 'POST' }),
+  riderRelease: (id: string) => request<RiderJob>(`/riders/jobs/${id}/release`, { method: 'POST' }),
+  riderDeliver: (id: string, code: string) =>
+    request<RiderJob>(`/riders/jobs/${id}/deliver`, { method: 'POST', body: { code } }),
+  riderEarnings: () => request<Earnings>('/riders/earnings'),
 };

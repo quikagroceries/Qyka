@@ -1,3 +1,4 @@
+import { Redirect } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,15 +10,16 @@ import { useSession } from '@/lib/session';
 const HOME_COPY: Record<Role, string> = {
   customer: 'Your orders will show here.',
   agent: 'Your market orders will show here.',
-  rider: 'The delivery job pool will show here.',
+  rider: '',
   shopkeeper: 'Your hub queue will show here.',
   admin: 'Admins use the web dashboard.',
 };
 
-// Placeholder landing. Each role gets its own home as its slice is built.
+// Sends each role to its own home. Roles without an app yet get a placeholder.
 export default function Home() {
   const { user, signOut } = useSession();
   if (!user) return null;
+  if (user.role === 'rider') return <Redirect href="/rider" />;
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.body}>

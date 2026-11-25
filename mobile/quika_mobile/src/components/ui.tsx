@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, type TextProps, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type TextProps, type ViewStyle } from 'react-native';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
 
@@ -60,3 +60,31 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: Colors.ink },
   body: { fontSize: 16, lineHeight: 24, color: Colors.muted },
 });
+
+export function Card({ children, highlight, style }: { children: React.ReactNode; highlight?: boolean; style?: ViewStyle }) {
+  return (
+    <View
+      style={[
+        {
+          backgroundColor: Colors.surface,
+          borderRadius: Radius.lg,
+          padding: Spacing.three,
+          gap: Spacing.two,
+          borderWidth: highlight ? 2 : 1,
+          borderColor: highlight ? Colors.primary : Colors.line,
+        },
+        style,
+      ]}>
+      {children}
+    </View>
+  );
+}
+
+export function ErrorBanner({ message }: { message?: string | null }) {
+  if (!message) return null;
+  return (
+    <View style={{ backgroundColor: '#FDECEA', borderRadius: Radius.md, padding: Spacing.three }}>
+      <Text style={{ color: Colors.danger, fontSize: 14 }}>{message}</Text>
+    </View>
+  );
+}
