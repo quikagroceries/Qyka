@@ -10,9 +10,10 @@ import CallScreen from '@/components/customer/CallScreen';
 import AgentProfileSheet from '@/components/customer/AgentProfileSheet';
 import { Avatar, SafeAreaView } from '@/components/ui';
 import { clockTime, dayLabel } from '@/lib/format';
-import { CONVERSATIONS, MESSAGES, PEOPLE } from '@/lib/mock';
+import { api, type ProposedAgent } from '@/lib/api';
+import { isPending, useMessages } from '@/lib/chat';
 import { useSession } from '@/lib/session';
-import type { Message } from '@/lib/types';
+import type { Conversation } from '@/lib/types';
 
 const CAMERA = ['M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z', 'M15 13a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z'];
 const PHONE = ['M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z'];
@@ -28,11 +29,12 @@ const Icon = ({ paths, color, size = 22, width = 2 }: { paths: string[]; color: 
 
 const QUICK_REPLIES = ['Hello', 'On it', 'Almost done', 'Thank you'];
 
-/** One order's chat. `backTo` is where the back arrow goes only when there is nothing to go back to (e.g. a deep link); otherwise it returns to where you came from; `who` names the other side. UI only: sent messages live in this screen's state. */
+/** One order's chat, live from the server. `backTo` is where the back arrow goes only when there is nothing to go back to (e.g. a deep link); otherwise it returns to where you came from; `who` names the other side. */
 export default function ChatScreen({ orderId, backTo, who }: { orderId: string; backTo: string; who: 'Customer' | 'Your agent' }) {
   const router = useRouter();
   const { user } = useSession();
-  const [messages, setMessages] = useState<Message[]>(MESSAGES);
+  const chat = useMessages(orderId);
+  const messages = chat.messages;
   const [text, setText] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -40,10 +42,22 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
   const scroller = useRef<ScrollViewInstance>(null);
   const insets = useSafeAreaInsets();
   const [keyboard, setKeyboard] = useState(false);
-  const other = CONVERSATIONS.find((c) => c.order_id === orderId)?.other ?? CONVERSATIONS[0].other;
-  // On the customer's side the other person is the shopping agent, whose profile opens from the header.
+  // On the customer's side the other person is the shopping agent (their profile and phone come with the order); on the agent's side,
+  // the customer comes from the inbox.
   const hasProfile = who === 'Your agent';
-  const agent = other ? { ...other, phone: PEOPLE.agent.phone } : null;
+  const [agentInfo, setAgentInfo] = useState<ProposedAgent | null>(null);
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (who === 'Your agent') api.getOrderAgent(orderId).then((a) => alive && setAgentInfo(a)).catch(() => undefined);
+    else api.getConversations().then((list) => alive && setConversation(list.find((c) => c.order_id === orderId) ?? null)).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [orderId, who]);
+  const other = hasProfile ? (agentInfo ? { id: agentInfo.id, full_name: agentInfo.full_name, avatar_url: agentInfo.avatar_url ?? null } : null) : (conversation?.other ?? null);
+  // The server doesn't share the agent's number with the customer, so calls go through the app (a number appears only if the server sends one).
+  const agent = agentInfo ? { id: agentInfo.id, full_name: agentInfo.full_name, avatar_url: agentInfo.avatar_url ?? null, phone: agentInfo.phone } : null;
 
   useEffect(() => {
     scroller.current?.scrollToEnd({ animated: true });
@@ -60,10 +74,9 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
   }, []);
 
   function sendImage(uri: string) {
-    setMessages((cur) => [...cur, { id: `local-${cur.length}`, order_id: orderId, sender_id: user?.id ?? '', text: null, image_url: uri, created_at: new Date().toISOString() }]);
+    chat.send({ imageUri: uri });
   }
 
-  // UI only: the picture is shown in this chat and not uploaded anywhere.
   async function pick(source: 'camera' | 'library') {
     try {
       const perm = source === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -91,8 +104,8 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
 
   function send(body: string) {
     if (!body) return;
-    setMessages((cur) => [...cur, { id: `local-${cur.length}`, order_id: orderId, sender_id: user?.id ?? '', text: body, image_url: null, created_at: new Date().toISOString() }]);
     setText('');
+    chat.send({ text: body });
   }
 
   return (
@@ -119,7 +132,7 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
               <Text className="text-xs text-muted">{hasProfile ? 'Your agent · tap for profile' : who}</Text>
             </View>
           </Pressable>
-          {hasProfile && agent?.phone ? (
+          {hasProfile && agent ? (
             <Pressable
               onPress={() => setCallOpen(true)}
               accessibilityRole="button"
@@ -132,7 +145,16 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
         </View>
 
         <ScrollView ref={scroller} className="flex-1" contentContainerClassName="px-4 py-3" keyboardShouldPersistTaps="handled">
-          {messages.length === 0 ? (
+          {!chat.loaded ? <Text className="py-16 text-center text-sm text-muted">Loading the conversation…</Text> : null}
+          {chat.loaded && chat.error && messages.length === 0 ? (
+            <View className="items-center gap-2 py-16">
+              <Text className="max-w-[260px] text-center text-sm font-semibold text-red-700">{chat.error}</Text>
+              <Pressable onPress={() => void chat.reload()} hitSlop={8}>
+                <Text className="text-sm font-bold text-brand-orange-dark">Try again</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {chat.loaded && !chat.error && messages.length === 0 ? (
             <View className="items-center gap-1 py-16">
               <Text className="text-base font-bold text-ink">No messages yet</Text>
               <Text className="max-w-[220px] text-center text-sm text-faint">Say hello, or send a quick reply below to get things started.</Text>
@@ -140,6 +162,7 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
           ) : null}
           {messages.map((m, i) => {
             const mine = m.sender_id === user?.id;
+            const waiting = isPending(m) ? m : null;
             const prev = messages[i - 1];
             const next = messages[i + 1];
             const showDivider = !prev || dayLabel(prev.created_at) !== dayLabel(m.created_at);
@@ -156,7 +179,8 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
                   <View
                     className={
                       'max-w-[80%] rounded-2xl px-3 py-2 ' +
-                      (mine ? 'bg-brand-orange ' + (lastInRun ? 'rounded-br-sm' : '') : 'bg-sunken ' + (lastInRun ? 'rounded-bl-sm' : ''))
+                      (mine ? 'bg-brand-orange ' + (lastInRun ? 'rounded-br-sm' : '') : 'bg-sunken ' + (lastInRun ? 'rounded-bl-sm' : '')) +
+                      (waiting?.pending === 'sending' ? ' opacity-60' : '')
                     }>
                     {m.text ? <Text className="text-sm text-ink">{m.text}</Text> : null}
                     {m.image_url ? (
@@ -165,13 +189,30 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
                       </Pressable>
                     ) : null}
                   </View>
-                  {lastInRun ? <Text className="mt-0.5 text-[11px] text-faint">{clockTime(m.created_at)}</Text> : null}
+                  {waiting ? (
+                    waiting.pending === 'failed' ? (
+                      <View className="mt-0.5 flex-row items-center gap-2">
+                        <Text className="text-[11px] font-semibold text-red-700">{waiting.error || 'Not sent.'}</Text>
+                        <Pressable onPress={() => chat.retry(waiting.id)} hitSlop={6}>
+                          <Text className="text-[11px] font-bold text-brand-orange-dark">Retry</Text>
+                        </Pressable>
+                        <Pressable onPress={() => chat.remove(waiting.id)} hitSlop={6}>
+                          <Text className="text-[11px] font-bold text-muted">Remove</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <Text className="mt-0.5 text-[11px] text-faint">Sending…</Text>
+                    )
+                  ) : lastInRun ? (
+                    <Text className="mt-0.5 text-[11px] text-faint">{clockTime(m.created_at)}</Text>
+                  ) : null}
                 </View>
               </View>
             );
           })}
         </ScrollView>
 
+        {chat.error && messages.length > 0 ? <Text className="px-4 pb-1 text-center text-xs font-semibold text-red-700">{chat.error} Trying again…</Text> : null}
         <View style={{ paddingBottom: keyboard ? 8 : Math.max(insets.bottom, 12), paddingHorizontal: 12, paddingTop: 6 }} className="gap-2">
           {text.trim().length === 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 px-1">

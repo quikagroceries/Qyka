@@ -75,3 +75,21 @@ async def verify_transfer(reference: str) -> dict:
         resp = await client.get(f"/transfer/verify/{reference}", headers=_headers())
         resp.raise_for_status()
         return resp.json()["data"]
+
+
+async def resolve_account(*, account_number: str, bank_code: str) -> dict:
+    """Ask the rail whose account this is. Returns {"account_name": ...}.
+
+    Outside production there is nothing real to ask, so it hands back a
+    placeholder name (like send_transfer's short-circuit).
+    """
+    if settings.environment != "production":
+        return {"account_name": f"TEST ACCOUNT {account_number[-4:]}"}
+    async with httpx.AsyncClient(base_url=settings.paystack_base_url) as client:
+        resp = await client.get(
+            "/bank/resolve",
+            params={"account_number": account_number, "bank_code": bank_code},
+            headers=_headers(),
+        )
+        resp.raise_for_status()
+        return resp.json()["data"]

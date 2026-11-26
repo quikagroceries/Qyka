@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/Text';
 
@@ -11,9 +11,11 @@ import OrderBackdrop from '@/components/customer/OrderBackdrop';
 import { PROBLEM, Progress } from '@/components/customer/orderLook';
 import PaymentChooser from '@/components/customer/PaymentChooser';
 import { Avatar, Button, Card, Field, Float, ItemArt, SafeAreaView, SectionHeader, StatusBadge } from '@/components/ui';
-import { naira, shortId } from '@/lib/format';
-import { PEOPLE, PURCHASES, WALLET_BALANCE, marketName } from '@/lib/mock';
-import { orderStore, useOrders } from '@/lib/orderStore';
+import { naira } from '@/lib/format';
+import { api, type ProposedAgent } from '@/lib/api';
+import { useMarkets } from '@/lib/catalog';
+import { orderStore, useOrder, useOrderState, useOrderSync } from '@/lib/orderStore';
+import { useWallet, walletStore } from '@/lib/wallet';
 import { CHAT, EXCEPTION, ON_THE_MOVE, PAID_OR_LATER, RATEABLE, UNPRICED, summarize } from '@/lib/orderStatus';
 import type { AgentOrder, OrderItem, Purchase } from '@/lib/types';
 
@@ -174,32 +176,106 @@ function ItemLine({ item, purchase, onDecide, onPreview }: { item: OrderItem; pu
 export default function CustomerOrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const orders = useOrders();
-  const initial = orders.find((o) => o.id === id) ?? orders[0];
-  // The status comes from the shared store: when the hub hands the order to the rider, or the rider says it was delivered,
-  // it shows up here, and what the customer does here (paying, confirming delivery) reaches them too.
-  const status = initial.status;
-  const setStatus = (s: string) => orderStore.setStatus(initial.id, s, s === 'delivered' ? { delivered_at: new Date().toISOString() } : {});
-  const [items, setItems] = useState<OrderItem[]>(initial.items);
-  const [depositPaid, setDepositPaid] = useState(!!initial.deposit_paid_at);
-  const [notice, setNotice] = useState('');
+  // The order comes from the server and is asked for again every few seconds, so the agent, hub and rider moving it along show up here.
+  useOrderSync(id);
+  const { loaded, error: loadError } = useOrderState();
+  const found = useOrder(id);
+  const { markets } = useMarkets();
+
+  const [problem, setProblem] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [agentInfo, setAgentInfo] = useState<ProposedAgent | null>(null);
+  const [auth, setAuth] = useState<{ cap: string; spent: string } | null>(null);
+  const [purchases, setPurchases] = useState<(Purchase & { status: string })[]>([]);
   const [rating, setRating] = useState<{ stars: number; comment: string | null } | null>(null);
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState('');
   const [raise, setRaise] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [agentOpen, setAgentOpen] = useState(false);
 
-  const order: AgentOrder = { ...initial, status, items, deposit_paid_at: depositPaid ? initial.deposit_paid_at ?? new Date().toISOString() : null };
-  const market = { name: marketName(order.market_id) };
-  const agent = order.agent_id ? PEOPLE.agent : null;
-  const proposed = status === 'proposed' ? PEOPLE.agent : null;
-  const auth = { cap: '10000.00', spent: '2800.00' };
-  const purchases: Purchase[] = PURCHASES;
-  const wallet = WALLET_BALANCE;
+  const status = found?.status;
+  const agentId = found?.agent_id;
+  const proposedId = found?.proposed_agent_id;
+  const depositPaidAt = found?.deposit_paid_at;
+  const itemsTotal = found?.items_total;
+  const needsMoney = status === 'proposed' ? !depositPaidAt : status === 'awaiting_payment';
 
-  const patchItem = (itemId: string, patch: Partial<OrderItem>) => setItems((cur) => cur.map((it) => (it.id === itemId ? { ...it, ...patch } : it)));
+  // The wallet balance is shared with the wallet screen; it is asked for again whenever a payment is due, and on coming back from adding money.
+  const { balance: walletBalance } = useWallet();
+  const wallet = walletBalance ?? '0';
+  const loadWallet = useCallback(() => walletStore.refreshBalance(), []);
+  useEffect(() => {
+    if (!needsMoney) return;
+    void walletStore.refreshBalance();
+    const t = setInterval(() => void walletStore.refreshBalance(), 5000);
+    return () => clearInterval(t);
+  }, [needsMoney]);
+
+  // Who the agent is: the proposed one until accepted, then the assigned one.
+  useEffect(() => {
+    if (!id || !status) return;
+    const req = status === 'proposed' ? (depositPaidAt ? api.getProposedAgent(id) : null) : agentId ? api.getOrderAgent(id) : null;
+    if (!req) return;
+    let alive = true;
+    req.then((a) => alive && setAgentInfo(a)).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [id, status, agentId, proposedId, depositPaidAt]);
+
+  // The spending cap and each stall payment (with its photo), once shopping has started.
+  useEffect(() => {
+    if (!id || !status || !(status === 'shopping' || status === 'awaiting_payment' || PAID_OR_LATER.has(status))) return;
+    let alive = true;
+    api.getAuthorization(id).then((a) => alive && setAuth(a)).catch(() => undefined);
+    api.getPurchases(id).then((p) => alive && setPurchases(p)).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [id, status, itemsTotal]);
+
+  useEffect(() => {
+    if (!id || !status || !RATEABLE.has(status)) return;
+    let alive = true;
+    api.getRating(id).then((r) => alive && r && setRating({ stars: r.stars, comment: r.comment })).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [id, status]);
+
+  // Runs something on the server, then reloads the order. Any failure is shown at the top of the page.
+  const act = async (fn: () => Promise<unknown>, after?: () => void) => {
+    setBusy(true);
+    setProblem('');
+    try {
+      await fn();
+      await orderStore.load(id);
+      after?.();
+    } catch (e) {
+      setProblem((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!found) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center gap-4 bg-canvas px-8" edges={['top']}>
+        <Text className="text-center text-base text-muted">{loaded && loadError ? loadError : loaded ? "We couldn't find that order." : 'Loading your order…'}</Text>
+        <Button label="Back" variant="outline" onPress={() => (router.canGoBack() ? router.back() : router.replace('/customer'))} />
+      </SafeAreaView>
+    );
+  }
+
+  const order: AgentOrder = found;
+  const items = order.items;
+  const depositPaid = !!order.deposit_paid_at;
+  const market = { name: markets.find((m) => m.id === order.market_id)?.name };
+  const agent = order.agent_id && agentInfo ? { ...agentInfo, avatar_url: agentInfo.avatar_url ?? null } : null;
+  const proposed = status === 'proposed' && depositPaid && agentInfo ? { ...agentInfo, avatar_url: agentInfo.avatar_url ?? null } : null;
 
   const needsDeposit = Number(order.deposit_amount) > 0 && !depositPaid;
   const priced = !UNPRICED.has(order.status);
@@ -213,6 +289,19 @@ export default function CustomerOrderScreen() {
   const purchaseFor = (it: OrderItem) => purchases.find((p) => p.id === it.vendor_transfer_id);
   const image = order.status === 'delivered' || order.status === 'closed' ? art.done : ON_THE_MOVE.has(order.status) ? art.moving : showFeed ? art.shopping : art.default;
   const fees = Number(order.combined_fee) + Number(order.emtl_total) + Number(order.transfer_fees_total);
+  // Pays from the wallet, then reloads the order (the server answers a payment with just a receipt) and the balance.
+  const payFromWallet = (pay: () => Promise<unknown>) => async () => {
+    await pay();
+    await orderStore.load(order.id);
+    void loadWallet();
+  };
+  // Development only: the server's dev wallet top-up.
+  const topUp = __DEV__
+    ? async (missing: number) => {
+        await api.fundWalletDev(Math.ceil(missing));
+        await loadWallet();
+      }
+    : undefined;
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
@@ -275,6 +364,12 @@ export default function CustomerOrderScreen() {
           </Animated.View>
         </View>
 
+        {problem ? (
+          <View className="rounded-2xl bg-red-50 px-4 py-3">
+            <Text className="text-sm font-semibold text-red-700">{problem}</Text>
+          </View>
+        ) : null}
+
         {exception ? (
           <View className="gap-1 rounded-3xl bg-red-50 p-5">
             <Text className="text-xs font-bold uppercase tracking-wide text-red-700">{order.status === 'disputed' ? 'Order under review' : 'Order cancelled'}</Text>
@@ -298,8 +393,8 @@ export default function CustomerOrderScreen() {
                     {naira(item.overage_requested_price ?? 0)} at the stall · {naira(extra)} over your {naira(item.listed_price ?? 0)}
                   </Text>
                   <View className="flex-row gap-2">
-                    <Button label={`Approve extra ${naira(extra)}`} className="flex-1" onPress={() => patchItem(item.id, { availability: 'available', overage_decision: 'approved' })} />
-                    <Button label="Skip this item" variant="neutral" className="flex-1" onPress={() => patchItem(item.id, { availability: 'dropped', overage_decision: 'declined' })} />
+                    <Button label={`Approve extra ${naira(extra)}`} className="flex-1" disabled={busy} onPress={() => act(() => api.decideOverage(order.id, item.id, 'approved'))} />
+                    <Button label="Skip this item" variant="neutral" className="flex-1" disabled={busy} onPress={() => act(() => api.decideOverage(order.id, item.id, 'declined'))} />
                   </View>
                 </View>
               );
@@ -314,13 +409,7 @@ export default function CustomerOrderScreen() {
                     : 'A deposit upfront '}
                   {order.status === 'proposed' ? 'before you can see and accept your shopping agent.' : 'before shopping can start.'}
                 </Text>
-                <PaymentChooser
-                  reference={`QYKA-${shortId(order.id)}`}
-                  amountDue={Number(order.deposit_amount)}
-                  walletBalance={wallet}
-                  onPayWallet={() => setDepositPaid(true)}
-                  onPayTransfer={() => setDepositPaid(true)}
-                />
+                <PaymentChooser amountDue={Number(order.deposit_amount)} walletBalance={wallet} onPayWallet={payFromWallet(() => api.payDeposit(order.id))} onTopUp={topUp} />
               </View>
             ) : null}
 
@@ -338,10 +427,9 @@ export default function CustomerOrderScreen() {
                 ) : (
                   <Text className="text-sm text-faint">Looking for an available agent…</Text>
                 )}
-                {notice ? <Text className="rounded-lg bg-brand-orange/15 px-3 py-2 text-sm text-brand-orange-dark">{notice}</Text> : null}
                 <View className="flex-row gap-2">
-                  <Button label="Accept" className="flex-1" onPress={() => { setNotice(''); setStatus('agent_assigned'); }} />
-                  <Button label="See another" variant="neutral" className="flex-1" onPress={() => setNotice(`No other agents available in this market. ${proposed?.full_name || 'This agent'} is your only option.`)} />
+                  <Button label="Accept" className="flex-1" disabled={busy || !proposed} onPress={() => act(() => api.acceptAgent(order.id))} />
+                  <Button label="See another" variant="neutral" className="flex-1" disabled={busy || !proposed} onPress={() => act(() => api.seeAnotherAgent(order.id))} />
                 </View>
               </Card>
             ) : null}
@@ -376,14 +464,28 @@ export default function CustomerOrderScreen() {
                 <View className="flex-row justify-between"><Text className="text-muted">Cap</Text><Text className="font-semibold text-ink">{naira(auth.cap)}</Text></View>
                 <View className="flex-row justify-between"><Text className="text-muted">Spent so far</Text><Text className="font-semibold text-ink">{naira(auth.spent)}</Text></View>
                 <Field placeholder="Amount to approve (₦)" value={raise} onChangeText={setRaise} keyboardType="decimal-pad" />
-                <Button label="Approve increase" onPress={() => setRaise('')} />
+                <Button
+                  label="Approve increase"
+                  disabled={busy || !(Number(raise) > 0)}
+                  onPress={() =>
+                    act(async () => {
+                      setAuth(await api.raiseCap(order.id, Number(raise)));
+                      setRaise('');
+                    })
+                  }
+                />
               </Card>
             ) : null}
 
             {order.status === 'awaiting_payment' ? (
               <Card>
                 <SectionHeader title="Pay balance" />
-                <PaymentChooser reference={`QYKA-${shortId(order.id)}`} amountDue={amountDue} walletBalance={wallet} onPayWallet={() => setStatus('paid')} onPayTransfer={() => setStatus('paid')} />
+                {order.payment_window_expires_at ? (
+                  <Text className="text-sm leading-5 text-muted">
+                    Pay by <Text className="font-bold text-ink">{new Date(order.payment_window_expires_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</Text>, or the order is cancelled and your deposit is lost.
+                  </Text>
+                ) : null}
+                <PaymentChooser amountDue={amountDue} walletBalance={wallet} onPayWallet={payFromWallet(() => api.payBalance(order.id))} onTopUp={topUp} />
               </Card>
             ) : null}
 
@@ -417,7 +519,7 @@ export default function CustomerOrderScreen() {
                     <Text className="text-sm font-semibold text-ink/80">This releases payment to your agent. Confirm you&apos;ve received everything?</Text>
                     <View className="flex-row gap-2">
                       <Button label="Cancel" variant="neutral" className="flex-1" onPress={() => setConfirming(false)} />
-                      <Button label="Yes, confirm" className="flex-1" onPress={() => { setConfirming(false); setStatus('delivered'); }} />
+                      <Button label="Yes, confirm" className="flex-1" disabled={busy} onPress={() => act(() => api.confirmDelivery(order.id), () => setConfirming(false))} />
                     </View>
                   </View>
                 ) : null}
@@ -431,9 +533,25 @@ export default function CustomerOrderScreen() {
               <Card>
                 <SectionHeader title={paidOrLater ? 'What was bought' : 'Live from the market'} />
                 {items.map((it) => (
-                  <ItemLine key={it.id} item={it} purchase={purchaseFor(it)} onPreview={setPreview} onDecide={(d) => patchItem(it.id, { availability: d })} />
+                  <ItemLine key={it.id} item={it} purchase={purchaseFor(it)} onPreview={setPreview} onDecide={(d) => act(() => api.decideItem(order.id, it.id, d))} />
                 ))}
               </Card>
+            ) : null}
+
+            {order.status === 'draft' || order.status === 'proposed' ? (
+              confirmingCancel ? (
+                <View className="gap-2 rounded-3xl border border-line bg-surface p-4">
+                  <Text className="text-sm font-semibold text-ink">Cancel this order?</Text>
+                  <View className="flex-row gap-2">
+                    <Button label="Keep it" variant="neutral" className="flex-1" onPress={() => setConfirmingCancel(false)} />
+                    <Button label="Yes, cancel" variant="outline" className="flex-1" disabled={busy} onPress={() => act(() => api.cancelOrder(order.id), () => setConfirmingCancel(false))} />
+                  </View>
+                </View>
+              ) : (
+                <Pressable onPress={() => setConfirmingCancel(true)} hitSlop={8} className="items-center py-2">
+                  <Text className="text-sm font-bold text-red-700">Cancel this order</Text>
+                </Pressable>
+              )
             ) : null}
 
             {RATEABLE.has(order.status) ? (
@@ -457,7 +575,19 @@ export default function CustomerOrderScreen() {
                       ))}
                     </View>
                     <Field placeholder="Tell us how it went (optional)" value={comment} onChangeText={setComment} multiline />
-                    <Button label="Submit rating" onPress={() => { setRating({ stars: stars || 5, comment: comment.trim() || null }); setStars(0); setComment(''); }} />
+                    <Button
+                      label="Submit rating"
+                      disabled={busy}
+                      onPress={() =>
+                        act(async () => {
+                          const given = stars || 5;
+                          await api.rateAgent(order.id, given, comment.trim() || null);
+                          setRating({ stars: given, comment: comment.trim() || null });
+                          setStars(0);
+                          setComment('');
+                        })
+                      }
+                    />
                   </>
                 )}
               </Card>

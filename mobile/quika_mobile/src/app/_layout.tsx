@@ -8,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 
+import AppLoading from '@/components/AppLoading';
 import SplashOverlay from '@/components/SplashOverlay';
 import { LanguageProvider } from '@/lib/language';
 import { SplashProvider, useSplash } from '@/lib/splash';
@@ -21,8 +22,10 @@ SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 200, fade: true });
 
 function Navigator({ fontsReady }: { fontsReady: boolean }) {
-  const { user } = useSession();
+  const { user, ready } = useSession();
   const { done: splashDone, finish } = useSplash();
+  // Until the saved sign-in has been checked, we don't know which screens to show.
+  if (!ready) return <AppLoading />;
   // Signed-out people land on the role picker (welcome), never straight on a login form.
   return (
     <View style={{ flex: 1 }}>

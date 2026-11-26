@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
 import { Text } from '@/components/Text';
 
 import Animated, { FadeInUp } from 'react-native-reanimated';
@@ -11,8 +11,8 @@ import OrderIdChip from '@/components/OrderIdChip';
 import PageHeader from '@/components/PageHeader';
 import { Button, Card, CodeInput, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';
 import { ago, shortId, splitAccent } from '@/lib/format';
-import { boughtItems, hub, useHubOrder } from '@/lib/hubStore';
-import { PLACES, type ProofPhoto } from '@/lib/proof';
+import { boughtItems, hub, useHub, useHubOrder } from '@/lib/hubStore';
+import type { ProofPhoto } from '@/lib/proof';
 import type { HubOrder } from '@/lib/types';
 
 // One order, one job at a time: which panel shows is decided by where the
@@ -26,12 +26,16 @@ const itemLabel = (it: HubOrder['items'][number]) => `${it.quantity ? `${it.quan
 export default function HubOrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  // The order lives in the hub store, so this page and the hub list always agree about where it is.
-  const order: HubOrder = useHubOrder(id);
-  const status = order.status;
+  // The order comes from the server (the hub store asks again every few seconds). Once it has been handed over it leaves the
+  // hub's list, so the last version seen is kept to show the "handed over" page.
+  const { loaded, error: loadError } = useHub();
+  const live = useHubOrder(id);
+  const [kept, setKept] = useState<HubOrder | undefined>(live);
+  if (live && live !== kept) setKept(live);
+  const order = live ?? kept;
 
-  // Check-in form
-  const [seen, setSeen] = useState<Set<string>>(() => new Set(boughtItems(order).map((i) => i.id)));
+  // Check-in form: the items the shopkeeper switched OFF (not in the bag).
+  const [unseen, setUnseen] = useState<Set<string>>(new Set());
   const [note, setNote] = useState('');
   const [photos, setPhotos] = useState<ProofPhoto[]>([]);
   const [triedCheckIn, setTriedCheckIn] = useState(false);
@@ -39,14 +43,40 @@ export default function HubOrderScreen() {
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState('');
   const [handedTo, setHandedTo] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState('');
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/shopkeeper'));
+
+  // Runs a hub action on the server; any refusal is shown on the page.
+  const act = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setProblem('');
+    try {
+      await fn();
+    } catch (e) {
+      setProblem((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!order) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center gap-4 bg-canvas px-8" edges={['top']}>
+        <Text className="text-center text-base text-muted">{loaded && loadError ? loadError : loaded ? "We couldn't find that order at your hub." : 'Loading the order…'}</Text>
+        <Button label="Back" variant="outline" onPress={back} />
+      </SafeAreaView>
+    );
+  }
+  const status = order.status;
 
   const items = order.items;
   // Only items that were actually bought should be in the bag; skipped ones aren't expected.
   const expected = boughtItems(order);
   const notBought = items.length - expected.length;
-  const missing = expected.filter((i) => !seen.has(i.id));
+  const missing = expected.filter((i) => unseen.has(i.id));
+  const seenIds = expected.filter((i) => !unseen.has(i.id)).map((i) => i.id);
 
   const shell = (eyebrow: string, title: string, body: string, content: React.ReactNode) => {
     const [top, accent] = splitAccent(title);
@@ -73,28 +103,6 @@ export default function HubOrderScreen() {
     );
   };
 
-  // ── On the way: the agent has paid and is carrying it here ───────────────
-  if (status === 'paid') {
-    return shell(
-      'On the way',
-      `#${shortId(order.id)} is on its way`,
-      `${order.agent_name || 'The agent'} is bringing this to your hub. It appears under "Just dropped" as soon as they drop it off.`,
-      <>
-        <Card>
-          <SectionHeader title="What's coming" />
-          {items.map((it) => (
-            <View key={it.id} className="flex-row items-center gap-3 border-t border-dashed border-line-strong py-3">
-              <ItemArt name={it.description} />
-              <Text className="flex-1 font-semibold text-ink">{itemLabel(it)}</Text>
-            </View>
-          ))}
-        </Card>
-        {__DEV__ ? <Button label="Dev: the agent arrives" variant="outline" onPress={() => hub.simulateAgentArrives(order.id)} /> : null}
-        <Button label="Back to hub" variant="neutral" onPress={back} />
-      </>,
-    );
-  }
-
   // ── Dropped: check what arrived against the list ──────────────────────
   if (status === 'dropped_at_hub') {
     return shell(
@@ -105,7 +113,7 @@ export default function HubOrderScreen() {
         <Card>
           <SectionHeader title="What's in the bag" />
           {expected.map((it) => {
-            const on = seen.has(it.id);
+            const on = !unseen.has(it.id);
             return (
               <View key={it.id} className="flex-row items-center gap-3 border-t border-line py-3">
                 <ItemArt name={it.description} />
@@ -117,10 +125,10 @@ export default function HubOrderScreen() {
                   value={on}
                   trackColor={{ true: '#EE9A5A' }}
                   onValueChange={() =>
-                    setSeen((cur) => {
+                    setUnseen((cur) => {
                       const next = new Set(cur);
-                      if (on) next.delete(it.id);
-                      else next.add(it.id);
+                      if (on) next.add(it.id);
+                      else next.delete(it.id);
                       return next;
                     })
                   }
@@ -130,6 +138,17 @@ export default function HubOrderScreen() {
           })}
           {notBought > 0 ? <Text className="mt-2 text-xs leading-4 text-muted">{notBought} item{notBought === 1 ? ' was' : 's were'} never bought, so {notBought === 1 ? "it isn't" : "they aren't"} expected in the bag.</Text> : null}
         </Card>
+
+        {order.packing_photos && order.packing_photos.length > 0 ? (
+          <Card>
+            <SectionHeader title="The agent's photos" subtitle="What they photographed when they dropped it off." />
+            <View className="flex-row flex-wrap gap-2">
+              {order.packing_photos.map((u) => (
+                <Image key={u} source={{ uri: u }} className="h-20 w-20 rounded-xl bg-sunken" />
+              ))}
+            </View>
+          </Card>
+        ) : null}
 
         {missing.length > 0 ? (
           <View className="gap-2 rounded-3xl border border-brand-orange/30 bg-brand-orange/10 p-5">
@@ -158,18 +177,19 @@ export default function HubOrderScreen() {
           <GoodsPhotos
             photos={photos}
             onChange={setPhotos}
-            place={PLACES['m-1']}
             error={triedCheckIn && photos.length === 0 ? 'Add a photo of the goods to check in.' : undefined}
             hint="Photograph what's in the bag as it arrived, before you check it in."
           />
         </Card>
 
+        {problem ? <Text className="text-center text-sm font-semibold text-red-700">{problem}</Text> : null}
         <Button
           label={missing.length > 0 ? `Check in with ${missing.length} missing` : "Everything's here: check in"}
+          busy={busy}
           onPress={() => {
             // Stays tappable so it can say what's missing, instead of looking broken.
             if (photos.length === 0 || (missing.length > 0 && !note.trim())) return setTriedCheckIn(true);
-            hub.checkIn(order.id, missing.map((m) => m.id), note);
+            void act(() => hub.checkIn(order.id, seenIds, note, photos.map((p) => p.uri)));
           }}
         />
       </>,
@@ -197,7 +217,8 @@ export default function HubOrderScreen() {
             <Text className="mt-2 rounded-2xl bg-sunken p-3 text-sm text-muted">{order.hub_receipt_note}</Text>
           ) : null}
         </Card>
-        <Button label="Ready for a rider" onPress={() => hub.markReady(order.id)} />
+        {problem ? <Text className="text-center text-sm font-semibold text-red-700">{problem}</Text> : null}
+        <Button label="Ready for a rider" busy={busy} onPress={() => void act(() => hub.markReady(order.id))} />
       </>,
     );
   }
@@ -218,27 +239,29 @@ export default function HubOrderScreen() {
             {codeError ? <Text className="text-center text-sm font-semibold text-red-700">{codeError}</Text> : null}
             <Button
               label="Hand over to rider"
+              busy={busy}
               disabled={code.length < 4}
-              onPress={() => {
+              onPress={async () => {
                 const rider = order.rider_name || 'the rider';
-                if (hub.handOver(order.id, code)) setHandedTo(rider);
-                else setCodeError("That code doesn't match. Ask the rider to check the code on their phone.");
+                setBusy(true);
+                setCodeError('');
+                try {
+                  await hub.handOver(order.id, code);
+                  setHandedTo(rider);
+                } catch (e) {
+                  setCodeError((e as Error).message);
+                } finally {
+                  setBusy(false);
+                }
               }}
             />
-            {__DEV__ && order.rider_code ? <Text className="text-center text-xs text-faint">Dev: the rider&apos;s code is {order.rider_code}</Text> : null}
             <Text className="text-center text-xs text-muted">Only hand the bag over once the code matches.</Text>
-            <Pressable onPress={() => hub.releaseClaim(order.id)} hitSlop={8} className="items-center pt-1">
-              <Text className="text-sm font-bold text-red-700">Rider didn&apos;t show up? Release them</Text>
-            </Pressable>
           </Card>
         ) : (
-          <View className="gap-3">
-            <Card className="items-center">
-              <Text className="text-muted">Waiting for a rider to claim this order…</Text>
-              <Text className="text-center text-xs text-faint">It&apos;s in the riders&apos; list now.</Text>
-            </Card>
-            {__DEV__ ? <Button label="Dev: a rider claims it" variant="outline" onPress={() => hub.claim(order.id, 'Musa Ibrahim')} /> : null}
-          </View>
+          <Card className="items-center">
+            <Text className="text-muted">Waiting for a rider to claim this order…</Text>
+            <Text className="text-center text-xs text-faint">It&apos;s in the riders&apos; list now.</Text>
+          </Card>
         )}
         <Card>
           <SectionHeader title="In the bag" />

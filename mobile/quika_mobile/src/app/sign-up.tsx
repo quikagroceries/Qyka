@@ -6,23 +6,74 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import AuthBackdrop from '@/components/auth/AuthBackdrop';
 import ResendCode from '@/components/auth/ResendCode';
 import CodeBoxes from '@/components/auth/CodeBoxes';
-import GoogleLogo from '@/components/auth/GoogleLogo';
 import PhoneField from '@/components/auth/PhoneField';
 import Logo from '@/components/Logo';
 import { Text } from '@/components/Text';
 import { Button, Field, SafeAreaView } from '@/components/ui';
+import { api } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { isNgMobile } from '@/lib/validate';
 
-// UI only: the steps just move through the screens. A new account needs a name, a phone number and an email;
-// once verified, a short confirmation leads straight into writing a first list.
+// Real sign-up: a new account needs a name and a phone number. A one-time code is texted to the phone, and verifying it creates the
+// account. A short confirmation then leads straight into writing a first list (the account is opened when you tap Start my list).
 export default function SignUp() {
   const router = useRouter();
-  const { signIn, signUp } = useSession();
+  const { acceptToken } = useSession();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'details' | 'code' | 'done'>('details');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [devCode, setDevCode] = useState('');
+  // The token from verifying the code. The account opens when they tap "Start my list", after the confirmation.
+  const [token, setToken] = useState('');
+
+  const target = `+234${phone.replace(/\D/g, '')}`;
+
+  const sendCode = async () => {
+    if (name.trim().length < 2) return setError('Enter your name.');
+    if (!isNgMobile(phone)) return setError('Enter a valid Nigerian mobile number.');
+    setBusy(true);
+    setError('');
+    try {
+      const sent = await api.requestOtp(target);
+      if (__DEV__ && sent.dev_otp) {
+        setDevCode(sent.dev_otp);
+        setCode(sent.dev_otp);
+      }
+      setStep('code');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verify = async () => {
+    if (code.length < 6) return setError('Enter the 6-digit code.');
+    setBusy(true);
+    setError('');
+    try {
+      const res = await api.verifyOtp(target, code, { full_name: name.trim() });
+      setToken(res.access_token);
+      setStep('done');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const start = async () => {
+    setBusy(true);
+    try {
+      await acceptToken(token);
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  };
 
   const firstName = name.trim().split(/\s+/)[0];
   const done = step === 'done';
@@ -64,38 +115,31 @@ export default function SignUp() {
               <>
                 <Field value={name} onChangeText={setName} placeholder="Full name or username" autoCapitalize="words" textContentType="name" />
                 <PhoneField value={phone} onChange={setPhone} />
-                <Field
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="Email address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="email-address"
-                  textContentType="emailAddress"
-                />
-                <Button label="Continue" onPress={() => setStep('code')} />
+                {error ? <Text className="text-center text-sm font-semibold text-red-700">{error}</Text> : null}
+                <Button label="Continue" busy={busy} onPress={sendCode} />
               </>
             ) : done ? (
-              <Button label="Start my list" onPress={() => signUp({ fullName: name, phone, email })} />
+              <>
+                {error ? <Text className="text-center text-sm font-semibold text-red-700">{error}</Text> : null}
+                <Button label="Start my list" busy={busy} onPress={start} />
+              </>
             ) : (
               <>
-                <CodeBoxes value={code} onChange={setCode} />
-                <Button label="Verify and create account" onPress={() => setStep('done')} />
-                <ResendCode onResend={() => setCode('')} />
+                <CodeBoxes value={code} onChange={(c) => { setCode(c); setError(''); }} />
+                {error ? <Text className="text-center text-sm font-semibold text-red-700">{error}</Text> : null}
+                {__DEV__ && devCode ? <Text className="text-center text-xs text-faint">Dev: the code is {devCode}</Text> : null}
+                <Button label="Verify and create account" busy={busy} onPress={verify} />
+                <ResendCode
+                  onResend={async () => {
+                    const sent = await api.requestOtp(target);
+                    setError('');
+                    setCode(__DEV__ && sent.dev_otp ? sent.dev_otp : '');
+                    if (__DEV__ && sent.dev_otp) setDevCode(sent.dev_otp);
+                  }}
+                />
               </>
             )}
           </Animated.View>
-
-          {step === 'details' ? (
-            <>
-              <View className="flex-row items-center gap-3">
-                <View className="h-px flex-1 bg-line-strong" />
-                <Text className="text-xs font-medium text-faint">Or continue with</Text>
-                <View className="h-px flex-1 bg-line-strong" />
-              </View>
-              <Button label="Sign up with Google" variant="outline" icon={<GoogleLogo />} onPress={() => signIn('customer')} />
-            </>
-          ) : null}
 
           {done ? null : (
             <View className="items-center gap-3">

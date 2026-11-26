@@ -10,9 +10,10 @@ const clock = (s: number) => `0:${String(s).padStart(2, '0')}`;
  * "Didn't get it? Resend code". UI only: nothing is sent, but it behaves like the real thing.
  * A 30-second wait, a short "Sending…", then "Code sent" and the wait starts again.
  */
-export default function ResendCode({ onResend }: { onResend?: () => void }) {
+export default function ResendCode({ onResend }: { onResend?: () => void | Promise<void> }) {
   const [seconds, setSeconds] = useState(WAIT);
-  const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+  const [failure, setFailure] = useState('');
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -26,18 +27,29 @@ export default function ResendCode({ onResend }: { onResend?: () => void }) {
     return () => pending.forEach(clearTimeout);
   }, []);
 
-  const resend = () => {
+  const resend = async () => {
     setState('sending');
-    timers.current.push(
-      setTimeout(() => {
-        setState('sent');
-        setSeconds(WAIT);
-        onResend?.();
-        timers.current.push(setTimeout(() => setState('idle'), 2400));
-      }, 800),
-    );
+    try {
+      await onResend?.();
+    } catch (e) {
+      setFailure((e as Error).message || "Couldn't send a new code.");
+      setState('failed');
+      return;
+    }
+    setState('sent');
+    setSeconds(WAIT);
+    timers.current.push(setTimeout(() => setState('idle'), 2400));
   };
 
+  if (state === 'failed')
+    return (
+      <View className="items-center gap-1">
+        <Text className="text-center text-sm font-semibold text-red-700">{failure}</Text>
+        <Pressable onPress={() => setState('idle')} hitSlop={8}>
+          <Text className="text-sm font-bold text-brand-orange-dark">Try again</Text>
+        </Pressable>
+      </View>
+    );
   if (state === 'sending') return <Text className="text-center text-sm font-semibold text-muted">Sending a new code…</Text>;
   if (state === 'sent')
     return (

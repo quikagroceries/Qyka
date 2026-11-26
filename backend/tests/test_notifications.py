@@ -182,3 +182,25 @@ async def test_hub_handover_sends_the_critical_out_for_delivery_notice(db_sessio
     assert note.kind == "out_for_delivery" and order.handover_code in note.message
     [email] = _emails(providers)
     assert email["subject"] == "Your Qyka order is on its way"
+
+
+@pytest.mark.asyncio
+async def test_read_all_and_unknown_id(client, db_session_factory):
+    from app.auth.models import User
+    from app.notifications import service as notifications
+    from sqlalchemy import select
+
+    r = await client.post("/auth/request-otp", json={"identifier": "+2348012300099"})
+    code = r.json()["dev_otp"]
+    r = await client.post("/auth/verify-otp", json={"identifier": "+2348012300099", "code": code})
+    h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    async with db_session_factory() as s:
+        uid = (await s.execute(select(User).where(User.phone == "+2348012300099"))).scalar_one().id
+        await notifications.send(s, user_id=uid, kind="order_cancelled", message="a")
+        await notifications.send(s, user_id=uid, kind="order_cancelled", message="b")
+        await s.commit()
+    assert all(not n["is_read"] for n in (await client.get("/notifications", headers=h)).json())
+    assert (await client.post("/notifications/read-all", headers=h)).status_code == 204
+    assert all(n["is_read"] for n in (await client.get("/notifications", headers=h)).json())
+    import uuid
+    assert (await client.post(f"/notifications/{uuid.uuid4()}/read", headers=h)).status_code == 404

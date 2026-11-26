@@ -9,10 +9,8 @@ import StatTiles from '@/components/StatTiles';
 import { Text } from '@/components/Text';
 import { Button, CodeInput, Float, SafeAreaView } from '@/components/ui';
 import { ago, naira, shortId, splitAccent } from '@/lib/format';
-import { hub, useCustomerOrderId, useHubJob, useHubJobs } from '@/lib/hubStore';
-import { EARNINGS, RIDER_ACTIVE, RIDER_POOL } from '@/lib/mock';
-import { orderStore, useOrder } from '@/lib/orderStore';
-import { PLACES, type ProofPhoto } from '@/lib/proof';
+import type { ProofPhoto } from '@/lib/proof';
+import { rider, useRider } from '@/lib/riderStore';
 import type { RiderJob } from '@/lib/types';
 
 // A rider does one job at a time (the backend enforces it), so this screen is
@@ -24,8 +22,6 @@ const riderArt = require('../../../../assets/illustrations/char-rider-scooter.we
 const routeArt = require('../../../../assets/illustrations/delivery-map-route.webp');
 const hubArt = require('../../../../assets/illustrations/map-pin-storefront.webp');
 const customerArt = require('../../../../assets/illustrations/person-shopping-list.webp');
-
-const RIDER_NAME = 'Musa Ibrahim';
 
 const mapsUrl = (j: RiderJob) =>
   j.dropoff_latitude != null && j.dropoff_longitude != null
@@ -57,7 +53,7 @@ function InfoCard({ art, tint, label, title, lines, children }: { art: number; t
   );
 }
 
-function Pickup({ job, photos, onPhotos, error }: { job: RiderJob; photos: ProofPhoto[]; onPhotos: (next: ProofPhoto[]) => void; error?: string }) {
+function Pickup({ job, photos, onPhotos }: { job: RiderJob; photos: ProofPhoto[]; onPhotos: (next: ProofPhoto[]) => void }) {
   return (
     <>
       <View className="items-center gap-1 rounded-3xl bg-brand-orange/20 px-5 py-5">
@@ -74,25 +70,51 @@ function Pickup({ job, photos, onPhotos, error }: { job: RiderJob; photos: Proof
       />
       <View className="gap-2">
         <Text className="ml-2 text-xs font-bold uppercase tracking-wide text-faint">Photo of the order (required)</Text>
-        <GoodsPhotos
-          photos={photos}
-          onChange={onPhotos}
-          place={PLACES['m-1']}
-          max={3}
-          error={error}
-          hint="Take a photo of the order as you collect it. It shows what you picked up, and when and where."
-        />
+        <GoodsPhotos photos={photos} onChange={onPhotos} max={3} hint="Take a photo of the order as you collect it. It shows what you picked up, and when and where." />
+      </View>
+      <View className="items-center rounded-3xl border border-line bg-surface p-4">
+        <Text className="text-center text-sm text-muted">Waiting for the hub to hand it over. This page moves on by itself.</Text>
       </View>
     </>
   );
 }
 
-function Deliver({ job, photos, onPhotos, expectedCode, onDeliver }: { job: RiderJob; photos: ProofPhoto[]; onPhotos: (next: ProofPhoto[]) => void; expectedCode?: string | null; onDeliver: () => void }) {
+function Deliver({
+  job,
+  photos,
+  onPhotos,
+  pickupPhotos,
+  onPickupPhotos,
+  onDeliver,
+}: {
+  job: RiderJob;
+  photos: ProofPhoto[];
+  onPhotos: (next: ProofPhoto[]) => void;
+  pickupPhotos: ProofPhoto[];
+  onPickupPhotos: (next: ProofPhoto[]) => void;
+  /** Sends the code to the server. Throws the server's message (e.g. a wrong code). */
+  onDeliver: (code: string) => Promise<void>;
+}) {
   const [code, setCode] = useState('');
   const [tried, setTried] = useState(false);
-  const [wrongCode, setWrongCode] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState('');
   // The photo should be taken at the customer's door, if the order has a pinned location.
   const dropoff = job.dropoff_latitude != null && job.dropoff_longitude != null ? { name: 'the delivery address', latitude: job.dropoff_latitude, longitude: job.dropoff_longitude } : undefined;
+  const needsPickupPhoto = pickupPhotos.length === 0;
+
+  const confirm = async () => {
+    if (code.length < 4 || photos.length === 0 || needsPickupPhoto) return setTried(true);
+    setBusy(true);
+    setProblem('');
+    try {
+      await onDeliver(code);
+    } catch (e) {
+      setProblem((e as Error).message);
+      setBusy(false);
+    }
+  };
+
   return (
     <>
       <InfoCard art={customerArt} tint="bg-brand-orange/15" label="Deliver to" title={job.customer_name || 'Customer'} lines={[job.delivery_address || 'No address on this order']}>
@@ -101,6 +123,12 @@ function Deliver({ job, photos, onPhotos, expectedCode, onDeliver }: { job: Ride
           <Button label="Directions" variant="outline" className="flex-1" onPress={() => void Linking.openURL(mapsUrl(job))} />
         </View>
       </InfoCard>
+      {needsPickupPhoto ? (
+        <View className="gap-2">
+          <Text className="ml-2 text-xs font-bold uppercase tracking-wide text-faint">Photo of the order from pickup (required)</Text>
+          <GoodsPhotos photos={pickupPhotos} onChange={onPickupPhotos} max={3} error={tried ? 'Add a photo of the order you collected.' : undefined} hint="Take a photo of the order you collected from the hub." />
+        </View>
+      ) : null}
       <View className="gap-2">
         <Text className="ml-2 text-xs font-bold uppercase tracking-wide text-faint">Photo at the door (required)</Text>
         <GoodsPhotos photos={photos} onChange={onPhotos} place={dropoff} max={3} error={tried && photos.length === 0 ? 'Add a photo at the door to confirm.' : undefined} hint="Take a photo of the order at the customer's door as you hand it over. It shows it was delivered, and when and where." />
@@ -110,25 +138,16 @@ function Deliver({ job, photos, onPhotos, expectedCode, onDeliver }: { job: Ride
           <Text className="text-center text-lg font-extrabold tracking-tight text-ink">Customer&apos;s code</Text>
           <Text className="text-center text-sm leading-5 text-muted">Ask for the 4-digit code on their phone before you hand anything over.</Text>
         </View>
-        <CodeInput value={code} onChange={(c) => { setCode(c); setWrongCode(false); }} />
+        <CodeInput value={code} onChange={(c) => { setCode(c); setProblem(''); }} />
         {tried && code.length < 4 ? <Text className="text-center text-sm font-semibold text-red-700">Enter the customer&apos;s 4-digit code.</Text> : null}
-        {wrongCode ? <Text className="text-center text-sm font-semibold text-red-700">That code doesn&apos;t match the customer&apos;s. Ask them to check their phone.</Text> : null}
-        {__DEV__ && expectedCode ? <Text className="text-center text-xs text-faint">Dev: the customer&apos;s code is {expectedCode}</Text> : null}
-        <Button
-          label="Confirm drop-off"
-          onPress={() => {
-            if (code.length < 4 || photos.length === 0) return setTried(true);
-            // The code has to be the one the customer was given when the hub handed the order over.
-            if (expectedCode && code !== expectedCode) return setWrongCode(true);
-            onDeliver();
-          }}
-        />
+        {problem ? <Text className="text-center text-sm font-semibold text-red-700">{problem}</Text> : null}
+        <Button label="Confirm drop-off" busy={busy} onPress={confirm} />
       </View>
     </>
   );
 }
 
-function PoolCard({ job, index, onClaim }: { job: RiderJob; index: number; onClaim: () => void }) {
+function PoolCard({ job, index, busy, onClaim }: { job: RiderJob; index: number; busy?: boolean; onClaim: () => void }) {
   return (
     <Animated.View entering={FadeInDown.delay(index * 80).duration(450)} className="gap-3 rounded-3xl border border-line bg-surface p-4 shadow-sm">
       <View className="flex-row items-center gap-4">
@@ -145,48 +164,46 @@ function PoolCard({ job, index, onClaim }: { job: RiderJob; index: number; onCla
           </Text>
         </View>
       </View>
-      <Button label="Claim this job" onPress={onClaim} />
+      <Button label="Claim this job" busy={busy} onPress={onClaim} />
     </Animated.View>
   );
 }
 
-// UI only: claiming, collecting and delivering just step through local state.
-type Stage = 'pool' | 'pickup' | 'deliver' | 'handed';
-
 export default function Jobs() {
-  const [stage, setStage] = useState<Stage>('pool');
+  const { pool, mine, earnings, loaded, error } = useRider();
   const [pickupPhotos, setPickupPhotos] = useState<ProofPhoto[]>([]);
   const [deliveryPhotos, setDeliveryPhotos] = useState<ProofPhoto[]>([]);
-  const [triedPickup, setTriedPickup] = useState(false);
-  // The job this rider has claimed from the hub (a real order the shopkeeper marked ready), if any.
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const hubJobs = useHubJobs();
-  const claimed = useHubJob(activeId);
-  // The customer's order behind the job: a hub order links to one; the sample job is the customer's out-for-delivery order.
-  const linkedId = useCustomerOrderId(activeId) ?? (activeId ? null : 'a1b2c3d4-0004');
-  const customerOrder = useOrder(linkedId);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState('');
 
-  // Back to the pool: the next job starts with no photos. Giving a job back (before collecting it) also frees it at the hub.
-  const toPool = (giveBack = false) => {
-    if (giveBack && activeId) hub.releaseClaim(activeId);
-    setActiveId(null);
+  // What the rider is doing is decided by where the order is, which the hub changes: claimed and waiting at the hub (ready for
+  // pickup), out for delivery once the hub has handed it over, then handed over to the customer.
+  const job: RiderJob | null = mine[0] ?? null;
+  // Once the rider has delivered, the job keeps a delivery time until the customer confirms, then it leaves the list.
+  const handedOver = !!job && !!job.delivered_at;
+  const delivering = !!job && job.status === 'out_for_delivery';
+
+  // A new job starts with no photos.
+  const jobId = job?.id ?? null;
+  const [photosFor, setPhotosFor] = useState<string | null>(jobId);
+  if (photosFor !== jobId) {
+    setPhotosFor(jobId);
     setPickupPhotos([]);
     setDeliveryPhotos([]);
-    setTriedPickup(false);
-    setStage('pool');
-  };
-  const claim = (j: RiderJob) => {
-    if (hubJobs.some((h) => h.id === j.id)) {
-      hub.claim(j.id, RIDER_NAME);
-      setActiveId(j.id);
+  }
+
+  // Runs a rider action on the server; any refusal (one job at a time, someone else claimed it...) is shown at the top.
+  const act = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setProblem('');
+    try {
+      await fn();
+    } catch (e) {
+      setProblem((e as Error).message);
+    } finally {
+      setBusy(false);
     }
-    setStage('pickup');
   };
-  const job: RiderJob | null = stage === 'pool' ? null : (claimed ?? RIDER_ACTIVE);
-  // Orders the hub has ready come first; the rest are sample jobs.
-  const pool = stage === 'pool' ? [...hubJobs, ...RIDER_POOL] : [];
-  const delivering = stage === 'deliver' || stage === 'handed';
-  const handedOver = stage === 'handed';
 
   let title = '';
   let body = '';
@@ -204,7 +221,7 @@ export default function Jobs() {
     body = "Show the shopkeeper your code and they'll hand you the order.";
   }
   const [top, accent] = splitAccent(title);
-  const empty = !job && pool.length === 0;
+  const empty = !job && pool.length === 0 && loaded && !error;
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={[]}>
@@ -236,10 +253,11 @@ export default function Jobs() {
                 {!delivering ? (
                   <Pressable
                     hitSlop={8}
+                    disabled={busy}
                     onPress={() =>
                       Alert.alert('Give this job back?', 'It goes back to the pool for other riders.', [
                         { text: 'Keep it', style: 'cancel' },
-                        { text: 'Give it back', style: 'destructive', onPress: () => toPool(true) },
+                        { text: 'Give it back', style: 'destructive', onPress: () => void act(() => rider.release(job.id)) },
                       ])
                     }>
                     <Text className="text-sm font-bold text-red-700">Give it back</Text>
@@ -251,30 +269,44 @@ export default function Jobs() {
           </>
         )}
 
-        {!job ? (
+        {!loaded ? <Text className="text-center text-sm text-muted">Loading your jobs…</Text> : null}
+        {error ? (
+          <View className="items-center gap-2 rounded-3xl border border-line bg-surface p-4">
+            <Text className="text-center text-sm font-semibold text-red-700">{error}</Text>
+            <Button label="Try again" variant="outline" onPress={() => void rider.refresh()} />
+          </View>
+        ) : null}
+        {problem ? (
+          <View className="rounded-2xl bg-red-50 px-4 py-3">
+            <Text className="text-sm font-semibold text-red-700">{problem}</Text>
+          </View>
+        ) : null}
+
+        {!job && earnings ? (
           <StatTiles
             delay={80}
             items={[
               { value: pool.length, label: 'Available', art: hubArt, tint: 'bg-gold/40', hot: pool.length > 0 },
-              { value: naira(EARNINGS.earnings_today), label: 'Today', art: require('../../../../assets/illustrations/wallet.webp'), tint: 'bg-brand-orange/15' },
-              { value: EARNINGS.completed_count, label: 'Deliveries', art: riderArt, tint: 'bg-brand-green/15' },
+              { value: naira(earnings.earnings_today), label: 'Today', art: require('../../../../assets/illustrations/wallet.webp'), tint: 'bg-brand-orange/15' },
+              { value: earnings.completed_count, label: 'Deliveries', art: riderArt, tint: 'bg-brand-green/15' },
             ]}
           />
         ) : null}
 
-        {job && !delivering && <Pickup job={job} photos={pickupPhotos} onPhotos={setPickupPhotos} error={triedPickup && pickupPhotos.length === 0 ? 'Add a photo of the order to continue.' : undefined} />}
-        {job && !delivering && <Button label="I've collected it from the hub" onPress={() => (pickupPhotos.length === 0 ? setTriedPickup(true) : setStage('deliver'))} />}
-        {job && delivering && !handedOver && <Deliver
+        {job && !delivering ? (
+          <Pickup job={job} photos={pickupPhotos} onPhotos={setPickupPhotos} />
+        ) : null}
+        {job && delivering && !handedOver ? (
+          <Deliver
             job={job}
             photos={deliveryPhotos}
             onPhotos={setDeliveryPhotos}
-            expectedCode={customerOrder?.handover_code}
-            onDeliver={() => {
-              if (linkedId) orderStore.riderDelivered(linkedId);
-              setStage('handed');
-            }}
-          />}
-        {handedOver && (
+            pickupPhotos={pickupPhotos}
+            onPickupPhotos={setPickupPhotos}
+            onDeliver={(code) => rider.deliver(job.id, code)}
+          />
+        ) : null}
+        {job && handedOver ? (
           <>
             <View className="items-center gap-1 rounded-3xl border border-line bg-surface p-5 shadow-sm">
               <View className="mb-1 h-12 w-12 items-center justify-center rounded-full bg-brand-green/20">
@@ -283,9 +315,8 @@ export default function Jobs() {
               <Text className="text-lg font-extrabold tracking-tight text-brand-army">Drop-off confirmed</Text>
               <Text className="text-center text-sm leading-5 text-muted">You can take a new job as soon as the customer confirms.</Text>
             </View>
-            <Button label="Back to jobs" variant="neutral" onPress={() => toPool()} />
           </>
-        )}
+        ) : null}
         {!job && pool.length > 0 ? (
           <View className="gap-3">
             <View className="gap-0.5">
@@ -293,7 +324,7 @@ export default function Jobs() {
               <Text className="text-sm text-muted">First to claim gets it.</Text>
             </View>
             {pool.map((j, i) => (
-              <PoolCard key={j.id} job={j} index={i} onClaim={() => claim(j)} />
+              <PoolCard key={j.id} job={j} index={i} busy={busy} onClaim={() => void act(() => rider.claim(j.id))} />
             ))}
           </View>
         ) : null}

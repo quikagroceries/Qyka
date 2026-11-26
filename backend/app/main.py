@@ -9,6 +9,7 @@ from app.admin.routes import router as admin_router
 from app.agent.routes import router as agent_router
 from app.agent_applications.routes import router as agent_applications_router
 from app.auth.routes import router as auth_router
+from app.payouts.routes import admin_router as payouts_admin_router, router as payouts_router
 from app.calls.routes import router as calls_router
 from app.content.routes import router as content_router
 from app.chat.routes import conversations_router, router as chat_router
@@ -167,4 +168,6 @@ app.include_router(content_router, prefix="/content", tags=["content"])
 app.include_router(investors_router, prefix="/investors", tags=["investors"])
 app.include_router(riders_router, prefix="/riders", tags=["riders"])
 app.include_router(calls_router, prefix="/calls", tags=["calls"])
+app.include_router(payouts_router, prefix="/payouts", tags=["payouts"])
+app.include_router(payouts_admin_router, prefix="/admin/payouts", tags=["admin"])
 app.include_router(dev_router, prefix="/dev", tags=["dev"])

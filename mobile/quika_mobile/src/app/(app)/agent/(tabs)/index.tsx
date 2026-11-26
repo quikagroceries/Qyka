@@ -1,22 +1,26 @@
 import { useRouter } from 'expo-router';
-import { Image, Pressable, ScrollView, View, type ImageSourcePropType } from 'react-native';
+import { useState } from 'react';
+import { Image, Pressable, ScrollView, Switch, View, type ImageSourcePropType } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import OrderBackdrop from '@/components/customer/OrderBackdrop';
 import PageHeader from '@/components/PageHeader';
 import StatTiles from '@/components/StatTiles';
 import { Text } from '@/components/Text';
-import { Float, SafeAreaView, StatusBadge } from '@/components/ui';
+import { Button, Float, SafeAreaView, StatusBadge } from '@/components/ui';
 import { shortId } from '@/lib/format';
-import { ORDERS, marketName } from '@/lib/mock';
+import { agentData, useAgentData } from '@/lib/agentData';
+import { useMarkets } from '@/lib/catalog';
+import { agentOrderStore, useAgentOrderState } from '@/lib/orderStore';
 import type { AgentOrder } from '@/lib/types';
 
 const readyToShop = (o: AgentOrder) => o.status === 'agent_assigned';
 const inProgress = (o: AgentOrder) => o.status === 'shopping';
 const needsDrop = (o: AgentOrder) => o.status === 'paid';
 const needsAttention = (o: AgentOrder) => o.status === 'cancelled_unpaid';
+const waitingToPay = (o: AgentOrder) => o.status === 'awaiting_payment';
 
-type Tone = 'ready' | 'progress' | 'drop' | 'attention';
+type Tone = 'ready' | 'progress' | 'drop' | 'attention' | 'waiting';
 
 // Each kind of task gets its own illustration tile, like the order cards on the customer side.
 const LOOK: Record<Tone, { art: ImageSourcePropType; tint: string; cta?: string }> = {
@@ -24,6 +28,7 @@ const LOOK: Record<Tone, { art: ImageSourcePropType; tint: string; cta?: string 
   progress: { art: require('../../../../../assets/illustrations/shopping-cart.webp'), tint: 'bg-gold/40', cta: 'Keep shopping' },
   drop: { art: require('../../../../../assets/illustrations/map-pin-storefront.webp'), tint: 'bg-gold/40', cta: 'Take to the hub' },
   attention: { art: require('../../../../../assets/illustrations/market-stall-produce.webp'), tint: 'bg-red-50' },
+  waiting: { art: require('../../../../../assets/illustrations/wallet.webp'), tint: 'bg-sunken' },
 };
 
 function TaskCard({ order, market, tone, index, onOpen }: { order: AgentOrder; market?: string; tone: Tone; index: number; onOpen: () => void }) {
@@ -67,13 +72,31 @@ function TaskCard({ order, market, tone, index, onOpen }: { order: AgentOrder; m
 
 export default function AgentHome() {
   const router = useRouter();
-  const orders = ORDERS.filter((o) => o.agent_id);
+  const { orders, loaded, error } = useAgentOrderState();
+  const { summary } = useAgentData();
+  const { markets } = useMarkets();
+  const marketName = (id: string) => markets.find((m) => m.id === id)?.name;
+  const [availBusy, setAvailBusy] = useState(false);
+  const [availError, setAvailError] = useState('');
 
   const drop = orders.filter(needsDrop);
   const ready = orders.filter(readyToShop);
   const going = orders.filter(inProgress);
   const attention = orders.filter(needsAttention);
+  const waiting = orders.filter(waitingToPay);
   const actionable = drop.length + ready.length + going.length;
+
+  const toggleAvailable = async (on: boolean) => {
+    setAvailBusy(true);
+    setAvailError('');
+    try {
+      await agentData.setAvailable(on);
+    } catch (e) {
+      setAvailError((e as Error).message);
+    } finally {
+      setAvailBusy(false);
+    }
+  };
 
   const title =
     attention.length > 0
@@ -99,7 +122,7 @@ export default function AgentHome() {
       </View>
     );
 
-  const empty = actionable === 0 && attention.length === 0;
+  const empty = loaded && !error && actionable === 0 && attention.length === 0 && waiting.length === 0;
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={[]}>
@@ -135,10 +158,39 @@ export default function AgentHome() {
           </>
         )}
 
+        {summary ? (
+          <Animated.View entering={FadeInDown.delay(120).duration(450)} className="gap-2 rounded-3xl border border-line bg-surface p-4 shadow-sm">
+            <View className="flex-row items-center gap-3">
+              <View className="flex-1">
+                <Text className="text-base font-extrabold tracking-tight text-ink">{summary.is_available ? 'Taking new orders' : 'Not taking new orders'}</Text>
+                <Text className="text-xs leading-4 text-muted">{summary.is_available ? 'New orders can be given to you.' : "You won't be given new orders. Ones you already have aren't affected."}</Text>
+              </View>
+              <Switch
+                value={summary.is_available}
+                disabled={availBusy}
+                onValueChange={toggleAvailable}
+                trackColor={{ true: '#EE9A5A', false: '#E0DDD3' }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor="#E0DDD3"
+              />
+            </View>
+            {availError ? <Text className="text-xs font-semibold text-red-700">{availError}</Text> : null}
+          </Animated.View>
+        ) : null}
+
+        {!loaded ? <Text className="text-center text-sm text-muted">Loading your tasks…</Text> : null}
+        {error ? (
+          <View className="items-center gap-2 rounded-3xl border border-line bg-surface p-4">
+            <Text className="text-center text-sm font-semibold text-red-700">{error}</Text>
+            <Button label="Try again" variant="outline" onPress={() => void agentOrderStore.refresh()} />
+          </View>
+        ) : null}
+
         {section('Needs attention', "The customer didn't pay the balance in time. The deposit is forfeited. Return the goods you already bought.", attention, 'attention')}
         {section('Take to the hub', 'Paid and bought. Drop these at the hub in the market.', drop, 'drop')}
         {section('Ready to shop', 'Start shopping now.', ready, 'ready')}
         {section('In progress', "You're actively shopping these.", going, 'progress')}
+        {section('Waiting for the customer', "You've finished shopping. They're paying the balance.", waiting, 'waiting')}
       </ScrollView>
     </SafeAreaView>
   );

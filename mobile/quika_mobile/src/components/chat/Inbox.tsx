@@ -9,7 +9,7 @@ import SegmentedToggle from '@/components/SegmentedToggle';
 import { Text } from '@/components/Text';
 import { Avatar, Float, SafeAreaView, StatusBadge } from '@/components/ui';
 import { shortId, whenLabel } from '@/lib/format';
-import { CONVERSATIONS } from '@/lib/mock';
+import { useConversations } from '@/lib/inbox';
 
 type Filter = 'all' | 'unread';
 
@@ -22,7 +22,7 @@ export default function Inbox({ chatHref, agent }: { chatHref: (orderId: string)
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>('all');
 
-  const all = CONVERSATIONS;
+  const { items: all, loaded, error, reload } = useConversations();
   const unread = all.filter((c) => c.unread > 0);
   const shown = filter === 'all' ? all : unread;
   const unreadCount = unread.reduce((n, c) => n + c.unread, 0);
@@ -31,7 +31,7 @@ export default function Inbox({ chatHref, agent }: { chatHref: (orderId: string)
     <SafeAreaView className="flex-1 bg-canvas" edges={[]}>
       <OrderBackdrop />
       <ScrollView contentContainerClassName="gap-5 px-5 pb-32 pt-3" showsVerticalScrollIndicator={false}>
-        {all.length === 0 ? (
+        {loaded && !error && all.length === 0 ? (
           <View className="items-center gap-2">
             <Animated.View entering={FadeInDown.duration(500)}>
               <Float>
@@ -57,6 +57,16 @@ export default function Inbox({ chatHref, agent }: { chatHref: (orderId: string)
             art={require('../../../assets/illustrations/agent-customer-conversation.webp')}
           />
         )}
+
+        {!loaded ? <Text className="text-center text-sm text-muted">Loading your messages…</Text> : null}
+        {error ? (
+          <View className="items-center gap-2 rounded-3xl border border-line bg-surface p-4">
+            <Text className="text-center text-sm font-semibold text-red-700">{error}</Text>
+            <Pressable onPress={() => void reload()} hitSlop={8}>
+              <Text className="text-sm font-bold text-brand-orange-dark">Try again</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <SegmentedToggle
           value={filter}

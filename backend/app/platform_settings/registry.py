@@ -76,6 +76,16 @@ SPECS: list[Spec] = [
     Spec("rider_max_active_jobs", "Safety limits", "Jobs a rider can hold at once", "A rider can't claim another job while holding this many.",
          "int", 1, 1, 10, "jobs"),
 
+    # --- Payouts (immediately) -----------------------------------------
+    Spec("payout_min_naira", "Payouts", "Smallest withdrawal", "People can't withdraw less than this at once.",
+         "int", 500, 100, 100_000, "₦"),
+    Spec("payout_max_per_request_naira", "Payouts", "Largest single withdrawal", "No single withdrawal may exceed this.",
+         "int", 50_000, 1000, 5_000_000, "₦"),
+    Spec("payout_daily_cap_naira", "Payouts", "Daily withdrawal limit", "The most one person can withdraw in a day.",
+         "int", 100_000, 1000, 10_000_000, "₦"),
+    Spec("payout_review_above_naira", "Payouts", "Hold for review above", "A withdrawal above this waits for an admin to approve it. A person's very first withdrawal is always held.",
+         "int", 20_000, 0, 5_000_000, "₦"),
+
     # --- Sign-in codes (immediately) ------------------------------------
     Spec("otp_expire_minutes", "Sign-in codes", "Code lifetime", "How long a sign-in code works.",
          "int", 2, 1, 30, "min", env_attr="otp_expire_minutes"),

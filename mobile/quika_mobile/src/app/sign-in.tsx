@@ -7,11 +7,12 @@ import AuthBackdrop from '@/components/auth/AuthBackdrop';
 import Logo from '@/components/Logo';
 import ResendCode from '@/components/auth/ResendCode';
 import CodeBoxes from '@/components/auth/CodeBoxes';
-import GoogleLogo from '@/components/auth/GoogleLogo';
 import PhoneField from '@/components/auth/PhoneField';
 import { Button, Field, SafeAreaView } from '@/components/ui';
 import { Text } from '@/components/Text';
+import { api } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { isEmail, isNgMobile } from '@/lib/validate';
 import type { Role } from '@/lib/types';
 
 const ROLE_COPY: Record<string, { label: string; headline: string; art: number }> = {
@@ -21,18 +22,57 @@ const ROLE_COPY: Record<string, { label: string; headline: string; art: number }
   shopkeeper: { label: 'Shopkeeper', headline: "Let's open your hub", art: require('../../assets/illustrations/map-pin-storefront.webp') },
 };
 
-// UI only: "Send code" and "Verify" just move through the screens, then the
-// chosen role's sample account opens.
+// Real sign-in: a one-time code is sent to your phone or email, and verifying it signs you in. The account's own role decides
+// which app opens. (In development builds, the role picked on Welcome is also requested for a brand-new account, and the
+// server returns the code so it can be filled in for you.)
 export default function SignIn() {
   const router = useRouter();
   const { role: roleParam } = useLocalSearchParams<{ role?: string }>();
   const picked = (roleParam && ROLE_COPY[roleParam] ? roleParam : 'customer') as Role;
   const copy = ROLE_COPY[picked];
-  const { signIn } = useSession();
+  const { acceptToken } = useSession();
   const [identifier, setIdentifier] = useState('');
   const [code, setCode] = useState('');
   const [mode, setMode] = useState<'phone' | 'email'>('phone');
   const [step, setStep] = useState<'identify' | 'code'>('identify');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [devCode, setDevCode] = useState('');
+
+  // What gets sent to the server: +234 and the ten digits, or the email address.
+  const target = mode === 'phone' ? `+234${identifier.replace(/\D/g, '')}` : identifier.trim();
+  const valid = mode === 'phone' ? isNgMobile(identifier) : isEmail(identifier);
+
+  const sendCode = async () => {
+    if (!valid) return setError(mode === 'phone' ? 'Enter a valid Nigerian mobile number.' : 'Enter a valid email address.');
+    setBusy(true);
+    setError('');
+    try {
+      const sent = await api.requestOtp(target);
+      if (__DEV__ && sent.dev_otp) {
+        setDevCode(sent.dev_otp);
+        setCode(sent.dev_otp);
+      }
+      setStep('code');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verify = async () => {
+    if (code.length < 6) return setError('Enter the 6-digit code.');
+    setBusy(true);
+    setError('');
+    try {
+      const { access_token } = await api.verifyOtp(target, code, __DEV__ && picked !== 'customer' ? { role: picked } : {});
+      await acceptToken(access_token);
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-canvas">
@@ -88,23 +128,26 @@ export default function SignIn() {
                     <Text className="text-sm font-bold text-brand-orange-dark">{mode === 'phone' ? 'Use email' : 'Use phone'}</Text>
                   </Pressable>
                 </View>
-                <Button label="Continue" onPress={() => setStep('code')} />
+                {error ? <Text className="text-center text-sm font-semibold text-red-700">{error}</Text> : null}
+                <Button label="Continue" busy={busy} onPress={sendCode} />
               </>
             ) : (
               <>
-                <CodeBoxes value={code} onChange={setCode} />
-                <Button label="Verify" onPress={() => signIn(picked)} />
-                <ResendCode onResend={() => setCode('')} />
+                <CodeBoxes value={code} onChange={(c) => { setCode(c); setError(''); }} />
+                {error ? <Text className="text-center text-sm font-semibold text-red-700">{error}</Text> : null}
+                {__DEV__ && devCode ? <Text className="text-center text-xs text-faint">Dev: the code is {devCode}</Text> : null}
+                <Button label="Verify" busy={busy} onPress={verify} />
+                <ResendCode
+                  onResend={async () => {
+                    const sent = await api.requestOtp(target);
+                    setError('');
+                    setCode(__DEV__ && sent.dev_otp ? sent.dev_otp : '');
+                    if (__DEV__ && sent.dev_otp) setDevCode(sent.dev_otp);
+                  }}
+                />
               </>
             )}
           </Animated.View>
-
-          <View className="flex-row items-center gap-3">
-            <View className="h-px flex-1 bg-line-strong" />
-            <Text className="text-xs font-medium text-faint">Or continue with</Text>
-            <View className="h-px flex-1 bg-line-strong" />
-          </View>
-          <Button label="Sign in with Google" variant="outline" icon={<GoogleLogo />} onPress={() => signIn(picked)} />
 
           <View className="items-center gap-1">
             {picked === 'customer' ? (

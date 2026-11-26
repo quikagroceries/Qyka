@@ -7,15 +7,14 @@ import OrderBackdrop from '@/components/customer/OrderBackdrop';
 import PageHeader from '@/components/PageHeader';
 import StatTiles from '@/components/StatTiles';
 import { Text } from '@/components/Text';
-import { Float, SafeAreaView } from '@/components/ui';
+import { Button, Float, SafeAreaView } from '@/components/ui';
 import { ago, clockTime, shortId } from '@/lib/format';
-import { useHub } from '@/lib/hubStore';
+import { hub, useHub } from '@/lib/hubStore';
 import type { HubOrder } from '@/lib/types';
 
 // The queue is three lanes in the order work happens at the hub: check what
 // the agent brought, bag it, hand it to the rider who comes.
 const LANES: { status: string; title: string; subtitle: string; hint: string; art: ImageSourcePropType; tint: string }[] = [
-  { status: 'paid', title: 'On the way', subtitle: 'Agents carrying goods to your hub.', hint: 'Waiting for the agent', art: require('../../../../../assets/illustrations/shopping-cart.webp'), tint: 'bg-sunken' },
   { status: 'dropped_at_hub', title: 'Just dropped', subtitle: 'Check what the agent brought against the list.', hint: 'Check in', art: require('../../../../../assets/illustrations/market-cart-vendor.webp'), tint: 'bg-brand-orange/15' },
   { status: 'received_by_hub', title: 'Checked in', subtitle: 'Bag it up and mark it ready for a rider.', hint: 'Mark ready', art: require('../../../../../assets/illustrations/produce-crate.webp'), tint: 'bg-gold/40' },
   { status: 'ready_for_pickup', title: 'Ready for riders', subtitle: 'A rider will show you a code when they arrive.', hint: 'Waiting for a rider', art: require('../../../../../assets/illustrations/rider-bicycle.webp'), tint: 'bg-brand-green/15' },
@@ -58,7 +57,7 @@ function OrderCard({ order, lane, index, onOpen }: { order: HubOrder; lane: (typ
 
 export default function HubHome() {
   const router = useRouter();
-  const { orders, handed } = useHub();
+  const { orders, handed, hubName, loaded, error } = useHub();
   // Tap a tile to show only that lane (tap it again for all); tap a lane's heading to fold it away.
   const [only, setOnly] = useState<string | null>(null);
   const [folded, setFolded] = useState<string[]>([]);
@@ -68,21 +67,24 @@ export default function HubHome() {
   const toCheckIn = byStatus('dropped_at_hub').length;
   const checkedIn = byStatus('received_by_hub').length;
   const ready = byStatus('ready_for_pickup').length;
-  const incoming = byStatus('paid').length;
   const waitingRiders = orders.filter((o) => o.rider_waiting && o.status === 'ready_for_pickup');
   const riderWaiting = waitingRiders.length;
+
+  // "Mile 12 Hub" reads as "Mile 12" in ink and "Hub" in peach.
+  const hubWords = (hubName ?? 'Your hub').split(' ');
+  const hubTop = hubWords.length > 1 ? hubWords.slice(0, -1).join(' ') : '';
+  const hubAccent = hubWords[hubWords.length - 1];
 
   let subtitle = 'Orders agents drop off show up here.';
   if (riderWaiting > 0) subtitle = `${riderWaiting} rider${riderWaiting === 1 ? ' is' : 's are'} waiting. Open the order and enter their code.`;
   else if (toCheckIn > 0) subtitle = `${toCheckIn} to check in. An agent has dropped goods off.`;
-  else if (incoming > 0) subtitle = `${incoming} on the way to you. Nothing to do until it arrives.`;
   else if (orders.length > 0) subtitle = 'Nothing needs you right now. Everything is waiting for a rider.';
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={[]}>
       <OrderBackdrop />
       <ScrollView contentContainerClassName="gap-5 px-5 pb-32 pt-3" showsVerticalScrollIndicator={false}>
-        {orders.length === 0 ? (
+        {loaded && !error && orders.length === 0 ? (
           <View className="items-center gap-2">
             <Animated.View entering={FadeInDown.duration(500)}>
               <Float>
@@ -99,18 +101,25 @@ export default function HubHome() {
           </View>
         ) : (
           <>
-            <PageHeader top="Your" accent="hub" subtitle={subtitle} art={require('../../../../../assets/illustrations/map-pin-storefront.webp')} />
+            <PageHeader top={hubTop} accent={hubAccent} subtitle={subtitle} art={require('../../../../../assets/illustrations/map-pin-storefront.webp')} />
             <StatTiles
               delay={80}
               items={[
-                { value: incoming, label: 'On the way', art: require('../../../../../assets/illustrations/shopping-cart.webp'), tint: 'bg-sunken', onPress: () => pick('paid'), selected: only === 'paid' },
-                { value: toCheckIn, label: 'Dropped', art: require('../../../../../assets/illustrations/market-cart-vendor.webp'), tint: 'bg-brand-orange/15', hot: toCheckIn > 0, onPress: () => pick('dropped_at_hub'), selected: only === 'dropped_at_hub' },
+                { value: toCheckIn, label: 'Just dropped', art: require('../../../../../assets/illustrations/market-cart-vendor.webp'), tint: 'bg-brand-orange/15', hot: toCheckIn > 0, onPress: () => pick('dropped_at_hub'), selected: only === 'dropped_at_hub' },
                 { value: checkedIn, label: 'Checked in', art: require('../../../../../assets/illustrations/produce-crate.webp'), tint: 'bg-gold/40', hot: checkedIn > 0, onPress: () => pick('received_by_hub'), selected: only === 'received_by_hub' },
                 { value: ready, label: 'Ready', art: require('../../../../../assets/illustrations/rider-bicycle.webp'), tint: 'bg-brand-green/15', hot: riderWaiting > 0, onPress: () => pick('ready_for_pickup'), selected: only === 'ready_for_pickup' },
               ]}
             />
           </>
         )}
+        {!loaded ? <Text className="text-center text-sm text-muted">Loading your hub…</Text> : null}
+        {error ? (
+          <View className="items-center gap-2 rounded-3xl border border-line bg-surface p-4">
+            <Text className="text-center text-sm font-semibold text-red-700">{error}</Text>
+            <Button label="Try again" variant="outline" onPress={() => void hub.refresh()} />
+          </View>
+        ) : null}
+
         {waitingRiders.map((o) => (
           <Animated.View key={o.id} entering={FadeInDown.duration(450)}>
             <Pressable

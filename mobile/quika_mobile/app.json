@@ -43,7 +43,9 @@
         {
           "locationWhenInUsePermission": "Qyka records where a photo of the goods was taken, to prove it was taken at the market or hub."
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,7 +1,7 @@
 import uuid
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
@@ -27,6 +27,18 @@ async def my_notifications(
     return list(result.scalars().all())
 
 
+@router.post("/read-all", status_code=204)
+async def mark_all_read(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    await db.execute(
+        update(Notification)
+        .where(Notification.user_id == user.id, Notification.is_read.is_(False))
+        .values(is_read=True)
+    )
+
+
 @router.post("/{notification_id}/read", response_model=NotificationOut)
 async def mark_read(
     notification_id: uuid.UUID,
@@ -38,7 +50,9 @@ async def mark_read(
             Notification.id == notification_id, Notification.user_id == user.id
         )
     )
-    note = result.scalar_one()
+    note = result.scalar_one_or_none()
+    if note is None:
+        raise HTTPException(404, "Notification not found")
     note.is_read = True
     await db.flush()
     return note

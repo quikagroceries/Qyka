@@ -1,6 +1,6 @@
 // Static sample data so every screen has something to show. UI only: nothing
 // here is fetched, saved or validated.
-import type { AgentOrder, Conversation, Earnings, HubOrder, Market, Message, OrderItem, Person, Purchase, RiderJob, Role, User } from '@/lib/types';
+import type { AgentOrder, Market, Message, OrderItem, Person, Purchase, Role, User } from '@/lib/types';
 
 const minsAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
 
@@ -22,7 +22,6 @@ export const MARKETS: Market[] = [
 export const marketName = (id: string) => MARKETS.find((m) => m.id === id)?.name;
 
 export const PRICING = { serviceFeeRate: 0.075, deliveryFee: 1500, depositRate: 0.3 };
-export const WALLET_BALANCE = '5000.00';
 
 export const PEOPLE: Record<string, Person> = {
   agent: { id: 'u-agent', full_name: 'Tunde Bakare', avatar_url: null, phone: '08023456789' },
@@ -132,64 +131,7 @@ export const PURCHASES: Purchase[] = [
   { id: 'p1', amount: '2800.00', account_number: '0123456789', photo_ref: null },
 ];
 
-export const HUB_ORDERS: HubOrder[] = [
-  {
-    id: 'b1c2d3e4-0004', customer_order_id: 'a1b2c3d4-0006', status: 'paid', agent_name: 'Chidi Obi', rider_name: null, rider_waiting: false,
-    items: [{ id: 'h7', description: 'Garri (paint bucket)', quantity: 2, requested_note: null }, { id: 'h8', description: 'Groundnut oil (5L)', quantity: 1, requested_note: null }],
-    packing_photos: [], dropped_at_hub_at: null, hub_received_at: null, hub_missing_item_ids: [], hub_receipt_note: null,
-  },
-  {
-    id: 'b1c2d3e4-0001', customer_order_id: 'a1b2c3d4-0001', status: 'dropped_at_hub', agent_name: 'Tunde Bakare', rider_name: null, rider_waiting: false,
-    items: [
-      { id: 'h1', description: 'Tomatoes (big basket)', quantity: 1, requested_note: null },
-      { id: 'h2', description: 'Pepper (tatashe)', quantity: 2, requested_note: 'Not too ripe' },
-      { id: 'h3', description: 'Onions', quantity: 3, requested_note: null },
-      { id: 'h9', description: 'Okra', quantity: 1, requested_note: 'Customer skipped this', availability: 'dropped' },
-    ],
-    packing_photos: [], dropped_at_hub_at: minsAgo(8), hub_received_at: null, hub_missing_item_ids: [], hub_receipt_note: null,
-  },
-  {
-    id: 'b1c2d3e4-0002', customer_order_id: 'a1b2c3d4-0002', status: 'received_by_hub', agent_name: 'Chidi Obi', rider_name: null, rider_waiting: false,
-    items: [{ id: 'h4', description: 'Yam tubers', quantity: 2, requested_note: null }, { id: 'h5', description: 'Eggs (crate)', quantity: 1, requested_note: null }],
-    packing_photos: [], dropped_at_hub_at: minsAgo(40), hub_received_at: minsAgo(30), hub_missing_item_ids: ['h5'], hub_receipt_note: 'Eggs were not in the bag.',
-  },
-  {
-    id: 'b1c2d3e4-0003', customer_order_id: 'a1b2c3d4-0007', status: 'ready_for_pickup', agent_name: 'Tunde Bakare', rider_name: 'Musa Ibrahim', rider_waiting: true, rider_code: '7305', ready_at: minsAgo(80),
-    items: [{ id: 'h6', description: 'Rice (50kg bag)', quantity: 1, requested_note: null }],
-    packing_photos: [], dropped_at_hub_at: minsAgo(90), hub_received_at: minsAgo(80), hub_missing_item_ids: [], hub_receipt_note: null,
-  },
-];
-export const hubOrderById = (id?: string) => HUB_ORDERS.find((o) => o.id === id) ?? HUB_ORDERS[0];
 
-const job = (id: string, over: Partial<RiderJob> = {}): RiderJob => ({
-  id, status: 'ready_for_pickup', hub_id: 'h-1', hub_name: 'Mile 12 Hub', market_name: 'Mile 12 Market', item_count: 4,
-  ready_at: minsAgo(12), claimed_at: null, pickup_code: null, customer_name: null, customer_phone: null, delivery_address: null,
-  dropoff_latitude: null, dropoff_longitude: null, delivered_at: null, ...over,
-});
-export const RIDER_POOL: RiderJob[] = [job('c1d2e3f4-0001'), job('c1d2e3f4-0002', { item_count: 2, hub_name: 'Oyingbo Hub', market_name: 'Oyingbo Market', ready_at: minsAgo(3) })];
-export const RIDER_ACTIVE: RiderJob = job('c1d2e3f4-0009', {
-  status: 'out_for_delivery', claimed_at: minsAgo(30), pickup_code: '7305', customer_name: 'Ada Okafor', customer_phone: '08012345678',
-  delivery_address: '12 Adeola Odeku St, Victoria Island', dropoff_latitude: 6.4281, dropoff_longitude: 3.4219,
-});
-
-export const EARNINGS: Earnings = {
-  earnings_today: '3000.00',
-  earnings_week: '14500.00',
-  earnings_total: '86500.00',
-  completed_count: 29,
-  recent: [
-    { order_id: 'c1d2e3f4-0101', amount: '1500.00', delivered_at: minsAgo(90) },
-    { order_id: 'c1d2e3f4-0102', amount: '1500.00', delivered_at: minsAgo(260) },
-    { order_id: 'c1d2e3f4-0103', amount: '1500.00', delivered_at: minsAgo(1500) },
-  ],
-};
-
-export const CONVERSATIONS: Conversation[] = [
-  { order_id: ORDERS[0].id, order_status: 'shopping', market_name: 'Mile 12 Market', other: { id: 'u-agent', full_name: 'Tunde Bakare', avatar_url: null },
-    last_message: { text: 'The pepper is a bit pricey today, ok to go higher?', has_image: false, sender_id: 'u-agent', created_at: minsAgo(4) }, unread: 2 },
-  { order_id: ORDERS[5].id, order_status: 'agent_assigned', market_name: 'Mile 12 Market', other: { id: 'u-agent', full_name: 'Tunde Bakare', avatar_url: null },
-    last_message: { text: 'Starting shortly', has_image: false, sender_id: 'u-agent', created_at: minsAgo(60) }, unread: 0 },
-];
 
 export const MESSAGES: Message[] = [
   { id: 'm1', order_id: ORDERS[0].id, sender_id: 'u-customer', text: 'Market list\n1. Tomatoes\n2. Pepper ×2\n3. Onions ×3', image_url: null, created_at: minsAgo(80) },

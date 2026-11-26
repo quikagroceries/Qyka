@@ -1,115 +1,72 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
-import { HUB_ORDERS } from '@/lib/mock';
-import { orderStore } from '@/lib/orderStore';
-import type { HubOrder, RiderJob } from '@/lib/types';
+import { api } from '@/lib/api';
+import type { HubOrder } from '@/lib/types';
 
-// UI only: the hub's orders live here, in memory, and the rider app reads and writes the SAME records, so the two
-// agree: marking an order ready puts a job in the rider's list, the rider's claim gives the hub a code to check,
-// and handing over only works with that code. A real hub would do all of this through the backend.
+// The hub's orders, from the server: goods agents have dropped, checked in, and waiting for riders. The hub list and each order's page
+// read this one store. There is no push yet, so a screen using it asks again every few seconds.
 
 export type Handover = { id: string; rider: string; at: string };
-type State = { orders: HubOrder[]; handed: Handover[] };
+type State = { orders: HubOrder[]; handed: Handover[]; hubName: string | null; loaded: boolean; error: string };
 
-let state: State = { orders: HUB_ORDERS.map((o) => ({ ...o })), handed: [] };
+let state: State = { orders: [], handed: [], hubName: null, loaded: false, error: '' };
 const listeners = new Set<() => void>();
-const set = (next: State) => {
-  state = next;
+const set = (next: Partial<State>) => {
+  state = { ...state, ...next };
   listeners.forEach((l) => l());
 };
-const patch = (id: string, change: Partial<HubOrder>) => set({ ...state, orders: state.orders.map((o) => (o.id === id ? { ...o, ...change } : o)) });
-
 const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => {
     listeners.delete(l);
   };
 };
-const snapshot = () => state;
-
-export const useHub = () => useSyncExternalStore(subscribe, snapshot);
-export const useHubOrder = (id?: string) => {
-  const { orders } = useHub();
-  return orders.find((o) => o.id === id) ?? orders[0];
-};
+const upsert = (order: HubOrder) => set({ orders: state.orders.some((o) => o.id === order.id) ? state.orders.map((o) => (o.id === order.id ? order : o)) : [order, ...state.orders] });
 
 /** Items that were actually bought: the only ones the hub should expect in the bag. */
 export const boughtItems = (o: HubOrder) => o.items.filter((i) => i.availability !== 'unavailable' && i.availability !== 'dropped');
 
-/** An order as the rider sees it as a job. The pickup code only shows once that rider has claimed it. */
-const asJob = (o: HubOrder): RiderJob => ({
-  id: o.id,
-  status: o.status,
-  hub_id: 'h-1',
-  hub_name: 'Mile 12 Hub',
-  market_name: 'Mile 12 Market',
-  item_count: boughtItems(o).length,
-  ready_at: o.ready_at ?? null,
-  claimed_at: o.rider_name ? new Date().toISOString() : null,
-  pickup_code: o.rider_code ?? null,
-  customer_name: 'Ada Okafor',
-  customer_phone: '08012345678',
-  delivery_address: '12 Adeola Odeku St, Victoria Island',
-  dropoff_latitude: 6.4281,
-  dropoff_longitude: 3.4219,
-  delivered_at: null,
-});
-
-/** Orders the hub has marked ready that no rider has claimed yet: the rider's pool. */
-export const useHubJobs = (): RiderJob[] => useHub().orders.filter((o) => o.status === 'ready_for_pickup' && !o.rider_name).map(asJob);
-/** One of those orders as a job (including its pickup code once claimed). */
-export const useHubJob = (id: string | null): RiderJob | null => {
-  const { orders } = useHub();
-  const o = id ? orders.find((x) => x.id === id) : null;
-  return o ? asJob(o) : null;
-};
-
-/** The customer's order a hub order belongs to. */
-const linked = (id: string) => state.orders.find((o) => o.id === id)?.customer_order_id;
-/** Same, for a screen: the customer's order id for the hub order the rider claimed. */
-export const useCustomerOrderId = (hubId: string | null): string | null => {
-  const { orders } = useHub();
-  return (hubId ? orders.find((o) => o.id === hubId)?.customer_order_id : null) ?? null;
-};
-
-const fourDigits = () => String(1000 + Math.floor(Math.random() * 9000));
-
 export const hub = {
-  /** What the shopkeeper saw in the bag. Moves the order to "checked in". */
-  checkIn(id: string, missingIds: string[], note: string) {
-    patch(id, { status: 'received_by_hub', hub_received_at: new Date().toISOString(), hub_missing_item_ids: missingIds, hub_receipt_note: note.trim() || null });
-    const c = linked(id);
-    if (c) orderStore.setStatus(c, 'received_by_hub');
+  async refresh() {
+    try {
+      // The hub's own name comes once; the orders every time.
+      const [orders, me] = await Promise.all([api.getHubOrders(), state.hubName ? Promise.resolve(null) : api.getMyHub()]);
+      set({ orders, hubName: me ? me.name : state.hubName, loaded: true, error: '' });
+    } catch (e) {
+      set({ loaded: true, error: (e as Error).message });
+    }
   },
-  /** Bagged and waiting: it is now a job riders can claim. */
-  markReady(id: string) {
-    patch(id, { status: 'ready_for_pickup', ready_at: new Date().toISOString(), rider_waiting: false, rider_name: null, rider_code: null });
-    const c = linked(id);
-    if (c) orderStore.setStatus(c, 'ready_for_pickup');
+  /** What the shopkeeper saw in the bag, with photos. Moves the order to "checked in". Throws the server's message if it refuses. */
+  async checkIn(id: string, seenIds: string[], note: string, photoUris: string[]) {
+    const photos = await Promise.all(photoUris.map((u) => api.uploadImage(u)));
+    upsert(await api.receiveHubOrder(id, { received_item_ids: seenIds, ...(note.trim() ? { note: note.trim() } : {}), ...(photos.length > 0 ? { photos } : {}) }));
   },
-  /** A rider claims the job and gets a pickup code to show at the hub. */
-  claim(id: string, rider: string) {
-    const o = state.orders.find((x) => x.id === id);
-    if (!o || o.status !== 'ready_for_pickup' || o.rider_name) return;
-    patch(id, { rider_name: rider, rider_waiting: true, rider_code: fourDigits() });
+  /** Bagged and waiting: riders can now claim it. */
+  async markReady(id: string) {
+    upsert(await api.markHubOrderReady(id));
   },
-  /** The rider gives the job back, or never turned up: it goes back to the pool. */
-  releaseClaim(id: string) {
-    patch(id, { rider_name: null, rider_waiting: false, rider_code: null });
+  /** Hand the bag to the rider, but only if the code they show matches the one the server gave them. Throws the server's message if not. */
+  async handOver(id: string, code: string) {
+    const before = state.orders.find((o) => o.id === id);
+    await api.handoverHubOrder(id, code);
+    set({ handed: [{ id, rider: before?.rider_name ?? 'The rider', at: new Date().toISOString() }, ...state.handed] });
+    await hub.refresh();
   },
-  /** Hand the bag to the rider, but only if the code they show matches. Returns whether it did. */
-  handOver(id: string, code: string): boolean {
-    const o = state.orders.find((x) => x.id === id);
-    if (!o || !o.rider_waiting || !o.rider_code || code !== o.rider_code) return false;
-    patch(id, { status: 'out_for_delivery', rider_waiting: false });
-    // The customer's order goes out for delivery too, and they get the code to give the rider at the door.
-    const c = linked(id);
-    if (c) orderStore.dispatch(c);
-    set({ ...state, handed: [{ id, rider: o.rider_name ?? 'The rider', at: new Date().toISOString() }, ...state.handed] });
-    return true;
-  },
-  /** Demo only: the agent arrives and drops the goods at the hub. */
-  simulateAgentArrives(id: string) {
-    patch(id, { status: 'dropped_at_hub', dropped_at_hub_at: new Date().toISOString() });
+  /** A different person is signing in, or this one signed out. */
+  reset() {
+    set({ orders: [], handed: [], hubName: null, loaded: false, error: '' });
   },
 };
+
+export const useHub = () => useSyncExternalStore(subscribe, () => state);
+/** One order at the hub, or undefined once it has left (handed over) or if there is none with that id. */
+export const useHubOrder = (id?: string) => useHub().orders.find((o) => o.id === id);
+
+/** Keeps the hub's orders fresh while a screen is open. */
+export function useHubSync(ms = 6000) {
+  useEffect(() => {
+    void hub.refresh();
+    const t = setInterval(() => void hub.refresh(), ms);
+    return () => clearInterval(t);
+  }, [ms]);
+}

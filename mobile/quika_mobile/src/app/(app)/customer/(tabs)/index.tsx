@@ -11,8 +11,8 @@ import SegmentedToggle from '@/components/SegmentedToggle';
 import { Text } from '@/components/Text';
 import { Button, Float, SafeAreaView, StatusBadge } from '@/components/ui';
 import { ago, naira, shortId } from '@/lib/format';
-import { marketName } from '@/lib/mock';
-import { useOrders } from '@/lib/orderStore';
+import { useMarkets } from '@/lib/catalog';
+import { orderStore, useOrderState } from '@/lib/orderStore';
 import { ON_THE_MOVE, isHistory, summarize } from '@/lib/orderStatus';
 
 type Filter = 'active' | 'history';
@@ -24,7 +24,9 @@ export default function Track() {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>('active');
 
-  const orders = useOrders();
+  const { orders, loaded, error } = useOrderState();
+  const { markets } = useMarkets();
+  const marketName = (id: string) => markets.find((m) => m.id === id)?.name;
   const sorted = [...orders].sort((a, b) => b.created_at.localeCompare(a.created_at));
   const active = sorted.filter((o) => !isHistory(o.status));
   const past = sorted.filter((o) => isHistory(o.status));
@@ -36,7 +38,7 @@ export default function Track() {
     <SafeAreaView className="flex-1 bg-canvas" edges={[]}>
       <OrderBackdrop />
       <ScrollView contentContainerClassName="gap-5 px-5 pb-32 pt-3" showsVerticalScrollIndicator={false}>
-        {orders.length === 0 ? (
+        {loaded && !error && orders.length === 0 ? (
           <>
             <View className="items-center gap-2">
               <Animated.View entering={FadeInDown.duration(500)}>
@@ -73,6 +75,14 @@ export default function Track() {
             }
           />
         )}
+
+        {!loaded ? <Text className="text-center text-sm text-muted">Loading your orders…</Text> : null}
+        {error ? (
+          <View className="items-center gap-2 rounded-3xl border border-line bg-surface p-4">
+            <Text className="text-center text-sm font-semibold text-red-700">{error}</Text>
+            <Button label="Try again" variant="outline" onPress={() => void orderStore.refresh()} />
+          </View>
+        ) : null}
 
         <SegmentedToggle
           value={filter}

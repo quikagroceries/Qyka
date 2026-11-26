@@ -15,8 +15,9 @@ import { Text } from '@/components/Text';
 import { Avatar, Button, SafeAreaView } from '@/components/ui';
 import { naira } from '@/lib/format';
 import { LANGUAGES, useLanguage } from '@/lib/language';
-import { WALLET_BALANCE } from '@/lib/mock';
+import { useAssignedMarket } from '@/lib/agentData';
 import { useOrders } from '@/lib/orderStore';
+import { useWallet, useWalletSync } from '@/lib/wallet';
 import { isHistory } from '@/lib/orderStatus';
 import { useSession } from '@/lib/session';
 
@@ -90,10 +91,10 @@ function ApplyCard({ title, blurb, image, tint, onPress }: { title: string; blur
 // The account page for every role: who you are, your settings, and (for customers) your wallet
 // and the ways to start earning with Qyka.
 export default function AccountView({ fallbackName }: { fallbackName: string }) {
-  const { user, guest, signOut, signIn, agentStatus, agentMarket, switchRole, approveAgent } = useSession();
+  const { user, guest, signOut, agentStatus, agentMarket, switchRole } = useSession();
   const { language } = useLanguage();
   const router = useRouter();
-  const [notifications, setNotifications] = useState(true);
+  const [switchError, setSwitchError] = useState('');
   const [editing, setEditing] = useState(false);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [pickingLanguage, setPickingLanguage] = useState(false);
@@ -102,9 +103,12 @@ export default function AccountView({ fallbackName }: { fallbackName: string }) 
   const contact = guest ? 'Browsing as a guest' : user?.phone || user?.email || '';
   const customer = user?.role === 'customer' && !guest;
   const agent = user?.role === 'agent';
+  const assignedMarket = useAssignedMarket(agent) ?? agentMarket;
   // An approved agent is also a customer, and can switch between the two.
-  const canSwitch = agentStatus === 'approved' && (user?.role === 'customer' || user?.role === 'agent');
+  const canSwitch = agentStatus === 'approved' && user?.has_customer_side !== false && (user?.role === 'customer' || user?.role === 'agent');
   const orders = useOrders();
+  useWalletSync(30000);
+  const { balance } = useWallet();
   const delivered = orders.filter((o) => o.status === 'delivered' || o.status === 'closed').length;
   const activeCount = orders.filter((o) => !isHistory(o.status)).length;
   const languageName = LANGUAGES.find((l) => l.code === language)?.native ?? 'English';
@@ -168,22 +172,40 @@ export default function AccountView({ fallbackName }: { fallbackName: string }) 
             </View>
             <SegmentedToggle
               value={agent ? 'agent' : 'customer'}
-              onChange={(role) => switchRole(role)}
+              onChange={async (role) => {
+                setSwitchError('');
+                try {
+                  await switchRole(role);
+                } catch (e) {
+                  setSwitchError((e as Error).message);
+                }
+              }}
               segments={[
                 { id: 'customer', label: 'Customer', icon: BAG },
                 { id: 'agent', label: 'Agent', icon: CLIPBOARD },
               ]}
             />
+            {switchError ? <Text className="text-sm font-semibold text-red-700">{switchError}</Text> : null}
           </Animated.View>
         ) : null}
 
         {customer ? (
-          <Animated.View entering={FadeInDown.delay(120).duration(450)} className="flex-row items-center justify-between rounded-3xl bg-brand-orange/20 px-5 py-4">
-            <View className="gap-0.5">
-              <Text className="text-sm font-semibold text-ink/70">Wallet balance</Text>
-              <Text className="text-[32px] font-extrabold leading-[38px] tracking-tight text-ink">{naira(WALLET_BALANCE)}</Text>
-            </View>
-            <Text className="max-w-[120px] text-right text-xs leading-4 text-ink/70">Used when you pay for an order.</Text>
+          <Animated.View entering={FadeInDown.delay(120).duration(450)}>
+            <Pressable
+              onPress={() => router.push('/customer/wallet')}
+              accessibilityRole="button"
+              accessibilityLabel="Open your wallet"
+              className="flex-row items-center justify-between rounded-3xl bg-brand-orange/20 px-5 py-4 active:bg-brand-orange/30"
+              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}>
+              <View className="gap-0.5">
+                <Text className="text-sm font-semibold text-ink/70">Wallet balance</Text>
+                <Text className="text-[32px] font-extrabold leading-[38px] tracking-tight text-ink">{balance === null ? '…' : naira(balance)}</Text>
+              </View>
+              <View className="items-end gap-1">
+                <Text className="max-w-[120px] text-right text-xs leading-4 text-ink/70">Add money, see your history.</Text>
+                <Text className="text-xl text-brand-orange-dark">›</Text>
+              </View>
+            </Pressable>
           </Animated.View>
         ) : null}
 
@@ -203,13 +225,13 @@ export default function AccountView({ fallbackName }: { fallbackName: string }) 
             user?.phone ? <Row key="phone" icon={ICON.phone} label="Phone" value={user.phone} /> : null,
             guest ? null : <Row key="email" icon={ICON.mail} label="Email" value={user?.email ?? 'Add your email'} onPress={() => setEditing(true)} />,
             customer ? <Row key="address" icon={ICON.pin} label="Delivery address" value={user?.default_delivery_address ?? 'Not set'} onPress={() => setEditing(true)} /> : null,
-            agent && agentMarket ? <Row key="market" icon={ICON.pin} label="Assigned market" value={agentMarket} /> : null,
+            agent && assignedMarket ? <Row key="market" icon={ICON.pin} label="Assigned market" value={assignedMarket} /> : null,
             <Row key="language" icon={ICON.globe} label="Language" value={languageName} onPress={() => setPickingLanguage(true)} />,
             <Row
               key="notifications"
               icon={ICON.bell}
               label="Notifications"
-              right={<Switch value={notifications} onValueChange={setNotifications} trackColor={{ true: '#EE9A5A', false: '#E0DDD3' }} thumbColor="#FFFFFF" ios_backgroundColor="#E0DDD3" />}
+              onPress={() => router.push('/notifications')}
             />,
           ]
             .filter((row): row is ReactElement<{ first?: boolean }> => !!row)
@@ -233,11 +255,6 @@ export default function AccountView({ fallbackName }: { fallbackName: string }) 
                 <Text className="text-sm leading-5 text-muted">
                   {agentMarket ? `For ${agentMarket}. ` : ''}We&apos;ll call your guarantors and check your documents. Once you&apos;re approved, you can switch to agent mode right here.
                 </Text>
-                {__DEV__ ? (
-                  <Pressable onPress={approveAgent} className="mt-1 self-start rounded-full border border-dashed border-line-strong px-3.5 py-1.5 active:bg-sunken">
-                    <Text className="text-xs font-bold text-muted">Dev: approve my application</Text>
-                  </Pressable>
-                ) : null}
               </View>
             ) : agentStatus === 'none' ? (
               <ApplyCard
@@ -268,11 +285,6 @@ export default function AccountView({ fallbackName }: { fallbackName: string }) 
           </Pressable>
         )}
 
-        {__DEV__ && guest ? (
-          <Pressable onPress={() => signIn('customer')} accessibilityRole="button" className="self-center rounded-full border border-dashed border-line-strong px-4 py-2 active:bg-sunken">
-            <Text className="text-xs font-bold text-muted">Dev: preview the signed-in view</Text>
-          </Pressable>
-        ) : null}
 
         <Text className="text-center text-xs text-faint">Qyka · version 1.0.0</Text>
       </ScrollView>

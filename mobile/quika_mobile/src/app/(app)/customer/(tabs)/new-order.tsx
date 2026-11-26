@@ -12,10 +12,13 @@ import FlowSteps, { type FlowStepKey } from '@/components/customer/FlowSteps';
 import { Button, Card, Field, Float, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';
 import { naira } from '@/lib/format';
 import { parseListLine } from '@/lib/parseListLine';
-import { MARKETS, PRICING, placeOrder } from '@/lib/mock';
+import { api } from '@/lib/api';
+import { clock, marketOpenNow, useMarkets, usePricing } from '@/lib/catalog';
 import { orderStore } from '@/lib/orderStore';
 import { useSession } from '@/lib/session';
 import type { Market } from '@/lib/types';
+
+const MIN_ADDRESS = 8;
 
 type Row = { item: string; price: string; qty: string; note: string };
 const blank = (): Row => ({ item: '', price: '', qty: '', note: '' });
@@ -41,7 +44,8 @@ const MARKET_TILES: { art: ImageSourcePropType; tint: string }[] = [
 export default function NewOrder() {
   const router = useRouter();
   const { user } = useSession();
-  const pricing = PRICING;
+  const pricing = usePricing();
+  const { markets, loading: marketsLoading, error: marketsError, retry: retryMarkets } = useMarkets();
 
   const [step, setStep] = useState<FlowStepKey>('list');
   const [mode, setMode] = useState<'freetext' | 'detailed'>('freetext');
@@ -51,6 +55,8 @@ export default function NewOrder() {
   const [market, setMarket] = useState<Market | null>(null);
   const [query, setQuery] = useState('');
   const [address, setAddress] = useState(user?.default_delivery_address ?? '');
+  const [placing, setPlacing] = useState(false);
+  const [problem, setProblem] = useState('');
 
   // Free-text: one item per line, read the way the web does ("3 packs of milk 2000").
   const parsedLines = useMemo(
@@ -77,28 +83,44 @@ export default function NewOrder() {
 
   const shownMarkets = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return MARKETS.filter((m) => !q || [m.name, m.city, m.state].some((v) => String(v || '').toLowerCase().includes(q)));
-  }, [query]);
+    return markets.filter((m) => !q || [m.name, m.city, m.state].some((v) => String(v || '').toLowerCase().includes(q)));
+  }, [query, markets]);
 
   const setRow = (i: number, patch: Partial<Row>) => setRows((cur) => cur.map((r, k) => (k === i ? { ...r, ...patch } : r)));
 
-  // UI only: nothing is sent anywhere. The order is kept in memory so Track and the order page can show it.
-  const place = () => {
+  // Sends the order to the server, which checks the market is open and works out the deposit. The deposit is paid on the order page.
+  const place = async () => {
     if (!market) return setStep('market');
-    const placed = placeOrder({
-      marketId: market.id,
-      address,
-      goodsEstimate: goodsTotal,
-      depositAmount: deposit,
-      items: filled.map((r) => ({ description: r.item.trim(), quantity: Number(r.qty) >= 1 ? Number(r.qty) : undefined, price: Number(r.price) > 0 ? Number(r.price) : undefined })),
-    });
-    orderStore.add(placed);
-    // Start the next order from a clean slate, then open this one.
-    setStep('list');
-    setText('');
-    setRows([blank()]);
-    setBudget('');
-    router.push(`/customer/orders/${placed.id}`);
+    if (filled.length === 0) return setStep('list');
+    if (address.trim().length < MIN_ADDRESS) return setStep('address');
+    setPlacing(true);
+    setProblem('');
+    try {
+      const placed = await api.createOrder({
+        market_id: market.id,
+        delivery_address: address.trim(),
+        // The budget for items with no price of their own; priced items carry theirs.
+        listed_items_total: budgetTotal.toFixed(2),
+        items: filled.map((r) => ({
+          description: r.item.trim(),
+          ...(Number(r.price) > 0 ? { listed_price: Number(r.price).toFixed(2) } : {}),
+          ...(Number(r.qty) >= 1 ? { quantity: Number(r.qty) } : {}),
+          ...(r.note.trim() ? { requested_note: r.note.trim() } : {}),
+        })),
+      });
+      orderStore.upsert(placed);
+      // Start the next order from a clean slate, then open this one.
+      setStep('list');
+      setText('');
+      setRows([blank()]);
+      setBudget('');
+      setMarket(null);
+      router.push(`/customer/orders/${placed.id}`);
+    } catch (e) {
+      setProblem((e as Error).message);
+    } finally {
+      setPlacing(false);
+    }
   };
 
   const SUB: Record<FlowStepKey, string> = {
@@ -108,7 +130,11 @@ export default function NewOrder() {
     quote: `Not a fixed catalogue total: your agent bargains real prices at ${market?.name || 'the market'}.`,
   };
   const copy = COPY[step];
-  const back = () => setStep(step === 'quote' ? 'address' : step === 'address' ? 'market' : 'list');
+  const goTo = (to: FlowStepKey) => {
+    setProblem('');
+    setStep(to);
+  };
+  const back = () => goTo(step === 'quote' ? 'address' : step === 'address' ? 'market' : 'list');
 
   const Top = (
     <Animated.View entering={FadeInUp.duration(450)} className="flex-row items-center justify-between">
@@ -119,7 +145,7 @@ export default function NewOrder() {
       ) : (
         <View className="h-11 w-11" />
       )}
-      <FlowSteps current={step} onStepClick={setStep} />
+      <FlowSteps current={step} onStepClick={goTo} />
       <View className="h-11 w-11" />
     </Animated.View>
   );
@@ -259,7 +285,15 @@ export default function NewOrder() {
                 <Text className="text-muted">Your estimate · {filled.length} item{filled.length === 1 ? '' : 's'}</Text>
                 <Text className="text-xl font-extrabold text-ink">{naira(goodsTotal)}</Text>
               </View>
-              <Button label="Continue" onPress={() => setStep(market ? 'address' : 'market')} />
+              {problem ? <Text className="text-center text-sm font-semibold text-red-700">{problem}</Text> : null}
+              <Button
+                label="Continue"
+                onPress={() => {
+                  if (filled.length === 0) return setProblem('Add at least one item to your list first.');
+                  setProblem('');
+                  setStep(market ? 'address' : 'market');
+                }}
+              />
             </Card>
           </>
         ) : null}
@@ -267,18 +301,27 @@ export default function NewOrder() {
         {step === 'market' ? (
           <>
             <Field placeholder="Search markets" value={query} onChangeText={setQuery} autoCapitalize="none" />
-            {shownMarkets.length === 0 ? <Text className="text-muted">No markets match your search.</Text> : null}
+            {marketsLoading ? <Text className="text-center text-muted">Loading markets…</Text> : null}
+            {marketsError ? (
+              <View className="items-center gap-2 rounded-3xl border border-line bg-surface p-5">
+                <Text className="text-center text-sm font-semibold text-red-700">{marketsError}</Text>
+                <Button label="Try again" variant="outline" onPress={retryMarkets} />
+              </View>
+            ) : null}
+            {!marketsLoading && !marketsError && shownMarkets.length === 0 ? <Text className="text-muted">No markets match your search.</Text> : null}
             {shownMarkets.map((m, i) => {
               const selected = market?.id === m.id;
               const tile = MARKET_TILES[i % MARKET_TILES.length];
+              const open = marketOpenNow(m);
               return (
                 <Animated.View key={m.id} entering={FadeInDown.delay(i * 90).duration(450)}>
                   <Pressable
+                    disabled={!open}
                     onPress={() => {
                       setMarket(m);
                       setStep('address');
                     }}
-                    className={'flex-row items-center gap-4 overflow-hidden rounded-3xl bg-surface p-4 shadow-sm active:bg-surface-2 ' + (selected ? 'border-2 border-brand-orange' : 'border border-line')}
+                    className={'flex-row items-center gap-4 overflow-hidden rounded-3xl bg-surface p-4 shadow-sm active:bg-surface-2 ' + (selected ? 'border-2 border-brand-orange' : 'border border-line') + (open ? '' : ' opacity-60')}
                     style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}>
                     <View className={`h-[84px] w-[84px] items-center justify-center rounded-2xl ${tile.tint}`}>
                       <Image source={tile.art} resizeMode="contain" className="h-[68px] w-[68px]" />
@@ -286,6 +329,7 @@ export default function NewOrder() {
                     <View className="flex-1 gap-1">
                       <Text className="text-lg font-extrabold tracking-tight text-ink">{m.name}</Text>
                       <Text className="text-sm font-semibold text-brand-orange-dark">{[m.city, m.state].filter(Boolean).join(', ')}</Text>
+                      <Text className={'text-xs font-bold ' + (open ? 'text-brand-army' : 'text-red-700')}>{open ? `Open until ${clock(m.closing_time)}` : `Closed · opens ${clock(m.opening_time)}`}</Text>
                       {m.description ? <Text className="text-sm leading-5 text-muted" numberOfLines={2}>{m.description}</Text> : null}
                     </View>
                     <Text className="text-2xl text-brand-orange-dark">›</Text>
@@ -306,7 +350,15 @@ export default function NewOrder() {
             ) : null}
             <Field placeholder="Street, area, landmark" value={address} onChangeText={setAddress} multiline className="min-h-[88px]" />
             <Text className="text-xs text-faint">Include a landmark or gate colour. It helps the rider find you.</Text>
-            <Button label="Continue" onPress={() => setStep('quote')} />
+            {problem ? <Text className="text-sm font-semibold text-red-700">{problem}</Text> : null}
+            <Button
+              label="Continue"
+              onPress={() => {
+                if (address.trim().length < MIN_ADDRESS) return setProblem('Enter the street and area, so your rider can find you.');
+                setProblem('');
+                setStep('quote');
+              }}
+            />
           </>
         ) : null}
 
@@ -345,7 +397,8 @@ export default function NewOrder() {
                 </View>
               ) : null}
               <Text className="text-xs text-faint">Delivering to: {address}</Text>
-              <Button label="Get my quote" onPress={place} />
+              {problem ? <Text className="text-center text-sm font-semibold text-red-700">{problem}</Text> : null}
+              <Button label="Place my order" busy={placing} onPress={place} />
             </Card>
           </>
         ) : null}

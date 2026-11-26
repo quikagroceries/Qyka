@@ -1,22 +1,24 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Image, Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/Text';
 
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
-import GoodsPhotos, { ProofViewer } from '@/components/GoodsPhotos';
+import GoodsPhotos from '@/components/GoodsPhotos';
 import { look } from '@/components/customer/orderLook';
 import OrderBackdrop from '@/components/customer/OrderBackdrop';
 import OrderIdChip from '@/components/OrderIdChip';
 import { Button, Card, Field, Float, ItemArt, SafeAreaView, StatusBadge } from '@/components/ui';
 import { naira } from '@/lib/format';
-import { PLACES, stamp, type ProofPhoto } from '@/lib/proof';
-import { marketName, orderById } from '@/lib/mock';
-import type { AgentOrder, OrderItem } from '@/lib/types';
+import { api, type Hub, type Vendor } from '@/lib/api';
+import { useMarkets } from '@/lib/catalog';
+import { agentOrderStore, useAgentOrder, useAgentOrderState, useAgentOrderSync } from '@/lib/orderStore';
+import type { Place, ProofPhoto } from '@/lib/proof';
+import type { AgentOrder, OrderItem, Purchase } from '@/lib/types';
 
-// Mirrors web's shared Shopping screen.
+// The agent's shopping screen, live from the server (mirrors the web's shared Shopping screen).
 
 const HEADLINE: Record<string, string> = {
   agent_assigned: 'Ready to shop',
@@ -48,25 +50,86 @@ const AT_HUB_NOTE: Record<string, string> = {
   closed: 'Delivered.',
 };
 
-function DropAtHub({ order, onDropped }: { order: AgentOrder; onDropped: () => void }) {
+/** Taking the paid order to the hub: pick the hub, photograph the goods, and drop. The hub's shopkeeper checks it in from there. */
+function DropAtHub({ order, place }: { order: AgentOrder; place?: Place }) {
+  const [hubs, setHubs] = useState<Hub[] | null>(null);
+  const [hubId, setHubId] = useState<string | null>(null);
   const [photos, setPhotos] = useState<ProofPhoto[]>([]);
   const [tried, setTried] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    api.getHubs(order.market_id)
+      .then((h) => alive && setHubs(h.filter((x) => x.is_active)))
+      .catch((e: Error) => {
+        if (!alive) return;
+        setHubs([]);
+        setProblem(e.message);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [order.market_id]);
+
+  const drop = async () => {
+    if (photos.length === 0) return setTried(true);
+    if (hubs && hubs.length > 1 && !hubId) return setProblem('Choose the hub you are dropping at.');
+    setBusy(true);
+    setProblem('');
+    try {
+      const refs = await Promise.all(photos.map((p) => api.uploadImage(p.uri)));
+      await api.dropAtHub(order.id, hubId ?? undefined);
+      // The drop has happened; if the photos fail to attach, the shopkeeper still checks the goods in.
+      await api.addPackingPhotos(order.id, refs).catch(() => undefined);
+      await agentOrderStore.load(order.id);
+    } catch (e) {
+      setProblem((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Card accent>
       <Text className="text-lg font-bold text-ink">Take it to the hub</Text>
       <Text className="mb-2 text-sm text-muted">
         Balance paid. Carry everything to the hub in the market and drop it with the shopkeeper. They check it in and hand it to a rider.
       </Text>
-      <Text className="rounded-2xl bg-sunken px-4 py-3 text-sm font-semibold text-ink">Drop at: Mile 12 Hub</Text>
+      {hubs === null ? (
+        <Text className="rounded-2xl bg-sunken px-4 py-3 text-sm text-muted">Finding the hub…</Text>
+      ) : hubs.length === 0 ? (
+        <Text className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">This market has no hub set up yet. Please tell Qyka.</Text>
+      ) : hubs.length === 1 ? (
+        <Text className="rounded-2xl bg-sunken px-4 py-3 text-sm font-semibold text-ink">Drop at: {hubs[0].name}</Text>
+      ) : (
+        <View className="gap-1.5">
+          <Text className="ml-1 text-xs font-bold uppercase tracking-wide text-faint">Which hub?</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {hubs.map((h) => (
+              <Pressable
+                key={h.id}
+                onPress={() => setHubId(h.id)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: hubId === h.id }}
+                className={'rounded-full border px-3.5 py-2 ' + (hubId === h.id ? 'border-brand-orange bg-brand-orange' : 'border-line-strong bg-surface')}>
+                <Text className={'text-sm font-bold ' + (hubId === h.id ? 'text-ink' : 'text-muted')}>{h.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
       <Text className="ml-1 mt-2 text-xs font-bold uppercase tracking-wide text-faint">Photo of the goods (required)</Text>
       <GoodsPhotos
         photos={photos}
         onChange={setPhotos}
-        place={PLACES[order.market_id]}
+        place={place}
         error={tried && photos.length === 0 ? 'Add a photo of the goods to continue.' : undefined}
         hint="Photograph everything you're handing over, together. It is your proof it was all there."
       />
-      <Button label="I've dropped it at the hub" onPress={() => (photos.length === 0 ? setTried(true) : onDropped())} />
+      {problem ? <Text className="text-sm font-semibold text-red-700">{problem}</Text> : null}
+      <Button label="I've dropped it at the hub" busy={busy} disabled={hubs !== null && hubs.length === 0} onPress={drop} />
     </Card>
   );
 }
@@ -77,8 +140,7 @@ function ItemRow({
   selected,
   onToggle,
   stallName,
-  boughtFrom,
-  boughtPhoto,
+  receiptUri,
   onPreview,
   onUnavailable,
 }: {
@@ -87,9 +149,9 @@ function ItemRow({
   selected: boolean;
   onToggle: () => void;
   stallName: string | null;
-  boughtFrom?: string;
-  boughtPhoto?: ProofPhoto;
-  onPreview: (p: ProofPhoto) => void;
+  /** The photo the agent attached when paying for this item. */
+  receiptUri?: string | null;
+  onPreview: (uri: string) => void;
   onUnavailable: () => void;
 }) {
   const bought = item.confirmed_price != null;
@@ -124,25 +186,15 @@ function ItemRow({
           </Text>
           {item.requested_note && actionable ? <Text className="text-sm text-muted">{item.requested_note}</Text> : null}
           {item.listed_price != null && actionable ? <Text className="text-sm text-muted">Customer expected: {naira(item.listed_price)}</Text> : null}
-          {item.preferred_stall_id && actionable ? (
-            <Text className="text-sm font-semibold text-brand-orange-dark">Preferred stall: {stallName || '…'}</Text>
-          ) : null}
-          {bought ? (
-            <Text className="font-semibold text-brand-army">
-              Bought: {naira(item.confirmed_price!)}
-              {boughtFrom ? <Text className="font-normal text-muted"> · {boughtFrom}</Text> : null}
-            </Text>
-          ) : null}
-          {bought && boughtPhoto ? <Text className={'text-xs font-semibold ' + (stamp(boughtPhoto).ok ? 'text-brand-army' : 'text-amber-700')}>Photo {stamp(boughtPhoto).text}</Text> : null}
+          {item.preferred_stall_id && actionable ? <Text className="text-sm font-semibold text-brand-orange-dark">Preferred stall: {stallName || '…'}</Text> : null}
+          {bought ? <Text className="font-semibold text-brand-army">Bought: {naira(item.confirmed_price!)}</Text> : null}
           {dropped ? <Text className="text-sm font-semibold text-faint">Dropped by customer</Text> : null}
           {waiting ? <Text className="text-sm font-semibold text-amber-700">Waiting for customer&apos;s decision</Text> : null}
-          {overagePending ? (
-            <Text className="text-sm font-semibold text-amber-700">Waiting for customer to approve {naira(item.overage_requested_price ?? 0)}</Text>
-          ) : null}
+          {overagePending ? <Text className="text-sm font-semibold text-amber-700">Waiting for customer to approve {naira(item.overage_requested_price ?? 0)}</Text> : null}
         </View>
-        {bought && boughtPhoto ? (
-          <Pressable onPress={() => onPreview(boughtPhoto)} accessibilityLabel="View photo of the goods">
-            <Image source={{ uri: boughtPhoto.uri }} className="h-12 w-12 rounded-xl bg-sunken" />
+        {bought && receiptUri ? (
+          <Pressable onPress={() => onPreview(receiptUri)} accessibilityLabel="View photo of the goods">
+            <Image source={{ uri: receiptUri }} className="h-12 w-12 rounded-xl bg-sunken" />
           </Pressable>
         ) : null}
         {actionable ? (
@@ -155,46 +207,101 @@ function ItemRow({
   );
 }
 
-const STALLS = ['Mama Ngozi Stall', 'Baba Tunde Provisions', 'Iya Basira Fresh Foods'];
-
-// UI only: every action updates this screen's local copy of the order.
 export default function AgentOrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const initial = orderById(id);
-  const [status, setStatus] = useState(initial.status);
-  const [items, setItems] = useState<OrderItem[]>(initial.items);
-  const order: AgentOrder = { ...initial, status, items };
+  // The order comes from the server and is asked for again every few seconds, so the customer's approvals and payments show up here.
+  useAgentOrderSync(id);
+  const { loaded, error: loadError } = useAgentOrderState();
+  const found = useAgentOrder(id);
+  const { markets } = useMarkets();
 
   // Pay-a-stall form
   const [selected, setSelected] = useState<string[]>([]);
   const [account, setAccount] = useState('');
   const [bankCode, setBankCode] = useState('');
   const [prices, setPrices] = useState<Record<string, string>>({});
-  // New stall
+  // The photo of the goods is required to pay a stall; the server keeps it with the payment as the receipt.
+  const [photos, setPhotos] = useState<ProofPhoto[]>([]);
+  const [triedPay, setTriedPay] = useState(false);
+  // True when the server refused a price above what the customer approved: the agent can ask them to approve more.
+  const [needsApproval, setNeedsApproval] = useState(false);
+  // The stalls in this market, and registering one that isn't listed.
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendorId, setVendorId] = useState<string | null>(null);
   const [addingStall, setAddingStall] = useState(false);
   const [stallName, setStallName] = useState('');
   const [stallDesc, setStallDesc] = useState('');
-  // Stalls this agent can pay at: the market's known ones plus any registered during this run.
-  const [stalls, setStalls] = useState<string[]>(STALLS);
-  const [stall, setStall] = useState(STALLS[0]);
-  const [boughtFrom, setBoughtFrom] = useState<Record<string, string>>({});
   const [stallNotice, setStallNotice] = useState('');
-  // The photo of the goods is required to pay a stall; each bought item keeps it as proof.
-  const [photos, setPhotos] = useState<ProofPhoto[]>([]);
-  const [triedPay, setTriedPay] = useState(false);
-  const [boughtPhotos, setBoughtPhotos] = useState<Record<string, ProofPhoto>>({});
-  const [viewing, setViewing] = useState<ProofPhoto | null>(null);
+  const [purchases, setPurchases] = useState<(Purchase & { status: string })[]>([]);
+  const [viewingUri, setViewingUri] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const status = found?.status;
+  const marketId = found?.market_id;
+  const boughtCount = found ? found.items.filter((it) => it.confirmed_price != null).length : 0;
+
+  useEffect(() => {
+    if (!marketId || status !== 'shopping') return;
+    let alive = true;
+    api.getVendors(marketId).then((v) => alive && setVendors(v)).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [marketId, status]);
+
+  // Each stall payment, with its photo, shown on the items it covered.
+  useEffect(() => {
+    if (!id || !status || status === 'agent_assigned') return;
+    let alive = true;
+    api.getPurchases(id).then((p) => alive && setPurchases(p)).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [id, status, boughtCount]);
+
+  // Runs something on the server, then reloads the order. Any failure is shown near the top of the page.
+  const act = async (fn: () => Promise<unknown>, after?: () => void) => {
+    setBusy(true);
+    setProblem('');
+    setNotice('');
+    try {
+      await fn();
+      await agentOrderStore.load(id);
+      after?.();
+    } catch (e) {
+      setProblem((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/agent'));
 
+  if (!found) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center gap-4 bg-canvas px-8" edges={['top']}>
+        <Text className="text-center text-base text-muted">{loaded && loadError ? loadError : loaded ? "We couldn't find that order." : 'Loading the order…'}</Text>
+        <Button label="Back" variant="outline" onPress={back} />
+      </SafeAreaView>
+    );
+  }
+
+  const order: AgentOrder = found;
+  const items = order.items;
+  const market = markets.find((m) => m.id === order.market_id);
+  // Photos are checked against the market, when the server knows where it is.
+  const place: Place | undefined = market && market.latitude != null && market.longitude != null ? { name: market.name, latitude: market.latitude, longitude: market.longitude } : undefined;
+
   const isShopping = status === 'shopping';
-  const stallLabel = (sid: string | null) => (sid ? STALLS[0] : null);
+  const stallLabel = (sid: string | null) => vendors.find((v) => v.id === sid)?.name ?? null;
+  const receiptFor = (it: OrderItem) => purchases.find((p) => p.id === it.vendor_transfer_id)?.photo_ref ?? null;
 
   const selectedItems = items.filter((it) => selected.includes(it.id));
   const payTotal = selectedItems.reduce((sum, it) => sum + (Number(prices[it.id]) || 0), 0);
-  const boughtCount = items.filter((it) => it.confirmed_price != null).length;
-  const headline = status === 'shopping' ? `${boughtCount} of ${items.length} bought` : HEADLINE[status] || 'Order status';
+  const headline = status === 'shopping' ? `${boughtCount} of ${items.length} bought` : HEADLINE[status as string] || 'Order status';
   // Two-tone: everything but the last word in ink, the last word in peach.
   const words = headline.split(' ');
   const headTop = words.length > 1 ? words.slice(0, -1).join(' ') : headline;
@@ -202,30 +309,63 @@ export default function AgentOrderScreen() {
 
   const toggle = (itemId: string) => setSelected((cur) => (cur.includes(itemId) ? cur.filter((x) => x !== itemId) : [...cur, itemId]));
 
-  const flagUnavailable = (itemId: string) => setItems((cur) => cur.map((it) => (it.id === itemId ? { ...it, availability: 'unavailable' } : it)));
-
-  function payVendor() {
-    setItems((cur) => cur.map((it) => (selected.includes(it.id) ? { ...it, confirmed_price: prices[it.id] || it.listed_price || '0' } : it)));
-    setBoughtFrom((cur) => ({ ...cur, ...Object.fromEntries(selected.map((id) => [id, stall])) }));
-    if (photos[0]) setBoughtPhotos((cur) => ({ ...cur, ...Object.fromEntries(selected.map((id) => [id, photos[0]])) }));
-    setPhotos([]);
-    setSelected([]);
-    setAccount('');
-    setBankCode('');
-    setPrices({});
+  // Pays the stall from the company's float. The server checks the customer's cap and the float, then moves the money.
+  async function payVendor() {
+    setProblem('');
+    setNotice('');
+    setNeedsApproval(false);
+    const acct = account.replace(/\D/g, '');
+    if (acct.length !== 10) return setProblem("Enter the stall owner's 10-digit account number.");
+    if (!bankCode.trim()) return setProblem('Enter the stall owner’s bank code.');
+    if (selectedItems.some((it) => !(Number(prices[it.id]) > 0))) return setProblem('Enter the price you paid for each item.');
+    if (photos.length === 0) return setTriedPay(true);
+    setBusy(true);
+    try {
+      const receipt = await api.uploadImage(photos[0].uri);
+      await api.payVendor(order.id, {
+        account_number: acct,
+        bank_code: bankCode.trim(),
+        items: selectedItems.map((it) => ({ item_id: it.id, price: Number(prices[it.id]).toFixed(2) })),
+        ...(vendorId ? { seller_id: vendorId } : {}),
+        photo_ref: receipt,
+      });
+      await agentOrderStore.load(order.id);
+      setSelected([]);
+      setAccount('');
+      setBankCode('');
+      setPrices({});
+      setPhotos([]);
+      setTriedPay(false);
+    } catch (e) {
+      const m = (e as Error).message;
+      setProblem(m);
+      setNeedsApproval(/cap|approve/i.test(m));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  // UI only: the stall is kept for this run. It is added to the list and selected for the next payment.
-  function saveStall() {
-    const name = stallName.trim();
-    if (!name) return;
-    setStalls((cur) => (cur.includes(name) ? cur : [...cur, name]));
-    setStall(name);
-    setStallNotice(`${name} added. It's selected for your next payment.`);
-    setAddingStall(false);
-    setStallName('');
-    setStallDesc('');
-  }
+  // The price is above what the customer approved: ask them to approve it, then pay once they do.
+  const askCustomer = () =>
+    act(async () => {
+      for (const it of selectedItems) await api.requestOverage(order.id, it.id, Number(prices[it.id]));
+      setSelected([]);
+      setPrices({});
+      setNeedsApproval(false);
+      setNotice('Asked the customer to approve. You can pay once they do.');
+    });
+
+  // Registers a stall that isn't listed. It is live straight away, and selected for the next payment.
+  const saveStall = () =>
+    act(async () => {
+      const v = await api.createVendor(order.market_id, { name: stallName.trim(), ...(stallDesc.trim() ? { stall_description: stallDesc.trim() } : {}) });
+      setVendors((cur) => [...cur, v]);
+      setVendorId(v.id);
+      setStallNotice(`${v.name} added. It's selected for your next payment.`);
+      setAddingStall(false);
+      setStallName('');
+      setStallDesc('');
+    });
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
@@ -246,17 +386,17 @@ export default function AgentOrderScreen() {
                 {headTop}
                 {headAccent ? <Text className="text-[28px] font-extrabold leading-[34px] tracking-tight text-brand-orange-dark"> {headAccent}</Text> : null}
               </Text>
-              {BODY[status] ? <Text className="text-sm leading-5 text-muted">{BODY[status]}</Text> : null}
+              {BODY[status as string] ? <Text className="text-sm leading-5 text-muted">{BODY[status as string]}</Text> : null}
             </View>
             <Float>
               <Image source={look(order).art} resizeMode="contain" style={{ width: 92, height: 70 }} />
             </Float>
           </View>
           <View className="flex-row flex-wrap items-center gap-2">
-            <StatusBadge status={status} />
+            <StatusBadge status={order.status} />
             <View className="rounded-full border border-line-strong bg-surface px-3 py-1">
               <Text className="text-xs font-bold text-ink">
-                {marketName(order.market_id) || 'Market'} · {items.length} item{items.length === 1 ? '' : 's'}
+                {market?.name || 'Market'} · {items.length} item{items.length === 1 ? '' : 's'}
               </Text>
             </View>
           </View>
@@ -271,6 +411,20 @@ export default function AgentOrderScreen() {
             </View>
           ) : null}
         </Animated.View>
+
+        {problem ? (
+          <View className="gap-2 rounded-2xl bg-red-50 px-4 py-3">
+            <Text className="text-sm font-semibold text-red-700">{problem}</Text>
+            {needsApproval ? (
+              <Button label="Ask the customer to approve this price" variant="outline" disabled={busy} onPress={askCustomer} />
+            ) : null}
+          </View>
+        ) : null}
+        {notice ? (
+          <View className="rounded-2xl bg-brand-green/15 px-4 py-3">
+            <Text className="text-sm font-semibold text-brand-army">{notice}</Text>
+          </View>
+        ) : null}
 
         {/* Chat with the customer exists only while the order is being shopped. */}
         {status === 'agent_assigned' || status === 'shopping' ? (
@@ -302,16 +456,16 @@ export default function AgentOrderScreen() {
 
         {status === 'agent_assigned' ? (
           <View className="gap-2">
-            <Button label="Start shopping" onPress={() => setStatus('shopping')} />
-            <Button label="Release this order" variant="neutral" onPress={back} />
+            <Button label="Start shopping" busy={busy} onPress={() => act(() => api.startShopping(order.id))} />
+            <Button label="Release this order" variant="neutral" disabled={busy} onPress={() => act(() => api.releaseOrder(order.id), back)} />
           </View>
         ) : null}
 
-        {status === 'paid' ? <DropAtHub order={order} onDropped={() => setStatus('dropped_at_hub')} /> : null}
+        {status === 'paid' ? <DropAtHub order={order} place={place} /> : null}
 
-        {AT_HUB_NOTE[status] ? (
+        {AT_HUB_NOTE[status as string] ? (
           <View className="rounded-2xl bg-brand-green/10 px-4 py-3">
-            <Text className="text-sm font-semibold text-brand-army">{AT_HUB_NOTE[status]}</Text>
+            <Text className="text-sm font-semibold text-brand-army">{AT_HUB_NOTE[status as string]}</Text>
           </View>
         ) : null}
 
@@ -322,7 +476,7 @@ export default function AgentOrderScreen() {
               <Field placeholder="Stall name" value={stallName} onChangeText={setStallName} />
               <Field placeholder="Rough location / what they sell (optional)" value={stallDesc} onChangeText={setStallDesc} />
               <View className="flex-row gap-2">
-                <Button label="Save stall" className="flex-1" disabled={!stallName.trim()} onPress={saveStall} />
+                <Button label="Save stall" className="flex-1" busy={busy} disabled={!stallName.trim()} onPress={saveStall} />
                 <Button
                   label="Cancel"
                   variant="neutral"
@@ -369,10 +523,9 @@ export default function AgentOrderScreen() {
                 selected={selected.includes(item.id)}
                 onToggle={() => toggle(item.id)}
                 stallName={stallLabel(item.preferred_stall_id)}
-                boughtFrom={boughtFrom[item.id]}
-                boughtPhoto={boughtPhotos[item.id]}
-                onPreview={setViewing}
-                onUnavailable={() => flagUnavailable(item.id)}
+                receiptUri={receiptFor(item)}
+                onPreview={setViewingUri}
+                onUnavailable={() => act(() => api.flagUnavailable(order.id, item.id))}
               />
             );
           })}
@@ -383,23 +536,25 @@ export default function AgentOrderScreen() {
             <Text className="text-lg font-bold text-ink">
               Pay for {selected.length} item{selected.length === 1 ? '' : 's'} from this stall
             </Text>
-            <View className="gap-1.5">
-              <Text className="ml-1 text-xs font-bold uppercase tracking-wide text-faint">Which stall?</Text>
-              <View className="flex-row flex-wrap gap-2">
-                {stalls.map((name) => (
-                  <Pressable
-                    key={name}
-                    onPress={() => setStall(name)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: stall === name }}
-                    className={'rounded-full border px-3.5 py-2 ' + (stall === name ? 'border-brand-orange bg-brand-orange' : 'border-line-strong bg-surface')}>
-                    <Text className={'text-sm font-bold ' + (stall === name ? 'text-ink' : 'text-muted')}>{name}</Text>
-                  </Pressable>
-                ))}
+            {vendors.length > 0 ? (
+              <View className="gap-1.5">
+                <Text className="ml-1 text-xs font-bold uppercase tracking-wide text-faint">Which stall?</Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {vendors.map((v) => (
+                    <Pressable
+                      key={v.id}
+                      onPress={() => setVendorId(vendorId === v.id ? null : v.id)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: vendorId === v.id }}
+                      className={'rounded-full border px-3.5 py-2 ' + (vendorId === v.id ? 'border-brand-orange bg-brand-orange' : 'border-line-strong bg-surface')}>
+                      <Text className={'text-sm font-bold ' + (vendorId === v.id ? 'text-ink' : 'text-muted')}>{v.name}</Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
-            </View>
-            <Field placeholder="Vendor account number" value={account} onChangeText={setAccount} keyboardType="number-pad" />
-            <Field placeholder="Bank code (e.g. 999992 for OPay)" value={bankCode} onChangeText={setBankCode} keyboardType="number-pad" />
+            ) : null}
+            <Field placeholder="Vendor account number" value={account} onChangeText={(t) => setAccount(t.replace(/\D/g, '').slice(0, 10))} keyboardType="number-pad" maxLength={10} />
+            <Field placeholder="Bank code (e.g. 999992 for OPay)" value={bankCode} onChangeText={(t) => setBankCode(t.replace(/\D/g, ''))} keyboardType="number-pad" />
 
             <View className="gap-2 border-t border-line pt-3">
               {selectedItems.map((it) => (
@@ -430,21 +585,25 @@ export default function AgentOrderScreen() {
               <GoodsPhotos
                 photos={photos}
                 onChange={setPhotos}
-                place={PLACES[order.market_id]}
-                max={3}
+                place={place}
+                max={1}
                 error={triedPay && photos.length === 0 ? 'Add a photo of what you bought to pay.' : undefined}
                 hint="Take a clear photo of what you bought. It's your proof of purchase."
               />
             </View>
 
-            <Button label="Pay vendor" onPress={() => (photos.length === 0 ? setTriedPay(true) : payVendor())} />
+            <Button label="Pay vendor" busy={busy} onPress={payVendor} />
           </View>
         ) : null}
 
-        {isShopping ? <Button label="Finish shopping" variant="secondary" onPress={() => setStatus('awaiting_payment')} /> : null}
+        {isShopping ? <Button label="Finish shopping" variant="secondary" disabled={busy} onPress={() => act(() => api.finishShopping(order.id))} /> : null}
       </ScrollView>
 
-      <ProofViewer photo={viewing} onClose={() => setViewing(null)} />
+      <Modal visible={!!viewingUri} transparent animationType="fade" onRequestClose={() => setViewingUri(null)}>
+        <Pressable onPress={() => setViewingUri(null)} className="flex-1 items-center justify-center bg-black/90 p-4">
+          {viewingUri ? <Image source={{ uri: viewingUri }} className="h-full w-full" resizeMode="contain" /> : null}
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

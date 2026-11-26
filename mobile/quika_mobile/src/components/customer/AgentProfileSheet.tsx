@@ -95,7 +95,8 @@ export default function AgentProfileSheet({ person, visible, onClose, onChat }: 
   };
   const [first, ...rest] = (person?.full_name || 'Your agent').split(' ');
   const [calling, setCalling] = useState(false);
-  const callPhone = person?.phone;
+  // Calling goes through the app, so it doesn't need the agent's number.
+  const callPhone = !!person;
   // Close the sheet, then ring: the call screen takes over, and ending it returns to where you were.
   const call = () => {
     close();

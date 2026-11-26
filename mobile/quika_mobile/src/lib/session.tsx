@@ -1,81 +1,165 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { GUEST, USERS } from '@/lib/mock';
-import type { Role, User } from '@/lib/types';
+import { api, toUser, type ServerUser } from '@/lib/api';
+import { GUEST } from '@/lib/mock';
+import { hub } from '@/lib/hubStore';
+import { agentData } from '@/lib/agentData';
+import { notificationStore } from '@/lib/notifications';
+import { inboxStore } from '@/lib/inbox';
+import { rider } from '@/lib/riderStore';
+import { walletStore } from '@/lib/wallet';
+import { agentOrderStore, orderStore } from '@/lib/orderStore';
+import { clearToken, loadToken, saveToken, setUnauthorizedHandler } from '@/lib/token';
+import type { User } from '@/lib/types';
 
 /** Where someone stands on becoming an agent. An approved agent can also shop as a customer, and switch between the two. */
 export type AgentStatus = 'none' | 'pending' | 'approved';
 
-// UI-only: there is no backend, so "signing in" just picks a sample user in memory.
 type Session = {
   user: User | null;
-  /** A customer who skipped sign-in to write a list straight away. */
+  /** False while the saved sign-in is being checked on start; the app shows its loading screen until then. */
+  ready: boolean;
+  /** A customer who skipped sign-in to write a list straight away (no account, no token). */
   guest: boolean;
-  signIn: (role: Role) => void;
-  /** Creates a new customer account from the sign-up details. */
-  signUp: (profile: { fullName: string; phone: string; email: string }) => void;
+  /** Completes a sign-in with the token the server gave after the code was verified. */
+  acceptToken: (token: string) => Promise<void>;
   continueAsGuest: () => void;
   /** Ends the session. `to` is where the signed-out app lands: the role picker (default) or straight to the sign-in page. */
   signOut: (to?: 'welcome' | 'sign-in') => void;
   /** True from signing out until the next sign-in, so the app skips the intro. */
   justSignedOut: boolean;
   signedOutTo: 'welcome' | 'sign-in' | null;
-  /** Saves edits to the signed-in person's details (in memory only). */
   agentStatus: AgentStatus;
   /** The market an agent is assigned to, once they have one. */
   agentMarket: string | null;
-  /** Switch between customer and agent. Only an approved agent can; it does nothing otherwise. */
-  switchRole: (role: 'customer' | 'agent') => void;
-  /** Records a finished agent registration: it is now waiting for review. */
+  /** Switch between the customer view and the agent view. The server refuses while an order is live; the message is thrown. */
+  switchRole: (role: 'customer' | 'agent') => Promise<void>;
+  /** Records a finished agent registration: it is now waiting for review. (Not sent to the server yet.) */
   submitAgentApplication: (market: string) => void;
-  /** Stands in for Qyka approving the application (the demo has no reviewer). */
-  approveAgent: () => void;
-  updateUser: (patch: Partial<Pick<User, 'full_name' | 'email' | 'default_delivery_address' | 'avatar_url'>>) => void;
+  /** Saves edits. Name and address go to the server; email and photo are kept on this phone for now. */
+  updateUser: (patch: Partial<Pick<User, 'full_name' | 'email' | 'default_delivery_address' | 'avatar_url'>>) => Promise<void>;
 };
 
 const Ctx = createContext<Session | null>(null);
 
+/** An agent account can be viewed as an agent or as a customer; the server remembers which. Everyone else is just themselves. */
+async function viewFor(me: ServerUser): Promise<User> {
+  const u = toUser(me);
+  if (me.role !== 'agent' || !me.has_customer_side) return u;
+  try {
+    const duty = await api.agentMe();
+    return duty.on_duty ? u : { ...u, role: 'customer' };
+  } catch {
+    return u;
+  }
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [ready, setReady] = useState(false);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('none');
   const [signedOutTo, setSignedOutTo] = useState<'welcome' | 'sign-in' | null>(null);
   const [agentMarket, setAgentMarket] = useState<string | null>(null);
-  const signIn = useCallback((role: Role) => {
-    setUser(USERS[role]);
-    setSignedOutTo(null);
-    // The sample agent is already approved and assigned to a market.
-    setAgentStatus(role === 'agent' ? 'approved' : 'none');
-    setAgentMarket(role === 'agent' ? 'Mile 12 Market' : null);
-  }, []);
-  const signUp = useCallback(
-    (p: { fullName: string; phone: string; email: string }) => {
-      setSignedOutTo(null);
-      setUser({ id: 'u-new', phone: p.phone ? `+234 ${p.phone}` : null, email: p.email.trim() || null, full_name: p.fullName.trim() || null, role: 'customer', status: 'active' });
-    },
-    [],
-  );
-  const continueAsGuest = useCallback(() => {
-    setUser(GUEST);
-    setSignedOutTo(null);
-  }, []);
+
   const signOut = useCallback((to?: 'welcome' | 'sign-in') => {
+    void clearToken();
+    orderStore.reset();
+    agentOrderStore.reset();
+    agentData.reset();
+    hub.reset();
+    rider.reset();
+    walletStore.reset();
+    inboxStore.reset();
+    notificationStore.reset();
     setUser(null);
     // Only an explicit 'sign-in' counts: onPress handlers pass an event object here.
     setSignedOutTo(to === 'sign-in' ? 'sign-in' : 'welcome');
     setAgentStatus('none');
     setAgentMarket(null);
   }, []);
+
+  const acceptToken = useCallback(async (token: string) => {
+    orderStore.reset();
+    agentOrderStore.reset();
+    agentData.reset();
+    hub.reset();
+    rider.reset();
+    walletStore.reset();
+    inboxStore.reset();
+    notificationStore.reset();
+    await saveToken(token);
+    try {
+      const me = await api.me();
+      setSignedOutTo(null);
+      setUser(await viewFor(me));
+      setAgentStatus(me.role === 'agent' ? 'approved' : 'none');
+    } catch (e) {
+      await clearToken();
+      throw e;
+    }
+  }, []);
+
+  // On start: if there's a saved sign-in, check it's still good. Any later 401 signs out (see api.ts).
+  useEffect(() => {
+    setUnauthorizedHandler(() => signOut());
+    let alive = true;
+    (async () => {
+      const token = await loadToken();
+      if (token) {
+        try {
+          const me = await api.me();
+          const view = await viewFor(me);
+          if (alive) {
+            setUser(view);
+            setAgentStatus(me.role === 'agent' ? 'approved' : 'none');
+          }
+        } catch {
+          // Expired, or the server can't be reached: start signed out. (A 401 already cleared the token.)
+        }
+      }
+      if (alive) setReady(true);
+    })();
+    return () => {
+      alive = false;
+      setUnauthorizedHandler(null);
+    };
+  }, [signOut]);
+
+  const continueAsGuest = useCallback(() => {
+    setUser(GUEST);
+    setSignedOutTo(null);
+  }, []);
   const switchRole = useCallback(
-    (role: 'customer' | 'agent') => setUser((u) => (u && agentStatus === 'approved' && (u.role === 'customer' || u.role === 'agent') ? { ...u, role } : u)),
+    async (role: 'customer' | 'agent') => {
+      if (agentStatus !== 'approved') return;
+      // On duty is the agent view; off duty is the customer view. The server refuses to leave the agent view while an order is live.
+      await api.setDuty(role === 'agent');
+      setUser((u) => (u && (u.role === 'customer' || u.role === 'agent') ? { ...u, role } : u));
+    },
     [agentStatus],
   );
   const submitAgentApplication = useCallback((market: string) => {
     setAgentStatus('pending');
     setAgentMarket(market);
   }, []);
-  const approveAgent = useCallback(() => setAgentStatus('approved'), []);
-  const updateUser = useCallback((patch: Partial<Pick<User, 'full_name' | 'email' | 'default_delivery_address' | 'avatar_url'>>) => setUser((u) => (u ? { ...u, ...patch } : u)), []);
-  const value = useMemo(() => ({ user, guest: user?.id === GUEST.id, signIn, signUp, continueAsGuest, signOut, justSignedOut: signedOutTo !== null, signedOutTo, updateUser, agentStatus, agentMarket, switchRole, submitAgentApplication, approveAgent }), [user, signIn, signUp, continueAsGuest, signOut, signedOutTo, updateUser, agentStatus, agentMarket, switchRole, submitAgentApplication, approveAgent]);
+
+  const updateUser = useCallback(async (patch: Partial<Pick<User, 'full_name' | 'email' | 'default_delivery_address' | 'avatar_url'>>) => {
+    const server: { full_name?: string; default_delivery_address?: string | null } = {};
+    if (patch.full_name) server.full_name = patch.full_name;
+    if ('default_delivery_address' in patch) server.default_delivery_address = patch.default_delivery_address ?? null;
+    let saved: Partial<User> = {};
+    if (Object.keys(server).length > 0) {
+      const u = toUser(await api.updateProfile(server));
+      saved = { full_name: u.full_name, default_delivery_address: u.default_delivery_address };
+    }
+    // The server has no endpoint for email or photo yet (email needs its own verification), so those stay on this phone.
+    setUser((cur) => (cur ? { ...cur, ...saved, ...('email' in patch ? { email: patch.email } : {}), ...('avatar_url' in patch ? { avatar_url: patch.avatar_url } : {}) } : cur));
+  }, []);
+
+  const value = useMemo(
+    () => ({ user, ready, guest: user?.id === GUEST.id, acceptToken, continueAsGuest, signOut, justSignedOut: signedOutTo !== null, signedOutTo, updateUser, agentStatus, agentMarket, switchRole, submitAgentApplication }),
+    [user, ready, acceptToken, continueAsGuest, signOut, signedOutTo, updateUser, agentStatus, agentMarket, switchRole, submitAgentApplication],
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

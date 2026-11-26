@@ -10,6 +10,8 @@ export type User = {
   default_delivery_address?: string | null;
   avatar_url?: string | null;
   must_prepay?: boolean;
+  /** False for agent-only accounts: there is no customer view to switch to. */
+  has_customer_side?: boolean;
 };
 
 export type RiderJob = {
@@ -60,12 +62,6 @@ export type HubOrder = {
   hub_received_at: string | null;
   hub_missing_item_ids: string[];
   hub_receipt_note: string | null;
-  /** The 4-digit code the waiting rider shows; the shopkeeper must enter it to hand the order over. */
-  rider_code?: string | null;
-  /** The customer's order this is the hub's side of, so a handover can reach the customer. */
-  customer_order_id?: string;
-  /** When it was marked ready, so riders can see how long it has been waiting. */
-  ready_at?: string | null;
 };
 
 export type OrderItem = {
@@ -113,6 +109,9 @@ export type AgentOrder = {
   delivered_at: string | null;
   handover_code: string | null;
   delivery_address: string | null;
+  /** When the balance has to be paid by, or the order is cancelled and the deposit is lost. */
+  payment_window_expires_at?: string | null;
+  proposed_agent_id?: string | null;
 };
 
 export type Person = { id: string; full_name: string | null; avatar_url: string | null; phone?: string };
@@ -127,6 +126,8 @@ export type Market = {
   venue_type?: string;
   image_url?: string | null;
   categories?: string[];
+  latitude?: number | null;
+  longitude?: number | null;
   opening_time?: string | null;
   closing_time?: string | null;
   timezone?: string | null;

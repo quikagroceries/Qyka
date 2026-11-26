@@ -6,6 +6,7 @@ import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { Text } from '@/components/Text';
 import { Avatar, Button, Field } from '@/components/ui';
 import { pickPhoto } from '@/lib/pickPhoto';
+import { useAssignedMarket } from '@/lib/agentData';
 import { isEmail } from '@/lib/validate';
 import { useSession } from '@/lib/session';
 
@@ -63,11 +64,14 @@ const Label = ({ children }: { children: string }) => <Text className="mb-1.5 ml
 /** The form inside the sheet. It mounts when the sheet opens, so it always starts from the saved details. */
 function Form({ onClose }: { onClose: () => void }) {
   const { user, updateUser, agentMarket } = useSession();
+  const realMarket = useAssignedMarket(user?.role === 'agent');
+  const assignedMarket = realMarket ?? agentMarket;
   const customer = user?.role === 'customer';
   const [name, setName] = useState(user?.full_name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [avatar, setAvatar] = useState<string | null>(user?.avatar_url ?? null);
   const [picking, setPicking] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [address, setAddress] = useState(user?.default_delivery_address ?? '');
   const [error, setError] = useState('');
   const agent = user?.role === 'agent';
@@ -79,11 +83,18 @@ function Form({ onClose }: { onClose: () => void }) {
     if (uri) setAvatar(uri);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!name.trim()) return setError('Your name can’t be empty');
     if (email.trim() && !isEmail(email)) return setError('That doesn’t look like an email address');
-    updateUser({ full_name: name.trim(), email: email.trim() || null, avatar_url: avatar, ...(customer ? { default_delivery_address: address.trim() || null } : {}) });
-    onClose();
+    setSaving(true);
+    try {
+      // Name and address are saved to the server; email and photo stay on this phone for now.
+      await updateUser({ full_name: name.trim(), email: email.trim() || null, avatar_url: avatar, ...(customer ? { default_delivery_address: address.trim() || null } : {}) });
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+      setSaving(false);
+    }
   };
 
   return (
@@ -124,10 +135,10 @@ function Form({ onClose }: { onClose: () => void }) {
         <Field value={email} onChangeText={(t) => { setEmail(t); setError(''); }} placeholder="you@example.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="emailAddress" />
       </View>
 
-      {agent && agentMarket ? (
+      {agent && assignedMarket ? (
         <View>
           <Label>Assigned market</Label>
-          <LockedField value={agentMarket} />
+          <LockedField value={assignedMarket} />
           <Text className="ml-2 mt-1.5 text-xs text-faint">Qyka sets your market. Contact support to change it.</Text>
         </View>
       ) : null}
@@ -142,7 +153,7 @@ function Form({ onClose }: { onClose: () => void }) {
       {error ? <Text className="ml-2 text-xs font-semibold text-red-700">{error}</Text> : null}
 
       <View className="gap-2 pt-1">
-        <Button label="Save changes" onPress={save} />
+        <Button label="Save changes" busy={saving} onPress={save} />
         <Pressable onPress={onClose} hitSlop={8} className="items-center py-2">
           <Text className="text-sm font-bold text-brand-orange-dark">Cancel</Text>
         </Pressable>
