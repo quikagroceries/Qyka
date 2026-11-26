@@ -104,7 +104,7 @@ export const ORDERS: AgentOrder[] = [
   order('a1b2c3d4-0006', 'agent_assigned', [item('i12', 'Bitter leaf'), item('i13', 'Ugwu leaves', { quantity: 2 })], { created_at: minsAgo(30) }),
   order('a1b2c3d4-0007', 'paid', [item('i14', 'Beans (brown)', { confirmed_price: '4500.00' })], { items_total: '4500.00', paid_at: minsAgo(20), created_at: minsAgo(180) }),
 ];
-/** Adds the order a customer just placed (in memory only) so Track and the order page can show it. */
+/** Builds the order a customer just placed. The order store adds it, so Track and the order page can show it. */
 export function placeOrder(input: { marketId: string; address: string; goodsEstimate: number; depositAmount: number; items: { description: string; quantity?: number; price?: number }[] }): AgentOrder {
   const id = `a1b2c3d4-${Date.now()}`;
   const placed = order(
@@ -124,7 +124,6 @@ export function placeOrder(input: { marketId: string; address: string; goodsEsti
       created_at: new Date().toISOString(),
     },
   );
-  ORDERS.unshift(placed);
   return placed;
 }
 export const orderById = (id?: string) => ORDERS.find((o) => o.id === id) ?? ORDERS[0];
@@ -135,12 +134,12 @@ export const PURCHASES: Purchase[] = [
 
 export const HUB_ORDERS: HubOrder[] = [
   {
-    id: 'b1c2d3e4-0004', status: 'paid', agent_name: 'Chidi Obi', rider_name: null, rider_waiting: false,
+    id: 'b1c2d3e4-0004', customer_order_id: 'a1b2c3d4-0006', status: 'paid', agent_name: 'Chidi Obi', rider_name: null, rider_waiting: false,
     items: [{ id: 'h7', description: 'Garri (paint bucket)', quantity: 2, requested_note: null }, { id: 'h8', description: 'Groundnut oil (5L)', quantity: 1, requested_note: null }],
     packing_photos: [], dropped_at_hub_at: null, hub_received_at: null, hub_missing_item_ids: [], hub_receipt_note: null,
   },
   {
-    id: 'b1c2d3e4-0001', status: 'dropped_at_hub', agent_name: 'Tunde Bakare', rider_name: null, rider_waiting: false,
+    id: 'b1c2d3e4-0001', customer_order_id: 'a1b2c3d4-0001', status: 'dropped_at_hub', agent_name: 'Tunde Bakare', rider_name: null, rider_waiting: false,
     items: [
       { id: 'h1', description: 'Tomatoes (big basket)', quantity: 1, requested_note: null },
       { id: 'h2', description: 'Pepper (tatashe)', quantity: 2, requested_note: 'Not too ripe' },
@@ -150,12 +149,12 @@ export const HUB_ORDERS: HubOrder[] = [
     packing_photos: [], dropped_at_hub_at: minsAgo(8), hub_received_at: null, hub_missing_item_ids: [], hub_receipt_note: null,
   },
   {
-    id: 'b1c2d3e4-0002', status: 'received_by_hub', agent_name: 'Chidi Obi', rider_name: null, rider_waiting: false,
+    id: 'b1c2d3e4-0002', customer_order_id: 'a1b2c3d4-0002', status: 'received_by_hub', agent_name: 'Chidi Obi', rider_name: null, rider_waiting: false,
     items: [{ id: 'h4', description: 'Yam tubers', quantity: 2, requested_note: null }, { id: 'h5', description: 'Eggs (crate)', quantity: 1, requested_note: null }],
     packing_photos: [], dropped_at_hub_at: minsAgo(40), hub_received_at: minsAgo(30), hub_missing_item_ids: ['h5'], hub_receipt_note: 'Eggs were not in the bag.',
   },
   {
-    id: 'b1c2d3e4-0003', status: 'ready_for_pickup', agent_name: 'Tunde Bakare', rider_name: 'Musa Ibrahim', rider_waiting: true, rider_code: '7305', ready_at: minsAgo(80),
+    id: 'b1c2d3e4-0003', customer_order_id: 'a1b2c3d4-0007', status: 'ready_for_pickup', agent_name: 'Tunde Bakare', rider_name: 'Musa Ibrahim', rider_waiting: true, rider_code: '7305', ready_at: minsAgo(80),
     items: [{ id: 'h6', description: 'Rice (50kg bag)', quantity: 1, requested_note: null }],
     packing_photos: [], dropped_at_hub_at: minsAgo(90), hub_received_at: minsAgo(80), hub_missing_item_ids: [], hub_receipt_note: null,
   },

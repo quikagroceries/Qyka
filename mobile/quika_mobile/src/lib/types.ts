@@ -62,6 +62,8 @@ export type HubOrder = {
   hub_receipt_note: string | null;
   /** The 4-digit code the waiting rider shows; the shopkeeper must enter it to hand the order over. */
   rider_code?: string | null;
+  /** The customer's order this is the hub's side of, so a handover can reach the customer. */
+  customer_order_id?: string;
   /** When it was marked ready, so riders can see how long it has been waiting. */
   ready_at?: string | null;
 };

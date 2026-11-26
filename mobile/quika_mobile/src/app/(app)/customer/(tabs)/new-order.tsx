@@ -13,6 +13,7 @@ import { Button, Card, Field, Float, ItemArt, SafeAreaView, SectionHeader } from
 import { naira } from '@/lib/format';
 import { parseListLine } from '@/lib/parseListLine';
 import { MARKETS, PRICING, placeOrder } from '@/lib/mock';
+import { orderStore } from '@/lib/orderStore';
 import { useSession } from '@/lib/session';
 import type { Market } from '@/lib/types';
 
@@ -91,6 +92,7 @@ export default function NewOrder() {
       depositAmount: deposit,
       items: filled.map((r) => ({ description: r.item.trim(), quantity: Number(r.qty) >= 1 ? Number(r.qty) : undefined, price: Number(r.price) > 0 ? Number(r.price) : undefined })),
     });
+    orderStore.add(placed);
     // Start the next order from a clean slate, then open this one.
     setStep('list');
     setText('');

@@ -15,7 +15,8 @@ import { Text } from '@/components/Text';
 import { Avatar, Button, SafeAreaView } from '@/components/ui';
 import { naira } from '@/lib/format';
 import { LANGUAGES, useLanguage } from '@/lib/language';
-import { ORDERS, WALLET_BALANCE } from '@/lib/mock';
+import { WALLET_BALANCE } from '@/lib/mock';
+import { useOrders } from '@/lib/orderStore';
 import { isHistory } from '@/lib/orderStatus';
 import { useSession } from '@/lib/session';
 
@@ -103,8 +104,9 @@ export default function AccountView({ fallbackName }: { fallbackName: string }) 
   const agent = user?.role === 'agent';
   // An approved agent is also a customer, and can switch between the two.
   const canSwitch = agentStatus === 'approved' && (user?.role === 'customer' || user?.role === 'agent');
-  const delivered = ORDERS.filter((o) => o.status === 'delivered' || o.status === 'closed').length;
-  const activeCount = ORDERS.filter((o) => !isHistory(o.status)).length;
+  const orders = useOrders();
+  const delivered = orders.filter((o) => o.status === 'delivered' || o.status === 'closed').length;
+  const activeCount = orders.filter((o) => !isHistory(o.status)).length;
   const languageName = LANGUAGES.find((l) => l.code === language)?.native ?? 'English';
 
   return (
@@ -189,7 +191,7 @@ export default function AccountView({ fallbackName }: { fallbackName: string }) 
           <StatTiles
             delay={150}
             items={[
-              { value: ORDERS.length, label: 'Orders', art: require('../../assets/illustrations/shop.webp'), tint: 'bg-brand-orange/15' },
+              { value: orders.length, label: 'Orders', art: require('../../assets/illustrations/shop.webp'), tint: 'bg-brand-orange/15' },
               { value: activeCount, label: 'Active', art: require('../../assets/illustrations/track.webp'), tint: 'bg-gold/40', hot: activeCount > 0 },
               { value: delivered, label: 'Delivered', art: require('../../assets/illustrations/order-handoff-vendor-customer.webp'), tint: 'bg-brand-green/15' },
             ]}

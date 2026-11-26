@@ -9,8 +9,9 @@ import StatTiles from '@/components/StatTiles';
 import { Text } from '@/components/Text';
 import { Button, CodeInput, Float, SafeAreaView } from '@/components/ui';
 import { ago, naira, shortId, splitAccent } from '@/lib/format';
-import { hub, useHubJob, useHubJobs } from '@/lib/hubStore';
+import { hub, useCustomerOrderId, useHubJob, useHubJobs } from '@/lib/hubStore';
 import { EARNINGS, RIDER_ACTIVE, RIDER_POOL } from '@/lib/mock';
+import { orderStore, useOrder } from '@/lib/orderStore';
 import { PLACES, type ProofPhoto } from '@/lib/proof';
 import type { RiderJob } from '@/lib/types';
 
@@ -86,9 +87,10 @@ function Pickup({ job, photos, onPhotos, error }: { job: RiderJob; photos: Proof
   );
 }
 
-function Deliver({ job, photos, onPhotos, onDeliver }: { job: RiderJob; photos: ProofPhoto[]; onPhotos: (next: ProofPhoto[]) => void; onDeliver: () => void }) {
+function Deliver({ job, photos, onPhotos, expectedCode, onDeliver }: { job: RiderJob; photos: ProofPhoto[]; onPhotos: (next: ProofPhoto[]) => void; expectedCode?: string | null; onDeliver: () => void }) {
   const [code, setCode] = useState('');
   const [tried, setTried] = useState(false);
+  const [wrongCode, setWrongCode] = useState(false);
   // The photo should be taken at the customer's door, if the order has a pinned location.
   const dropoff = job.dropoff_latitude != null && job.dropoff_longitude != null ? { name: 'the delivery address', latitude: job.dropoff_latitude, longitude: job.dropoff_longitude } : undefined;
   return (
@@ -108,9 +110,19 @@ function Deliver({ job, photos, onPhotos, onDeliver }: { job: RiderJob; photos: 
           <Text className="text-center text-lg font-extrabold tracking-tight text-ink">Customer&apos;s code</Text>
           <Text className="text-center text-sm leading-5 text-muted">Ask for the 4-digit code on their phone before you hand anything over.</Text>
         </View>
-        <CodeInput value={code} onChange={setCode} />
+        <CodeInput value={code} onChange={(c) => { setCode(c); setWrongCode(false); }} />
         {tried && code.length < 4 ? <Text className="text-center text-sm font-semibold text-red-700">Enter the customer&apos;s 4-digit code.</Text> : null}
-        <Button label="Confirm drop-off" onPress={() => (code.length < 4 || photos.length === 0 ? setTried(true) : onDeliver())} />
+        {wrongCode ? <Text className="text-center text-sm font-semibold text-red-700">That code doesn&apos;t match the customer&apos;s. Ask them to check their phone.</Text> : null}
+        {__DEV__ && expectedCode ? <Text className="text-center text-xs text-faint">Dev: the customer&apos;s code is {expectedCode}</Text> : null}
+        <Button
+          label="Confirm drop-off"
+          onPress={() => {
+            if (code.length < 4 || photos.length === 0) return setTried(true);
+            // The code has to be the one the customer was given when the hub handed the order over.
+            if (expectedCode && code !== expectedCode) return setWrongCode(true);
+            onDeliver();
+          }}
+        />
       </View>
     </>
   );
@@ -150,6 +162,9 @@ export default function Jobs() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const hubJobs = useHubJobs();
   const claimed = useHubJob(activeId);
+  // The customer's order behind the job: a hub order links to one; the sample job is the customer's out-for-delivery order.
+  const linkedId = useCustomerOrderId(activeId) ?? (activeId ? null : 'a1b2c3d4-0004');
+  const customerOrder = useOrder(linkedId);
 
   // Back to the pool: the next job starts with no photos. Giving a job back (before collecting it) also frees it at the hub.
   const toPool = (giveBack = false) => {
@@ -249,7 +264,16 @@ export default function Jobs() {
 
         {job && !delivering && <Pickup job={job} photos={pickupPhotos} onPhotos={setPickupPhotos} error={triedPickup && pickupPhotos.length === 0 ? 'Add a photo of the order to continue.' : undefined} />}
         {job && !delivering && <Button label="I've collected it from the hub" onPress={() => (pickupPhotos.length === 0 ? setTriedPickup(true) : setStage('deliver'))} />}
-        {job && delivering && !handedOver && <Deliver job={job} photos={deliveryPhotos} onPhotos={setDeliveryPhotos} onDeliver={() => setStage('handed')} />}
+        {job && delivering && !handedOver && <Deliver
+            job={job}
+            photos={deliveryPhotos}
+            onPhotos={setDeliveryPhotos}
+            expectedCode={customerOrder?.handover_code}
+            onDeliver={() => {
+              if (linkedId) orderStore.riderDelivered(linkedId);
+              setStage('handed');
+            }}
+          />}
         {handedOver && (
           <>
             <View className="items-center gap-1 rounded-3xl border border-line bg-surface p-5 shadow-sm">

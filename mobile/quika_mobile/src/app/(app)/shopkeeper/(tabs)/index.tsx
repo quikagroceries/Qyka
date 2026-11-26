@@ -15,10 +15,10 @@ import type { HubOrder } from '@/lib/types';
 // The queue is three lanes in the order work happens at the hub: check what
 // the agent brought, bag it, hand it to the rider who comes.
 const LANES: { status: string; title: string; subtitle: string; hint: string; art: ImageSourcePropType; tint: string }[] = [
-  { status: 'paid', title: 'On the way', subtitle: 'Agents carrying goods to your hub.', hint: 'Waiting for the agent', art: require('../../../../assets/illustrations/shopping-cart.webp'), tint: 'bg-sunken' },
-  { status: 'dropped_at_hub', title: 'Just dropped', subtitle: 'Check what the agent brought against the list.', hint: 'Check in', art: require('../../../../assets/illustrations/market-cart-vendor.webp'), tint: 'bg-brand-orange/15' },
-  { status: 'received_by_hub', title: 'Checked in', subtitle: 'Bag it up and mark it ready for a rider.', hint: 'Mark ready', art: require('../../../../assets/illustrations/produce-crate.webp'), tint: 'bg-gold/40' },
-  { status: 'ready_for_pickup', title: 'Ready for riders', subtitle: 'A rider will show you a code when they arrive.', hint: 'Waiting for a rider', art: require('../../../../assets/illustrations/rider-bicycle.webp'), tint: 'bg-brand-green/15' },
+  { status: 'paid', title: 'On the way', subtitle: 'Agents carrying goods to your hub.', hint: 'Waiting for the agent', art: require('../../../../../assets/illustrations/shopping-cart.webp'), tint: 'bg-sunken' },
+  { status: 'dropped_at_hub', title: 'Just dropped', subtitle: 'Check what the agent brought against the list.', hint: 'Check in', art: require('../../../../../assets/illustrations/market-cart-vendor.webp'), tint: 'bg-brand-orange/15' },
+  { status: 'received_by_hub', title: 'Checked in', subtitle: 'Bag it up and mark it ready for a rider.', hint: 'Mark ready', art: require('../../../../../assets/illustrations/produce-crate.webp'), tint: 'bg-gold/40' },
+  { status: 'ready_for_pickup', title: 'Ready for riders', subtitle: 'A rider will show you a code when they arrive.', hint: 'Waiting for a rider', art: require('../../../../../assets/illustrations/rider-bicycle.webp'), tint: 'bg-brand-green/15' },
 ];
 
 function OrderCard({ order, lane, index, onOpen }: { order: HubOrder; lane: (typeof LANES)[number]; index: number; onOpen: () => void }) {
@@ -86,7 +86,7 @@ export default function HubHome() {
           <View className="items-center gap-2">
             <Animated.View entering={FadeInDown.duration(500)}>
               <Float>
-                <Image source={require('../../../../assets/illustrations/produce-crate.webp')} resizeMode="contain" style={{ width: 190, height: 140 }} />
+                <Image source={require('../../../../../assets/illustrations/produce-crate.webp')} resizeMode="contain" style={{ width: 190, height: 140 }} />
               </Float>
             </Animated.View>
             <Animated.View entering={FadeInDown.delay(100).duration(500)} className="items-center gap-2">
@@ -99,14 +99,14 @@ export default function HubHome() {
           </View>
         ) : (
           <>
-            <PageHeader top="Your" accent="hub" subtitle={subtitle} art={require('../../../../assets/illustrations/map-pin-storefront.webp')} />
+            <PageHeader top="Your" accent="hub" subtitle={subtitle} art={require('../../../../../assets/illustrations/map-pin-storefront.webp')} />
             <StatTiles
               delay={80}
               items={[
-                { value: incoming, label: 'On the way', art: require('../../../../assets/illustrations/shopping-cart.webp'), tint: 'bg-sunken', onPress: () => pick('paid'), selected: only === 'paid' },
-                { value: toCheckIn, label: 'Dropped', art: require('../../../../assets/illustrations/market-cart-vendor.webp'), tint: 'bg-brand-orange/15', hot: toCheckIn > 0, onPress: () => pick('dropped_at_hub'), selected: only === 'dropped_at_hub' },
-                { value: checkedIn, label: 'Checked in', art: require('../../../../assets/illustrations/produce-crate.webp'), tint: 'bg-gold/40', hot: checkedIn > 0, onPress: () => pick('received_by_hub'), selected: only === 'received_by_hub' },
-                { value: ready, label: 'Ready', art: require('../../../../assets/illustrations/rider-bicycle.webp'), tint: 'bg-brand-green/15', hot: riderWaiting > 0, onPress: () => pick('ready_for_pickup'), selected: only === 'ready_for_pickup' },
+                { value: incoming, label: 'On the way', art: require('../../../../../assets/illustrations/shopping-cart.webp'), tint: 'bg-sunken', onPress: () => pick('paid'), selected: only === 'paid' },
+                { value: toCheckIn, label: 'Dropped', art: require('../../../../../assets/illustrations/market-cart-vendor.webp'), tint: 'bg-brand-orange/15', hot: toCheckIn > 0, onPress: () => pick('dropped_at_hub'), selected: only === 'dropped_at_hub' },
+                { value: checkedIn, label: 'Checked in', art: require('../../../../../assets/illustrations/produce-crate.webp'), tint: 'bg-gold/40', hot: checkedIn > 0, onPress: () => pick('received_by_hub'), selected: only === 'received_by_hub' },
+                { value: ready, label: 'Ready', art: require('../../../../../assets/illustrations/rider-bicycle.webp'), tint: 'bg-brand-green/15', hot: riderWaiting > 0, onPress: () => pick('ready_for_pickup'), selected: only === 'ready_for_pickup' },
               ]}
             />
           </>

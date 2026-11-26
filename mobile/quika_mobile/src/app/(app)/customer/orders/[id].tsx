@@ -12,7 +12,8 @@ import { PROBLEM, Progress } from '@/components/customer/orderLook';
 import PaymentChooser from '@/components/customer/PaymentChooser';
 import { Avatar, Button, Card, Field, Float, ItemArt, SafeAreaView, SectionHeader, StatusBadge } from '@/components/ui';
 import { naira, shortId } from '@/lib/format';
-import { PEOPLE, PURCHASES, WALLET_BALANCE, marketName, orderById } from '@/lib/mock';
+import { PEOPLE, PURCHASES, WALLET_BALANCE, marketName } from '@/lib/mock';
+import { orderStore, useOrders } from '@/lib/orderStore';
 import { CHAT, EXCEPTION, ON_THE_MOVE, PAID_OR_LATER, RATEABLE, UNPRICED, summarize } from '@/lib/orderStatus';
 import type { AgentOrder, OrderItem, Purchase } from '@/lib/types';
 
@@ -169,12 +170,16 @@ function ItemLine({ item, purchase, onDecide, onPreview }: { item: OrderItem; pu
   );
 }
 
-// UI only: every action updates this screen's local copy of the order.
+// UI only: the order's status lives in the shared order store; the rest of the actions update this screen's local copy.
 export default function CustomerOrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const initial = orderById(id);
-  const [status, setStatus] = useState(initial.status);
+  const orders = useOrders();
+  const initial = orders.find((o) => o.id === id) ?? orders[0];
+  // The status comes from the shared store: when the hub hands the order to the rider, or the rider says it was delivered,
+  // it shows up here, and what the customer does here (paying, confirming delivery) reaches them too.
+  const status = initial.status;
+  const setStatus = (s: string) => orderStore.setStatus(initial.id, s, s === 'delivered' ? { delivered_at: new Date().toISOString() } : {});
   const [items, setItems] = useState<OrderItem[]>(initial.items);
   const [depositPaid, setDepositPaid] = useState(!!initial.deposit_paid_at);
   const [notice, setNotice] = useState('');

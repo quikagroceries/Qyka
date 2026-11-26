@@ -11,7 +11,8 @@ import SegmentedToggle from '@/components/SegmentedToggle';
 import { Text } from '@/components/Text';
 import { Button, Float, SafeAreaView, StatusBadge } from '@/components/ui';
 import { ago, naira, shortId } from '@/lib/format';
-import { ORDERS, marketName } from '@/lib/mock';
+import { marketName } from '@/lib/mock';
+import { useOrders } from '@/lib/orderStore';
 import { ON_THE_MOVE, isHistory, summarize } from '@/lib/orderStatus';
 
 type Filter = 'active' | 'history';
@@ -23,7 +24,8 @@ export default function Track() {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>('active');
 
-  const sorted = [...ORDERS].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const orders = useOrders();
+  const sorted = [...orders].sort((a, b) => b.created_at.localeCompare(a.created_at));
   const active = sorted.filter((o) => !isHistory(o.status));
   const past = sorted.filter((o) => isHistory(o.status));
   const shown = filter === 'active' ? active : past;
@@ -34,7 +36,7 @@ export default function Track() {
     <SafeAreaView className="flex-1 bg-canvas" edges={[]}>
       <OrderBackdrop />
       <ScrollView contentContainerClassName="gap-5 px-5 pb-32 pt-3" showsVerticalScrollIndicator={false}>
-        {ORDERS.length === 0 ? (
+        {orders.length === 0 ? (
           <>
             <View className="items-center gap-2">
               <Animated.View entering={FadeInDown.duration(500)}>

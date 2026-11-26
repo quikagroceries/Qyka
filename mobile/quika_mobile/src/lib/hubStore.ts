@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { HUB_ORDERS } from '@/lib/mock';
+import { orderStore } from '@/lib/orderStore';
 import type { HubOrder, RiderJob } from '@/lib/types';
 
 // UI only: the hub's orders live here, in memory, and the rider app reads and writes the SAME records, so the two
@@ -63,16 +64,28 @@ export const useHubJob = (id: string | null): RiderJob | null => {
   return o ? asJob(o) : null;
 };
 
+/** The customer's order a hub order belongs to. */
+const linked = (id: string) => state.orders.find((o) => o.id === id)?.customer_order_id;
+/** Same, for a screen: the customer's order id for the hub order the rider claimed. */
+export const useCustomerOrderId = (hubId: string | null): string | null => {
+  const { orders } = useHub();
+  return (hubId ? orders.find((o) => o.id === hubId)?.customer_order_id : null) ?? null;
+};
+
 const fourDigits = () => String(1000 + Math.floor(Math.random() * 9000));
 
 export const hub = {
   /** What the shopkeeper saw in the bag. Moves the order to "checked in". */
   checkIn(id: string, missingIds: string[], note: string) {
     patch(id, { status: 'received_by_hub', hub_received_at: new Date().toISOString(), hub_missing_item_ids: missingIds, hub_receipt_note: note.trim() || null });
+    const c = linked(id);
+    if (c) orderStore.setStatus(c, 'received_by_hub');
   },
   /** Bagged and waiting: it is now a job riders can claim. */
   markReady(id: string) {
     patch(id, { status: 'ready_for_pickup', ready_at: new Date().toISOString(), rider_waiting: false, rider_name: null, rider_code: null });
+    const c = linked(id);
+    if (c) orderStore.setStatus(c, 'ready_for_pickup');
   },
   /** A rider claims the job and gets a pickup code to show at the hub. */
   claim(id: string, rider: string) {
@@ -89,6 +102,9 @@ export const hub = {
     const o = state.orders.find((x) => x.id === id);
     if (!o || !o.rider_waiting || !o.rider_code || code !== o.rider_code) return false;
     patch(id, { status: 'out_for_delivery', rider_waiting: false });
+    // The customer's order goes out for delivery too, and they get the code to give the rider at the door.
+    const c = linked(id);
+    if (c) orderStore.dispatch(c);
     set({ ...state, handed: [{ id, rider: o.rider_name ?? 'The rider', at: new Date().toISOString() }, ...state.handed] });
     return true;
   },
