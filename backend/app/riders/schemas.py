@@ -24,6 +24,7 @@ class RiderJobOut(BaseModel):
     customer_name: str | None = None
     customer_phone: str | None = None
     delivery_address: str | None = None
+    delivery_landmark: str | None = None
     dropoff_latitude: float | None = None
     dropoff_longitude: float | None = None
     delivered_at: datetime | None = None    # the rider's own drop-off confirmation

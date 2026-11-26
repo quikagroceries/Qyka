@@ -7,6 +7,7 @@ import { Text } from '@/components/Text';
 
 import PageHeader from '@/components/PageHeader';
 import SegmentedToggle from '@/components/SegmentedToggle';
+import AddressPicker, { EMPTY_ADDRESS, type AddressValue } from '@/components/AddressPicker';
 import OrderBackdrop from '@/components/customer/OrderBackdrop';
 import FlowSteps, { type FlowStepKey } from '@/components/customer/FlowSteps';
 import { Button, Card, Field, Float, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';
@@ -54,7 +55,9 @@ export default function NewOrder() {
   const [budget, setBudget] = useState('');
   const [market, setMarket] = useState<Market | null>(null);
   const [query, setQuery] = useState('');
-  const [address, setAddress] = useState(user?.default_delivery_address ?? '');
+  const savedAddress: AddressValue | null = user?.default_delivery_address ? { address: user.default_delivery_address, landmark: user.default_delivery_landmark ?? '', latitude: user.default_delivery_latitude ?? null, longitude: user.default_delivery_longitude ?? null } : null;
+  const [place_, setPlace] = useState<AddressValue>(savedAddress ?? EMPTY_ADDRESS);
+  const address = place_.address;
   const [placing, setPlacing] = useState(false);
   const [problem, setProblem] = useState('');
 
@@ -99,6 +102,8 @@ export default function NewOrder() {
       const placed = await api.createOrder({
         market_id: market.id,
         delivery_address: address.trim(),
+        ...(place_.landmark.trim() ? { delivery_landmark: place_.landmark.trim() } : {}),
+        ...(place_.latitude != null && place_.longitude != null ? { dropoff_latitude: place_.latitude, dropoff_longitude: place_.longitude } : {}),
         // The budget for items with no price of their own; priced items carry theirs.
         listed_items_total: budgetTotal.toFixed(2),
         items: filled.map((r) => ({
@@ -342,14 +347,7 @@ export default function NewOrder() {
 
         {step === 'address' ? (
           <>
-            {user?.default_delivery_address && address !== user.default_delivery_address ? (
-              <Pressable onPress={() => setAddress(user.default_delivery_address!)} className="rounded-2xl bg-sunken px-4 py-3">
-                <Text className="text-xs font-bold uppercase tracking-wide text-faint">Saved address</Text>
-                <Text className="font-semibold text-ink">{user.default_delivery_address}</Text>
-              </Pressable>
-            ) : null}
-            <Field placeholder="Street, area, landmark" value={address} onChangeText={setAddress} multiline className="min-h-[88px]" />
-            <Text className="text-xs text-faint">Include a landmark or gate colour. It helps the rider find you.</Text>
+            <AddressPicker value={place_} onChange={setPlace} saved={savedAddress} />
             {problem ? <Text className="text-sm font-semibold text-red-700">{problem}</Text> : null}
             <Button
               label="Continue"

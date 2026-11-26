@@ -64,6 +64,10 @@ class GoogleAuthOut(BaseModel):
 class UpdateProfileIn(BaseModel):
     full_name: str | None = Field(default=None, min_length=1, max_length=120, examples=["Ada Obi"])
     default_delivery_address: str | None = Field(default=None, examples=["12 Allen Avenue, Ikeja"])
+    # Sent together with the address when it was picked from the address search.
+    default_delivery_landmark: str | None = Field(default=None, max_length=300)
+    default_delivery_latitude: float | None = Field(default=None, ge=-90, le=90)
+    default_delivery_longitude: float | None = Field(default=None, ge=-180, le=180)
     # Sending null (or "") REMOVES the photo; omitting the field leaves it
     # alone - the route tells the two apart via model_fields_set. Only images
     # hosted on our Cloudinary account are accepted, so a profile can't point
@@ -120,6 +124,9 @@ class UserOut(BaseModel):
     full_name: str | None
     avatar_url: str | None = None
     default_delivery_address: str | None
+    default_delivery_landmark: str | None = None
+    default_delivery_latitude: float | None = None
+    default_delivery_longitude: float | None = None
     role: UserRole
     status: UserStatus
     is_phone_verified: bool

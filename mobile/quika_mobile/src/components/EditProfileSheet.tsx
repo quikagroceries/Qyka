@@ -1,3 +1,4 @@
+import AddressPicker, { type AddressValue } from '@/components/AddressPicker';
 import { useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
@@ -72,7 +73,7 @@ function Form({ onClose }: { onClose: () => void }) {
   const [avatar, setAvatar] = useState<string | null>(user?.avatar_url ?? null);
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [address, setAddress] = useState(user?.default_delivery_address ?? '');
+  const [place, setPlace] = useState<AddressValue>({ address: user?.default_delivery_address ?? '', landmark: user?.default_delivery_landmark ?? '', latitude: user?.default_delivery_latitude ?? null, longitude: user?.default_delivery_longitude ?? null });
   const [error, setError] = useState('');
   const agent = user?.role === 'agent';
 
@@ -89,7 +90,7 @@ function Form({ onClose }: { onClose: () => void }) {
     setSaving(true);
     try {
       // Name and address are saved to the server; email and photo stay on this phone for now.
-      await updateUser({ full_name: name.trim(), email: email.trim() || null, avatar_url: avatar, ...(customer ? { default_delivery_address: address.trim() || null } : {}) });
+      await updateUser({ full_name: name.trim(), email: email.trim() || null, avatar_url: avatar, ...(customer ? { default_delivery_address: place.address.trim() || null, default_delivery_landmark: place.landmark.trim() || null, default_delivery_latitude: place.latitude, default_delivery_longitude: place.longitude } : {}) });
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -146,7 +147,7 @@ function Form({ onClose }: { onClose: () => void }) {
       {customer ? (
         <View>
           <Label>Delivery address</Label>
-          <Field value={address} onChangeText={setAddress} placeholder="Street, area, landmark" multiline className="min-h-[88px]" textAlignVertical="top" />
+          <AddressPicker value={place} onChange={setPlace} />
         </View>
       ) : null}
 

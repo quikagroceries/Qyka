@@ -117,7 +117,7 @@ function Deliver({
 
   return (
     <>
-      <InfoCard art={customerArt} tint="bg-brand-orange/15" label="Deliver to" title={job.customer_name || 'Customer'} lines={[job.delivery_address || 'No address on this order']}>
+      <InfoCard art={customerArt} tint="bg-brand-orange/15" label="Deliver to" title={job.customer_name || 'Customer'} lines={[job.delivery_address || 'No address on this order', job.delivery_landmark ? `Note: ${job.delivery_landmark}` : null]}>
         <View className="flex-row gap-2">
           {job.customer_phone ? <Button label="Call" variant="outline" className="flex-1" onPress={() => void Linking.openURL(`tel:${job.customer_phone}`)} /> : null}
           <Button label="Directions" variant="outline" className="flex-1" onPress={() => void Linking.openURL(mapsUrl(job))} />

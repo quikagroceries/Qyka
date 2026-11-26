@@ -60,6 +60,9 @@ export type ServerUser = {
   full_name: string | null;
   avatar_url?: string | null;
   default_delivery_address: string | null;
+  default_delivery_landmark?: string | null;
+  default_delivery_latitude?: number | null;
+  default_delivery_longitude?: number | null;
   role: Role;
   status: string;
   must_prepay: boolean;
@@ -78,6 +81,9 @@ export const toUser = (u: ServerUser): User => ({
   role: u.role,
   status: u.status,
   default_delivery_address: u.default_delivery_address,
+  default_delivery_landmark: u.default_delivery_landmark ?? null,
+  default_delivery_latitude: u.default_delivery_latitude ?? null,
+  default_delivery_longitude: u.default_delivery_longitude ?? null,
   avatar_url: u.avatar_url ?? null,
   must_prepay: u.must_prepay,
   has_customer_side: u.has_customer_side,
@@ -92,6 +98,9 @@ export type ProposedAgent = { id: string; full_name: string | null; phone?: stri
 export type NewOrderBody = {
   market_id: string;
   delivery_address: string;
+  delivery_landmark?: string;
+  dropoff_latitude?: number;
+  dropoff_longitude?: number;
   listed_items_total: string;
   items: { description: string; listed_price?: string; quantity?: number; requested_note?: string }[];
 };
@@ -137,6 +146,8 @@ export type AgentSummary = {
 export type Vendor = { id: string; market_id: string; name: string; stall_description: string | null };
 /** One line of the wallet's history. */
 export type WalletEntry = { id: string; order_id: string | null; direction: 'credit' | 'debit' | string; amount: string; balance_after: string; note: string | null; created_at: string };
+export type PlaceSuggestion = { place_id: string; title: string; subtitle: string };
+export type PlaceDetails = { place_id: string; address: string; latitude: number; longitude: number };
 export type AppNotification = { id: string; order_id: string | null; kind: string; message: string; is_read: boolean; created_at: string };
 export type NotificationPrefs = { order_updates: boolean; agent_messages: boolean; payment_reminders: boolean; offers: boolean };
 export type Bank = { code: string; name: string };
@@ -163,7 +174,7 @@ export const api = {
   verifyOtp: (identifier: string, code: string, extra: { full_name?: string; role?: Role } = {}) =>
     request<{ access_token: string }>('/auth/verify-otp', { method: 'POST', body: { identifier, code, ...extra } }),
   me: () => request<ServerUser>('/auth/me'),
-  updateProfile: (body: { full_name?: string; default_delivery_address?: string | null }) => request<ServerUser>('/auth/me', { method: 'PATCH', body }),
+  updateProfile: (body: { full_name?: string; default_delivery_address?: string | null; default_delivery_landmark?: string | null; default_delivery_latitude?: number | null; default_delivery_longitude?: number | null }) => request<ServerUser>('/auth/me', { method: 'PATCH', body }),
   health: () => request<{ status: string }>('/health'),
 
   // --- Catalogue ---
@@ -219,6 +230,8 @@ export const api = {
   receiveHubOrder: (id: string, body: { received_item_ids: string[]; note?: string; photos?: string[] }) => request<HubOrder>(`/hubs/orders/${id}/receive`, { method: 'POST', body }),
   markHubOrderReady: (id: string) => request<HubOrder>(`/hubs/orders/${id}/ready`, { method: 'POST' }),
   handoverHubOrder: (id: string, code: string) => request<HubOrder>(`/hubs/orders/${id}/handover`, { method: 'POST', body: { code } }),
+  searchPlaces: (q: string, session: string) => request<PlaceSuggestion[]>(`/locations/search?q=${encodeURIComponent(q)}&session=${session}`),
+  getPlace: (placeId: string, session: string) => request<PlaceDetails>(`/locations/place?place_id=${encodeURIComponent(placeId)}&session=${session}`),
   notifications: () => request<AppNotification[]>('/notifications'),
   markNotificationRead: (id: string) => request<AppNotification>(`/notifications/${id}/read`, { method: 'POST' }),
   markAllNotificationsRead: () => request<unknown>('/notifications/read-all', { method: 'POST' }),

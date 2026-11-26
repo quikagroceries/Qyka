@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, Integer, String, Text, false, func, true
+from sqlalchemy import Boolean, DateTime, Enum, Float, Integer, String, Text, false, func, true
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -39,6 +39,9 @@ class User(Base):
     # Saved address, offered as a default when a new order asks for one.
     # Purely a convenience prefill — never used by any money/eligibility logic.
     default_delivery_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    default_delivery_landmark: Mapped[str | None] = mapped_column(Text, nullable=True)
+    default_delivery_latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    default_delivery_longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole), default=UserRole.CUSTOMER
     )

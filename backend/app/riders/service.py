@@ -60,6 +60,7 @@ async def _job(db: AsyncSession, order: Order, *, mine: bool) -> dict:
             customer_name=customer.full_name if customer else None,
             customer_phone=customer.phone if customer else None,
             delivery_address=order.delivery_address,
+            delivery_landmark=order.delivery_landmark,
             dropoff_latitude=order.dropoff_latitude,
             dropoff_longitude=order.dropoff_longitude,
             delivered_at=order.rider_delivered_at,

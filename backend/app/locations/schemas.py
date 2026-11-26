@@ -12,3 +12,16 @@ class PopularLocationOut(BaseModel):
     count: int
     latitude: float | None = None
     longitude: float | None = None
+
+
+class SuggestionOut(BaseModel):
+    place_id: str
+    title: str
+    subtitle: str
+
+
+class PlaceOut(BaseModel):
+    place_id: str
+    address: str
+    latitude: float
+    longitude: float

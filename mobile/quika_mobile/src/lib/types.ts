@@ -8,6 +8,9 @@ export type User = {
   role: Role;
   status: string;
   default_delivery_address?: string | null;
+  default_delivery_landmark?: string | null;
+  default_delivery_latitude?: number | null;
+  default_delivery_longitude?: number | null;
   avatar_url?: string | null;
   must_prepay?: boolean;
   /** False for agent-only accounts: there is no customer view to switch to. */
@@ -28,6 +31,7 @@ export type RiderJob = {
   customer_name: string | null;
   customer_phone: string | null;
   delivery_address: string | null;
+  delivery_landmark?: string | null;
   dropoff_latitude: number | null;
   dropoff_longitude: number | null;
   delivered_at: string | null;

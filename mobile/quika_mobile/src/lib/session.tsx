@@ -37,7 +37,7 @@ type Session = {
   /** Records a finished agent registration: it is now waiting for review. (Not sent to the server yet.) */
   submitAgentApplication: (market: string) => void;
   /** Saves edits. Name and address go to the server; email and photo are kept on this phone for now. */
-  updateUser: (patch: Partial<Pick<User, 'full_name' | 'email' | 'default_delivery_address' | 'avatar_url'>>) => Promise<void>;
+  updateUser: (patch: Partial<Pick<User, 'full_name' | 'email' | 'default_delivery_address' | 'default_delivery_landmark' | 'default_delivery_latitude' | 'default_delivery_longitude' | 'avatar_url'>>) => Promise<void>;
 };
 
 const Ctx = createContext<Session | null>(null);
@@ -143,14 +143,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setAgentMarket(market);
   }, []);
 
-  const updateUser = useCallback(async (patch: Partial<Pick<User, 'full_name' | 'email' | 'default_delivery_address' | 'avatar_url'>>) => {
-    const server: { full_name?: string; default_delivery_address?: string | null } = {};
+  const updateUser = useCallback(async (patch: Partial<Pick<User, 'full_name' | 'email' | 'default_delivery_address' | 'default_delivery_landmark' | 'default_delivery_latitude' | 'default_delivery_longitude' | 'avatar_url'>>) => {
+    const server: Parameters<typeof api.updateProfile>[0] = {};
     if (patch.full_name) server.full_name = patch.full_name;
-    if ('default_delivery_address' in patch) server.default_delivery_address = patch.default_delivery_address ?? null;
+    if ('default_delivery_address' in patch) {
+      server.default_delivery_address = patch.default_delivery_address ?? null;
+      server.default_delivery_landmark = patch.default_delivery_landmark ?? null;
+      server.default_delivery_latitude = patch.default_delivery_latitude ?? null;
+      server.default_delivery_longitude = patch.default_delivery_longitude ?? null;
+    }
     let saved: Partial<User> = {};
     if (Object.keys(server).length > 0) {
       const u = toUser(await api.updateProfile(server));
-      saved = { full_name: u.full_name, default_delivery_address: u.default_delivery_address };
+      saved = { full_name: u.full_name, default_delivery_address: u.default_delivery_address, default_delivery_landmark: u.default_delivery_landmark, default_delivery_latitude: u.default_delivery_latitude, default_delivery_longitude: u.default_delivery_longitude };
     }
     // The server has no endpoint for email or photo yet (email needs its own verification), so those stay on this phone.
     setUser((cur) => (cur ? { ...cur, ...saved, ...('email' in patch ? { email: patch.email } : {}), ...('avatar_url' in patch ? { avatar_url: patch.avatar_url } : {}) } : cur));

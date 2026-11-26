@@ -39,6 +39,7 @@ async def create_order(
         market_id=body.market_id,
         items=[i.model_dump() for i in body.items],
         delivery_address=body.delivery_address,
+        delivery_landmark=body.delivery_landmark,
         listed_items_total=body.listed_items_total,
         dropoff_latitude=body.dropoff_latitude,
         dropoff_longitude=body.dropoff_longitude,

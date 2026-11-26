@@ -46,6 +46,7 @@ class AddItemIn(BaseModel):
 
 class CreateOrderIn(BaseModel):
     delivery_address: str | None = None
+    delivery_landmark: str | None = Field(default=None, max_length=300)
     # Where the customer dropped the delivery pin (optional - an address
     # alone still works). Used for courier quotes.
     dropoff_latitude: float | None = Field(default=None, ge=-90, le=90)
@@ -130,6 +131,7 @@ class OrderOut(BaseModel):
     courier_reference: str | None
     handover_code: str | None
     packing_photos: list[str] | None
+    delivery_landmark: str | None = None
     dropoff_latitude: float | None
     dropoff_longitude: float | None
     created_at: datetime

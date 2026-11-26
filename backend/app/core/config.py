@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # before it's locked (invalidated) and a fresh one must be requested.
     otp_max_verify_attempts: int = 5
 
+    # Google Maps Platform (Places API New) - delivery address search. Server-side only.
+    google_maps_api_key: str = ""
+
     # Paystack
     paystack_secret_key: str = ""
     paystack_public_key: str = ""

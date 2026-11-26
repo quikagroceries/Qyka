@@ -156,6 +156,8 @@ class Order(Base):
     # Where the courier delivers to. Captured now; used for courier quotes
     # once Kwik/Sendbox are integrated.
     delivery_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # "Green gate, next to the pharmacy": what the rider needs when the pin is not enough.
+    delivery_landmark: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Packing photos (proof the full order was assembled and handed to courier).
     # A JSON array of storage refs — never the bytes. Uploads must NEVER block
     # the money or the handover; they attach best-effort.

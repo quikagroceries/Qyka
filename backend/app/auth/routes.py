@@ -149,7 +149,7 @@ async def update_me(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> User:
-    return await service.update_profile(
+    user = await service.update_profile(
         db,
         current_user,
         full_name=body.full_name,
@@ -157,6 +157,13 @@ async def update_me(
         avatar_url=body.avatar_url,
         clear_avatar="avatar_url" in body.model_fields_set and body.avatar_url is None,
     )
+    if body.default_delivery_address is not None:
+        # A new address replaces its pin and landmark too (a typed address has none).
+        user.default_delivery_landmark = (body.default_delivery_landmark or "").strip() or None
+        user.default_delivery_latitude = body.default_delivery_latitude
+        user.default_delivery_longitude = body.default_delivery_longitude
+        await db.flush()
+    return user
 
 
 @router.get("/me/notification-preferences", response_model=NotificationPreferences)
