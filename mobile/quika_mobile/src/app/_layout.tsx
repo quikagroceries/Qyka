@@ -26,9 +26,9 @@ function Navigator({ fontsReady }: { fontsReady: boolean }) {
   // Signed-out people land on the role picker (welcome), never straight on a login form.
   return (
     <View style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
+      <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom', contentStyle: { backgroundColor: '#F0ECE0' } }}>
           <Stack.Protected guard={!!user}>
-            <Stack.Screen name="(app)" />
+            <Stack.Screen name="(app)" options={{ animation: 'fade' }} />
           </Stack.Protected>
           <Stack.Protected guard={!user}>
             <Stack.Screen name="intro" />

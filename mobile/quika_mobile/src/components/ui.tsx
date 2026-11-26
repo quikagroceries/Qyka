@@ -19,7 +19,7 @@ const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boo
 
 const VARIANTS = {
   primary: { box: 'bg-brand-orange active:bg-brand-orange-dark', text: 'text-[#1A1A1A]' },
-  secondary: { box: 'border-2 border-brand-green bg-surface active:bg-brand-green/10', text: 'text-brand-green' },
+  secondary: { box: 'border-2 border-brand-army bg-surface active:bg-brand-green/10', text: 'text-brand-army' },
   neutral: { box: 'bg-sunken active:bg-line-strong', text: 'text-ink' },
   outline: { box: 'border border-line-strong bg-surface active:bg-sunken', text: 'text-ink' },
 } as const;
@@ -68,7 +68,7 @@ export function StatTile({ label, value, tone }: { label: string; value: string;
   return (
     <View className="flex-1 rounded-2xl bg-sunken-2/70 p-3">
       <Text className="text-[10px] font-bold uppercase tracking-wide text-faint">{label}</Text>
-      <Text className={cx('mt-1 text-xl font-extrabold', tone === 'green' ? 'text-brand-green' : 'text-ink')}>{value}</Text>
+      <Text className={cx('mt-1 text-xl font-extrabold', tone === 'green' ? 'text-brand-army' : 'text-ink')}>{value}</Text>
     </View>
   );
 }
@@ -176,8 +176,8 @@ export function StatusBadge({ status }: { status: string }) {
   const problem = PROBLEM.has(status);
   const success = SUCCESS.has(status);
   const box = problem ? 'bg-red-50' : success ? 'bg-brand-green/10' : 'bg-brand-orange/15';
-  const text = problem ? 'text-red-700' : success ? 'text-brand-green' : 'text-brand-orange-dark';
-  const dot = problem ? 'bg-red-600' : success ? 'bg-brand-green' : 'bg-brand-orange';
+  const text = problem ? 'text-red-700' : success ? 'text-brand-army' : 'text-brand-orange-dark';
+  const dot = problem ? 'bg-red-600' : success ? 'bg-brand-army' : 'bg-brand-orange';
   return (
     <View className={cx('flex-row items-center gap-1.5 self-start rounded-full px-2.5 py-1', box)}>
       <View className={cx('h-1.5 w-1.5 rounded-full', dot)} />

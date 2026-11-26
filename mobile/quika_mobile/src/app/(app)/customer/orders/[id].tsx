@@ -3,12 +3,38 @@ import { useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/Text';
 
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+
+import AgentProfileSheet from '@/components/customer/AgentProfileSheet';
+import OrderIdChip from '@/components/OrderIdChip';
+import OrderBackdrop from '@/components/customer/OrderBackdrop';
+import { PROBLEM, Progress } from '@/components/customer/orderLook';
 import PaymentChooser from '@/components/customer/PaymentChooser';
-import { Avatar, Button, Card, Field, Hero, ItemArt, SafeAreaView, SectionHeader, StatusBadge } from '@/components/ui';
+import { Avatar, Button, Card, Field, Float, ItemArt, SafeAreaView, SectionHeader, StatusBadge } from '@/components/ui';
 import { naira, shortId } from '@/lib/format';
 import { PEOPLE, PURCHASES, WALLET_BALANCE, marketName, orderById } from '@/lib/mock';
 import { CHAT, EXCEPTION, ON_THE_MOVE, PAID_OR_LATER, RATEABLE, UNPRICED, summarize } from '@/lib/orderStatus';
 import type { AgentOrder, OrderItem, Purchase } from '@/lib/types';
+
+// Short two-tone headline per stage; the longer sentence from summarize() sits under it.
+const HEADLINE: Record<string, [string, string]> = {
+  draft: ['Your list is', 'not sent yet'],
+  proposed: ['Finding you', 'an agent'],
+  agent_assigned: ['Agent', 'assigned'],
+  shopping: ['Shopping', 'in progress'],
+  awaiting_payment: ['Time to', 'pay up'],
+  paid: ['Paid, and', 'on the way to the hub'],
+  dropped_at_hub: ['At the', 'market hub'],
+  received_by_hub: ['Checked in at', 'the hub'],
+  ready_for_pickup: ['Ready for', 'a rider'],
+  packed: ['Ready for', 'a rider'],
+  out_for_delivery: ['On its way', 'to you'],
+  delivered: ['Delivered', 'with care'],
+  closed: ['Delivered', 'with care'],
+  cancelled: ['Order', 'cancelled'],
+  cancelled_unpaid: ['Order', 'cancelled'],
+  disputed: ['Order', 'under review'],
+};
 
 const art = {
   shopping: require('../../../../../assets/illustrations/agent-customer-conversation.webp'),
@@ -65,10 +91,10 @@ function Timeline({ order, onPreview }: { order: AgentOrder; onPreview: (u: stri
         return (
           <View key={r.key} className="flex-row gap-3">
             <View className="items-center">
-              <View className={'h-8 w-8 items-center justify-center rounded-full ' + (done ? 'bg-brand-green' : isCurrent ? 'bg-brand-orange' : 'bg-sunken')}>
+              <View className={'h-8 w-8 items-center justify-center rounded-full ' + (done ? 'bg-brand-army' : isCurrent ? 'bg-brand-orange' : 'bg-sunken')}>
                 {done ? <Text className="font-extrabold text-white">✓</Text> : <View className="h-2 w-2 rounded-full bg-faint" />}
               </View>
-              {!last ? <View className={'my-1 w-0.5 flex-1 ' + (done ? 'bg-brand-green' : 'bg-line-strong')} /> : null}
+              {!last ? <View className={'my-1 w-0.5 flex-1 ' + (done ? 'bg-brand-army/40' : 'bg-line-strong')} /> : null}
             </View>
             <View className={'flex-1 ' + (last ? '' : 'pb-5')}>
               <View className="flex-row flex-wrap items-center justify-between gap-x-2">
@@ -106,7 +132,7 @@ function ItemLine({ item, purchase, onDecide, onPreview }: { item: OrderItem; pu
     <View className="gap-2 border-t border-dashed border-line-strong py-3">
       <View className="flex-row items-center gap-3">
         <View className={'h-7 w-7 items-center justify-center rounded-full ' + (bought ? 'bg-brand-green/10' : 'bg-sunken')}>
-          {bought ? <Text className="font-extrabold text-brand-green">✓</Text> : null}
+          {bought ? <Text className="font-extrabold text-brand-army">✓</Text> : null}
         </View>
         <ItemArt name={item.description} />
         <View className="flex-1">
@@ -115,7 +141,7 @@ function ItemLine({ item, purchase, onDecide, onPreview }: { item: OrderItem; pu
             {item.description}
           </Text>
           {bought ? (
-            <Text className="text-sm text-brand-green">
+            <Text className="text-sm text-brand-army">
               Bought for {naira(item.confirmed_price!)}
               {item.listed_price != null && Number(item.confirmed_price) < Number(item.listed_price) ? ` (saved ${naira(Number(item.listed_price) - Number(item.confirmed_price))})` : ''}
             </Text>
@@ -158,6 +184,7 @@ export default function CustomerOrderScreen() {
   const [raise, setRaise] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [agentOpen, setAgentOpen] = useState(false);
 
   const order: AgentOrder = { ...initial, status, items, deposit_paid_at: depositPaid ? initial.deposit_paid_at ?? new Date().toISOString() : null };
   const market = { name: marketName(order.market_id) };
@@ -184,26 +211,64 @@ export default function CustomerOrderScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
-      <ScrollView contentContainerClassName="gap-4 p-4 pb-10" keyboardShouldPersistTaps="handled">
-        <Pressable onPress={() => router.replace('/customer')} className="self-start py-1">
-          <Text className="text-sm font-semibold text-muted">← Back</Text>
-        </Pressable>
+      <OrderBackdrop />
+      <ScrollView contentContainerClassName="gap-5 px-5 pb-10 pt-3" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <Animated.View entering={FadeInUp.duration(450)} className="flex-row items-center justify-between">
+          <Pressable
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/customer'))}
+            hitSlop={10}
+            accessibilityLabel="Back"
+            className="h-11 w-11 items-center justify-center rounded-full bg-surface shadow-sm active:bg-sunken">
+            <Text className="text-2xl text-ink">‹</Text>
+          </Pressable>
+          <OrderIdChip id={order.id} />
+          <View className="h-11 w-11" />
+        </Animated.View>
 
-        <Hero eyebrow={`${market.name || 'Order'} · #${shortId(order.id)}`} title={summarize(order, market.name)} image={image}>
-          <View className="gap-3">
-            <StatusBadge status={order.status} />
+        <View className="items-center gap-2">
+          <Animated.View entering={FadeInDown.duration(500)}>
+            <Float>
+              <Image source={image} resizeMode="contain" style={{ width: 190, height: 140 }} />
+            </Float>
+          </Animated.View>
+          <Animated.View entering={FadeInDown.delay(100).duration(500)} className="w-full items-center gap-3">
+            <Text className="text-center text-[30px] font-extrabold leading-[36px] tracking-tight text-ink">
+              {(HEADLINE[order.status] ?? ['Your', 'order'])[0]}
+              {'\n'}
+              <Text className="text-[30px] font-extrabold leading-[36px] tracking-tight text-brand-orange-dark">{(HEADLINE[order.status] ?? ['Your', 'order'])[1]}</Text>
+            </Text>
+            <Text className="max-w-[300px] text-center text-base leading-6 text-muted">{summarize(order, market.name)}</Text>
+            <View className="flex-row flex-wrap items-center justify-center gap-2">
+              <StatusBadge status={order.status} />
+              <View className="rounded-full border border-line-strong bg-surface px-3 py-1">
+                <Text className="text-xs font-bold text-ink">
+                  {market.name || 'Market'} · {items.length} item{items.length === 1 ? '' : 's'}
+                </Text>
+              </View>
+            </View>
+            {!PROBLEM.has(order.status) ? (
+              <View style={{ alignSelf: 'stretch' }}>
+                <Progress status={order.status} labels />
+              </View>
+            ) : null}
             {agent && !exception ? (
-              <View className="flex-row items-center gap-2.5 self-start rounded-full border border-line-strong bg-surface py-1 pl-1 pr-4">
+              <Pressable
+                onPress={() => setAgentOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel="View agent profile"
+                className="flex-row items-center gap-2.5 rounded-full border border-line-strong bg-surface py-1 pl-1 pr-3 active:bg-sunken"
+                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}>
                 <Avatar uri={agent.avatar_url} name={agent.full_name} className="h-9 w-9" />
                 <View>
                   <Text className="text-[10px] font-bold uppercase tracking-wide text-faint">Your agent</Text>
                   <Text className="text-sm font-bold text-ink">{agent.full_name || 'Your agent'}</Text>
                 </View>
-              </View>
+                <Text className="text-lg text-brand-orange-dark">›</Text>
+              </Pressable>
             ) : null}
-            {canChat ? <Button label="Chat with agent" onPress={() => router.push(`/customer/chat/${id}`)} /> : null}
-          </View>
-        </Hero>
+            {canChat ? <Button label="Chat with agent" className="self-stretch" onPress={() => router.push(`/customer/chat/${id}`)} /> : null}
+          </Animated.View>
+        </View>
 
         {exception ? (
           <View className="gap-1 rounded-3xl bg-red-50 p-5">
@@ -245,6 +310,7 @@ export default function CustomerOrderScreen() {
                   {order.status === 'proposed' ? 'before you can see and accept your shopping agent.' : 'before shopping can start.'}
                 </Text>
                 <PaymentChooser
+                  reference={`QYKA-${shortId(order.id)}`}
                   amountDue={Number(order.deposit_amount)}
                   walletBalance={wallet}
                   onPayWallet={() => setDepositPaid(true)}
@@ -257,13 +323,13 @@ export default function CustomerOrderScreen() {
               <Card accent>
                 <Text className="text-lg font-bold text-ink">Your shopping agent</Text>
                 {proposed ? (
-                  <View className="flex-row items-center gap-3">
+                  <Pressable onPress={() => setAgentOpen(true)} className="flex-row items-center gap-3 active:opacity-70">
                     <Avatar uri={proposed.avatar_url} name={proposed.full_name} className="h-14 w-14" />
                     <View>
                       <Text className="font-semibold text-ink">{proposed.full_name || 'Unnamed agent'}</Text>
                       <Text className="text-sm text-faint">{proposed.phone}</Text>
                     </View>
-                  </View>
+                  </Pressable>
                 ) : (
                   <Text className="text-sm text-faint">Looking for an available agent…</Text>
                 )}
@@ -312,7 +378,7 @@ export default function CustomerOrderScreen() {
             {order.status === 'awaiting_payment' ? (
               <Card>
                 <SectionHeader title="Pay balance" />
-                <PaymentChooser amountDue={amountDue} walletBalance={wallet} onPayWallet={() => setStatus('paid')} onPayTransfer={() => setStatus('paid')} />
+                <PaymentChooser reference={`QYKA-${shortId(order.id)}`} amountDue={amountDue} walletBalance={wallet} onPayWallet={() => setStatus('paid')} onPayTransfer={() => setStatus('paid')} />
               </Card>
             ) : null}
 
@@ -351,7 +417,7 @@ export default function CustomerOrderScreen() {
                   </View>
                 ) : null}
                 {order.status === 'delivered' || order.status === 'closed' ? (
-                  <Text className="mt-4 rounded-lg bg-brand-green/10 px-3 py-2 text-center text-sm font-semibold text-brand-green">Delivered. Thanks for shopping with Qyka!</Text>
+                  <Text className="mt-4 rounded-lg bg-brand-green/10 px-3 py-2 text-center text-sm font-semibold text-brand-army">Delivered. Thanks for shopping with Qyka!</Text>
                 ) : null}
               </Card>
             ) : null}
@@ -394,6 +460,8 @@ export default function CustomerOrderScreen() {
           </>
         )}
       </ScrollView>
+
+      <AgentProfileSheet person={agent ?? proposed} visible={agentOpen} onClose={() => setAgentOpen(false)} onChat={canChat ? () => router.push(`/customer/chat/${id}`) : undefined} />
 
       <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
         <Pressable onPress={() => setPreview(null)} className="flex-1 items-center justify-center bg-black/90 p-4">

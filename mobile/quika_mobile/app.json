@@ -30,7 +30,20 @@
           "imageWidth": 180
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Qyka uses your photos so you can send a picture in a chat.",
+          "cameraPermission": "Qyka uses your camera so you can take a picture to send in a chat."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Qyka records where a photo of the goods was taken, to prove it was taken at the market or hub."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

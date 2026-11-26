@@ -1,17 +1,39 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Image, Pressable, ScrollView, View, type ImageSourcePropType } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Text } from '@/components/Text';
 
+import PageHeader from '@/components/PageHeader';
+import SegmentedToggle from '@/components/SegmentedToggle';
+import OrderBackdrop from '@/components/customer/OrderBackdrop';
 import FlowSteps, { type FlowStepKey } from '@/components/customer/FlowSteps';
-import { Button, Card, Field, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';
+import { Button, Card, Field, Float, ItemArt, SafeAreaView, SectionHeader } from '@/components/ui';
 import { naira } from '@/lib/format';
-import { MARKETS, ORDERS, PRICING } from '@/lib/mock';
+import { parseListLine } from '@/lib/parseListLine';
+import { MARKETS, PRICING, placeOrder } from '@/lib/mock';
 import { useSession } from '@/lib/session';
 import type { Market } from '@/lib/types';
 
 type Row = { item: string; price: string; qty: string; note: string };
 const blank = (): Row => ({ item: '', price: '', qty: '', note: '' });
+
+const PENCIL = ['M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z', 'm15 5 4 4'];
+const LIST = ['M8 6h13', 'M8 12h13', 'M8 18h13', 'M3 6h.01', 'M3 12h.01', 'M3 18h.01'];
+
+// Each step opens with an illustration and a two-tone headline, like the intro and welcome pages.
+const COPY: Record<FlowStepKey, { art: ImageSourcePropType; top: string; accent: string }> = {
+  list: { art: require('../../../../../assets/illustrations/person-shopping-list.webp'), top: 'What do you need', accent: 'from the market?' },
+  market: { art: require('../../../../../assets/illustrations/market-stall-produce.webp'), top: 'Pick your', accent: 'market' },
+  address: { art: require('../../../../../assets/illustrations/delivery-map-route.webp'), top: 'Where should we', accent: 'deliver?' },
+  quote: { art: require('../../../../../assets/illustrations/grocery-basket.webp'), top: "Here's your", accent: 'estimate' },
+};
+const MARKET_TILES: { art: ImageSourcePropType; tint: string }[] = [
+  { art: require('../../../../../assets/illustrations/market-stall-produce.webp'), tint: 'bg-brand-orange/15' },
+  { art: require('../../../../../assets/illustrations/market-cart-vendor.webp'), tint: 'bg-brand-green/15' },
+  { art: require('../../../../../assets/illustrations/vendor-stall-pantry-jars.webp'), tint: 'bg-gold/40' },
+];
 
 // The same four steps as the web: your list, the market, where to deliver,
 // then the estimate. State lives here so going back never loses anything.
@@ -21,13 +43,29 @@ export default function NewOrder() {
   const pricing = PRICING;
 
   const [step, setStep] = useState<FlowStepKey>('list');
+  const [mode, setMode] = useState<'freetext' | 'detailed'>('freetext');
+  const [text, setText] = useState('');
   const [rows, setRows] = useState<Row[]>([blank()]);
   const [budget, setBudget] = useState('');
   const [market, setMarket] = useState<Market | null>(null);
   const [query, setQuery] = useState('');
   const [address, setAddress] = useState(user?.default_delivery_address ?? '');
 
-  const filled = rows.filter((r) => r.item.trim());
+  // Free-text: one item per line, read the way the web does ("3 packs of milk 2000").
+  const parsedLines = useMemo(
+    () =>
+      text
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map(parseListLine),
+    [text],
+  );
+  const entries: Row[] =
+    mode === 'freetext'
+      ? parsedLines.map((p) => ({ item: p.description, price: p.price != null ? String(p.price) : '', qty: p.quantity != null ? String(p.quantity) : '', note: '' }))
+      : rows;
+  const filled = entries.filter((r) => r.item.trim());
   const priced = filled.filter((r) => Number(r.price) > 0);
   const unpriced = filled.filter((r) => !(Number(r.price) > 0));
   const budgetTotal = unpriced.length > 0 ? Number(budget) || 0 : 0;
@@ -43,16 +81,79 @@ export default function NewOrder() {
 
   const setRow = (i: number, patch: Partial<Row>) => setRows((cur) => cur.map((r, k) => (k === i ? { ...r, ...patch } : r)));
 
-  // UI only: nothing is sent anywhere, so placing an order just opens a sample one.
-  const place = () => router.replace(`/customer/orders/${ORDERS[2].id}`);
+  // UI only: nothing is sent anywhere. The order is kept in memory so Track and the order page can show it.
+  const place = () => {
+    if (!market) return setStep('market');
+    const placed = placeOrder({
+      marketId: market.id,
+      address,
+      goodsEstimate: goodsTotal,
+      depositAmount: deposit,
+      items: filled.map((r) => ({ description: r.item.trim(), quantity: Number(r.qty) >= 1 ? Number(r.qty) : undefined, price: Number(r.price) > 0 ? Number(r.price) : undefined })),
+    });
+    // Start the next order from a clean slate, then open this one.
+    setStep('list');
+    setText('');
+    setRows([blank()]);
+    setBudget('');
+    router.push(`/customer/orders/${placed.id}`);
+  };
 
-  const Header = (
-    <View className="gap-4 rounded-3xl border border-line bg-surface p-5 shadow-sm">
+  const SUB: Record<FlowStepKey, string> = {
+    list: "Write it the way you'd tell someone: the item, and roughly what you expect to pay.",
+    market: 'Where should your agent shop your list?',
+    address: `We'll deliver your haul from ${market?.name || 'the market'} to your door.`,
+    quote: `Not a fixed catalogue total: your agent bargains real prices at ${market?.name || 'the market'}.`,
+  };
+  const copy = COPY[step];
+  const back = () => setStep(step === 'quote' ? 'address' : step === 'address' ? 'market' : 'list');
+
+  const Top = (
+    <Animated.View entering={FadeInUp.duration(450)} className="flex-row items-center justify-between">
+      {step !== 'list' ? (
+        <Pressable onPress={back} hitSlop={10} accessibilityLabel="Back" className="h-11 w-11 items-center justify-center rounded-full bg-surface shadow-sm active:bg-sunken">
+          <Text className="text-2xl text-ink">‹</Text>
+        </Pressable>
+      ) : (
+        <View className="h-11 w-11" />
+      )}
       <FlowSteps current={step} onStepClick={setStep} />
+      <View className="h-11 w-11" />
+    </Animated.View>
+  );
+
+  const Hero = (
+    <View key={step} className="items-center gap-2">
+      <Animated.View entering={FadeInDown.duration(500)}>
+        <Float>
+          <Image source={copy.art} resizeMode="contain" style={{ width: 190, height: 140 }} />
+        </Float>
+      </Animated.View>
+      <Animated.View entering={FadeInDown.delay(100).duration(500)} className="items-center gap-2">
+        <Text className="text-center text-[30px] font-extrabold leading-[36px] tracking-tight text-ink">
+          {copy.top}
+          {'\n'}
+          <Text className="text-[30px] font-extrabold leading-[36px] tracking-tight text-brand-orange-dark">{copy.accent}</Text>
+        </Text>
+        <Text className="max-w-[300px] text-center text-base leading-6 text-muted">{SUB[step]}</Text>
+        {market && step !== 'market' ? (
+          <Pressable onPress={() => setStep('market')} className="mt-1 rounded-full border border-line-strong bg-surface px-3.5 py-1.5">
+            <Text className="text-xs font-bold text-ink">
+              Shopping at {market.name} <Text className="font-semibold text-brand-orange-dark">· change</Text>
+            </Text>
+          </Pressable>
+        ) : null}
+      </Animated.View>
+    </View>
+  );
+
+  const CompactHero = (
+    <View key={step} className="gap-3">
+      <PageHeader top={copy.top} accent={copy.accent} subtitle={SUB[step]} art={copy.art} />
       {market && step !== 'market' ? (
-        <Pressable onPress={() => setStep('market')} className="self-start rounded-full border border-line-strong bg-surface px-3 py-1.5">
+        <Pressable onPress={() => setStep('market')} className="self-start rounded-full border border-line-strong bg-surface px-3.5 py-1.5">
           <Text className="text-xs font-bold text-ink">
-            Shopping at {market.name} <Text className="font-semibold text-faint">· change</Text>
+            Shopping at {market.name} <Text className="font-semibold text-brand-orange-dark">· change</Text>
           </Text>
         </Pressable>
       ) : null}
@@ -60,17 +161,59 @@ export default function NewOrder() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
-      <ScrollView contentContainerClassName="gap-4 p-4 pb-10" keyboardShouldPersistTaps="handled">
-        {Header}
+    <SafeAreaView className="flex-1 bg-canvas" edges={[]}>
+      <OrderBackdrop />
+      <ScrollView contentContainerClassName="gap-5 px-5 pb-32 pt-3" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {Top}
+        {step === 'list' ? Hero : CompactHero}
 
         {step === 'list' ? (
           <>
-            <View className="gap-1">
-              <Text className="text-2xl font-extrabold tracking-tight text-ink">What do you need from the market?</Text>
-              <Text className="text-sm text-muted">Write it the way you&apos;d tell someone: the item, and roughly what you expect to pay.</Text>
-            </View>
-            {rows.map((r, i) => (
+            <SegmentedToggle
+              value={mode}
+              onChange={setMode}
+              segments={[
+                { id: 'freetext', label: 'Free-text', icon: PENCIL, count: parsedLines.length },
+                { id: 'detailed', label: 'Detailed', icon: LIST, count: rows.filter((r) => r.item.trim()).length },
+              ]}
+            />
+
+            {mode === 'freetext' ? (
+              <>
+                <Card>
+                  <Text className="text-sm text-muted">
+                    Type or paste one item per line, like <Text className="font-semibold text-ink">&quot;3 packs of milk 2000&quot;</Text>. We pick up the price and quantity for you.
+                  </Text>
+                  <Field
+                    multiline
+                    value={text}
+                    onChangeText={setText}
+                    placeholder={'3 packs of milk 2000\nPepper 1500\nOnions\nTomatoes ₦800'}
+                    textAlignVertical="top"
+                    autoCapitalize="sentences"
+                    className="min-h-[180px]"
+                  />
+                </Card>
+                {parsedLines.length > 0 ? (
+                  <Card>
+                    <Text className="text-xs font-bold uppercase tracking-wide text-faint">We read it as</Text>
+                    {parsedLines.map((p, i) => (
+                      <View key={i} className="flex-row items-center gap-3 py-1">
+                        <ItemArt name={p.description} />
+                        <Text className="flex-1 text-sm font-semibold text-ink" numberOfLines={1}>
+                          {p.description}
+                          {p.quantity != null ? <Text className="text-xs text-faint"> ×{p.quantity}</Text> : null}
+                        </Text>
+                        <Text className={p.price != null ? 'text-sm font-bold text-brand-army' : 'text-xs font-semibold text-faint'}>{p.price != null ? naira(p.price) : 'no price'}</Text>
+                      </View>
+                    ))}
+                  </Card>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {rows.map((r, i) => (
+
               <Card key={i}>
                 <View className="flex-row items-center gap-2">
                   <Field className="flex-1" placeholder="e.g. 500 naira pepper" value={r.item} onChangeText={(t) => setRow(i, { item: t })} />
@@ -87,7 +230,20 @@ export default function NewOrder() {
                 <Field placeholder="Note: stall, ripeness, brand (optional)" value={r.note} onChangeText={(t) => setRow(i, { note: t })} />
               </Card>
             ))}
-            <Button label="+ Add another item" variant="neutral" onPress={() => setRows((cur) => [...cur, blank()])} />
+            <Button
+                  label="Add another item"
+                  variant="outline"
+                  onPress={() => setRows((cur) => [...cur, blank()])}
+                  icon={
+                    <View className="h-7 w-7 items-center justify-center rounded-full bg-brand-orange">
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth={2.75} strokeLinecap="round">
+                        <Path d="M12 5v14M5 12h14" />
+                      </Svg>
+                    </View>
+                  }
+                />
+              </>
+            )}
 
             {unpriced.length > 0 ? (
               <Card>
@@ -108,32 +264,31 @@ export default function NewOrder() {
 
         {step === 'market' ? (
           <>
-            <View className="gap-1">
-              <Text className="text-2xl font-extrabold tracking-tight text-ink">Which market?</Text>
-              <Text className="text-sm text-muted">Where should your agent shop your list?</Text>
-            </View>
             <Field placeholder="Search markets" value={query} onChangeText={setQuery} autoCapitalize="none" />
             {shownMarkets.length === 0 ? <Text className="text-muted">No markets match your search.</Text> : null}
-            {shownMarkets.map((m) => {
+            {shownMarkets.map((m, i) => {
               const selected = market?.id === m.id;
+              const tile = MARKET_TILES[i % MARKET_TILES.length];
               return (
-                <Pressable
-                  key={m.id}
-                  onPress={() => {
-                    setMarket(m);
-                    setStep('address');
-                  }}
-                  className="active:opacity-80">
-                  <Card accent={selected}>
-                    <View className="flex-row items-start justify-between gap-2">
-                      <View className="flex-1">
-                        <Text className="text-lg font-extrabold text-ink">{m.name}</Text>
-                        <Text className="text-sm text-muted">{[m.city, m.state].filter(Boolean).join(', ')}</Text>
-                      </View>
+                <Animated.View key={m.id} entering={FadeInDown.delay(i * 90).duration(450)}>
+                  <Pressable
+                    onPress={() => {
+                      setMarket(m);
+                      setStep('address');
+                    }}
+                    className={'flex-row items-center gap-4 overflow-hidden rounded-3xl bg-surface p-4 shadow-sm active:bg-surface-2 ' + (selected ? 'border-2 border-brand-orange' : 'border border-line')}
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}>
+                    <View className={`h-[84px] w-[84px] items-center justify-center rounded-2xl ${tile.tint}`}>
+                      <Image source={tile.art} resizeMode="contain" className="h-[68px] w-[68px]" />
                     </View>
-                    {m.description ? <Text className="text-sm text-muted" numberOfLines={2}>{m.description}</Text> : null}
-                  </Card>
-                </Pressable>
+                    <View className="flex-1 gap-1">
+                      <Text className="text-lg font-extrabold tracking-tight text-ink">{m.name}</Text>
+                      <Text className="text-sm font-semibold text-brand-orange-dark">{[m.city, m.state].filter(Boolean).join(', ')}</Text>
+                      {m.description ? <Text className="text-sm leading-5 text-muted" numberOfLines={2}>{m.description}</Text> : null}
+                    </View>
+                    <Text className="text-2xl text-brand-orange-dark">›</Text>
+                  </Pressable>
+                </Animated.View>
               );
             })}
           </>
@@ -141,10 +296,6 @@ export default function NewOrder() {
 
         {step === 'address' ? (
           <>
-            <View className="gap-1">
-              <Text className="text-2xl font-extrabold tracking-tight text-ink">Where to?</Text>
-              <Text className="text-sm text-muted">We&apos;ll deliver your haul from {market?.name || 'the market'} here.</Text>
-            </View>
             {user?.default_delivery_address && address !== user.default_delivery_address ? (
               <Pressable onPress={() => setAddress(user.default_delivery_address!)} className="rounded-2xl bg-sunken px-4 py-3">
                 <Text className="text-xs font-bold uppercase tracking-wide text-faint">Saved address</Text>
@@ -159,10 +310,6 @@ export default function NewOrder() {
 
         {step === 'quote' && market ? (
           <>
-            <View className="gap-1">
-              <Text className="text-2xl font-extrabold tracking-tight text-ink">Your estimate</Text>
-              <Text className="text-sm text-muted">Not a fixed catalogue total: your agent bargains real prices at {market.name}.</Text>
-            </View>
             <Card>
               <SectionHeader title="Your list" subtitle="What your agent will shop for." />
               {filled.map((r, i) => (
@@ -177,7 +324,12 @@ export default function NewOrder() {
               ))}
             </Card>
             <Card>
-              <SectionHeader title="Estimate" />
+              <View className="items-center py-2">
+                <Text className="text-sm font-semibold text-muted">Estimated total</Text>
+                <Text className="text-[40px] font-extrabold leading-[46px] tracking-tight text-ink">{naira(goodsTotal + pricing.deliveryFee)}</Text>
+                <Text className="text-xs text-faint">goods + delivery, before the service fee</Text>
+              </View>
+              <View className="my-1 h-px bg-line-strong" />
               <View className="flex-row justify-between"><Text className="text-muted">Goods estimate</Text><Text className="font-semibold text-ink">{naira(goodsTotal)}</Text></View>
               <View className="flex-row justify-between"><Text className="text-muted">Delivery quote</Text><Text className="font-semibold text-ink">{naira(pricing.deliveryFee)}</Text></View>
               <Text className="text-xs text-faint">

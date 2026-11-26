@@ -104,6 +104,29 @@ export const ORDERS: AgentOrder[] = [
   order('a1b2c3d4-0006', 'agent_assigned', [item('i12', 'Bitter leaf'), item('i13', 'Ugwu leaves', { quantity: 2 })], { created_at: minsAgo(30) }),
   order('a1b2c3d4-0007', 'paid', [item('i14', 'Beans (brown)', { confirmed_price: '4500.00' })], { items_total: '4500.00', paid_at: minsAgo(20), created_at: minsAgo(180) }),
 ];
+/** Adds the order a customer just placed (in memory only) so Track and the order page can show it. */
+export function placeOrder(input: { marketId: string; address: string; goodsEstimate: number; depositAmount: number; items: { description: string; quantity?: number; price?: number }[] }): AgentOrder {
+  const id = `a1b2c3d4-${Date.now()}`;
+  const placed = order(
+    id,
+    'proposed',
+    input.items.map((it, i) =>
+      item(`n${i}`, it.description, { quantity: it.quantity ?? 1, listed_price: it.price ? it.price.toFixed(2) : null }),
+    ),
+    {
+      market_id: input.marketId,
+      agent_id: null,
+      agent_assigned_at: null,
+      deposit_paid_at: null,
+      delivery_address: input.address,
+      goods_estimate: input.goodsEstimate.toFixed(2),
+      deposit_amount: input.depositAmount.toFixed(2),
+      created_at: new Date().toISOString(),
+    },
+  );
+  ORDERS.unshift(placed);
+  return placed;
+}
 export const orderById = (id?: string) => ORDERS.find((o) => o.id === id) ?? ORDERS[0];
 
 export const PURCHASES: Purchase[] = [
@@ -112,11 +135,17 @@ export const PURCHASES: Purchase[] = [
 
 export const HUB_ORDERS: HubOrder[] = [
   {
+    id: 'b1c2d3e4-0004', status: 'paid', agent_name: 'Chidi Obi', rider_name: null, rider_waiting: false,
+    items: [{ id: 'h7', description: 'Garri (paint bucket)', quantity: 2, requested_note: null }, { id: 'h8', description: 'Groundnut oil (5L)', quantity: 1, requested_note: null }],
+    packing_photos: [], dropped_at_hub_at: null, hub_received_at: null, hub_missing_item_ids: [], hub_receipt_note: null,
+  },
+  {
     id: 'b1c2d3e4-0001', status: 'dropped_at_hub', agent_name: 'Tunde Bakare', rider_name: null, rider_waiting: false,
     items: [
       { id: 'h1', description: 'Tomatoes (big basket)', quantity: 1, requested_note: null },
       { id: 'h2', description: 'Pepper (tatashe)', quantity: 2, requested_note: 'Not too ripe' },
       { id: 'h3', description: 'Onions', quantity: 3, requested_note: null },
+      { id: 'h9', description: 'Okra', quantity: 1, requested_note: 'Customer skipped this', availability: 'dropped' },
     ],
     packing_photos: [], dropped_at_hub_at: minsAgo(8), hub_received_at: null, hub_missing_item_ids: [], hub_receipt_note: null,
   },
@@ -126,7 +155,7 @@ export const HUB_ORDERS: HubOrder[] = [
     packing_photos: [], dropped_at_hub_at: minsAgo(40), hub_received_at: minsAgo(30), hub_missing_item_ids: ['h5'], hub_receipt_note: 'Eggs were not in the bag.',
   },
   {
-    id: 'b1c2d3e4-0003', status: 'ready_for_pickup', agent_name: 'Tunde Bakare', rider_name: 'Musa Ibrahim', rider_waiting: true,
+    id: 'b1c2d3e4-0003', status: 'ready_for_pickup', agent_name: 'Tunde Bakare', rider_name: 'Musa Ibrahim', rider_waiting: true, rider_code: '7305', ready_at: minsAgo(80),
     items: [{ id: 'h6', description: 'Rice (50kg bag)', quantity: 1, requested_note: null }],
     packing_photos: [], dropped_at_hub_at: minsAgo(90), hub_received_at: minsAgo(80), hub_missing_item_ids: [], hub_receipt_note: null,
   },
@@ -141,7 +170,7 @@ const job = (id: string, over: Partial<RiderJob> = {}): RiderJob => ({
 export const RIDER_POOL: RiderJob[] = [job('c1d2e3f4-0001'), job('c1d2e3f4-0002', { item_count: 2, hub_name: 'Oyingbo Hub', market_name: 'Oyingbo Market', ready_at: minsAgo(3) })];
 export const RIDER_ACTIVE: RiderJob = job('c1d2e3f4-0009', {
   status: 'out_for_delivery', claimed_at: minsAgo(30), pickup_code: '7305', customer_name: 'Ada Okafor', customer_phone: '08012345678',
-  delivery_address: '12 Adeola Odeku St, Victoria Island',
+  delivery_address: '12 Adeola Odeku St, Victoria Island', dropoff_latitude: 6.4281, dropoff_longitude: 3.4219,
 });
 
 export const EARNINGS: Earnings = {
@@ -168,3 +197,31 @@ export const MESSAGES: Message[] = [
   { id: 'm2', order_id: ORDERS[0].id, sender_id: 'u-agent', text: 'On it, heading to the stalls now.', image_url: null, created_at: minsAgo(70) },
   { id: 'm3', order_id: ORDERS[0].id, sender_id: 'u-agent', text: 'The pepper is a bit pricey today, ok to go higher?', image_url: null, created_at: minsAgo(4) },
 ];
+
+/** Extra profile details for the sample agent (UI only; a real profile would come from the backend). */
+export const AGENT_PROFILE = {
+  rating: 4.9,
+  reviews: 126,
+  ordersDone: 312,
+  since: 'Mar 2025',
+  markets: ['Mile 12 Market', 'Oyingbo Market'],
+  review: { quote: 'Sent photos of every item before paying and got me a better price on the tomatoes. Will order again.', by: 'Chioma, Lekki' },
+};
+
+/** Sample customer reviews and the star breakdown for the sample agent (UI only). */
+export const AGENT_REVIEWS = [
+  { id: 'r1', by: 'Chioma, Lekki', stars: 5, text: 'Sent photos of every item before paying and got me a better price on the tomatoes. Will order again.', when: '2 days ago' },
+  { id: 'r2', by: 'Emeka, Yaba', stars: 5, text: 'Fast and polite. Everything was fresh and exactly what I asked for.', when: '5 days ago' },
+  { id: 'r3', by: 'Funke, Surulere', stars: 4, text: 'Good job overall. The pepper was a bit pricey but he checked with me first.', when: '1 week ago' },
+  { id: 'r4', by: 'Tosin, Ikeja', stars: 5, text: 'Kept me updated the whole time in chat. Very easy to deal with.', when: '2 weeks ago' },
+  { id: 'r5', by: 'Aisha, Ajah', stars: 5, text: 'Found the last bag of rice at a different stall when the first had none. Legend.', when: '3 weeks ago' },
+  { id: 'r6', by: 'Bode, Maryland', stars: 3, text: 'Took a little longer than expected but the goods were good.', when: '1 month ago' },
+];
+export const REVIEW_BREAKDOWN: Record<number, number> = { 5: 104, 4: 15, 3: 4, 2: 2, 1: 1 };
+
+/** Sample money for the earnings screens (UI only). Earned money is paid out to this bank account. */
+export const PAYOUT = {
+  available: 14500,
+  pending: 4500,
+  bank: { name: 'GTBank', last4: '4821', holder: 'Tunde Bakare' },
+};

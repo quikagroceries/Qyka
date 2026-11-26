@@ -51,22 +51,24 @@ export default function SwipeButton({ label, onComplete }: { label: string; onCo
 
   const knob = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
   const hint = useAnimatedStyle(() => ({ opacity: interpolate(x.value, [0, Math.max(1, maxSV.value * 0.6)], [1, 0], Extrapolation.CLAMP) }));
+  // The dark-peach fill is the knob plus PAD on every side, growing as the knob moves.
   const fill = useAnimatedStyle(() => ({ width: x.value + KNOB + PAD * 2 }));
 
   return (
     <View
       onLayout={(e) => setTrackW(e.nativeEvent.layout.width)}
-      className="h-16 justify-center overflow-hidden rounded-full bg-brand-orange"
+      style={{ height: KNOB + PAD * 2 }}
+      className="justify-center overflow-hidden rounded-full bg-brand-orange"
       accessibilityRole="button"
       accessibilityLabel={label}>
-      <Animated.View style={fill} className="absolute left-0 top-0 h-16 rounded-full bg-brand-orange-dark/35" />
+      <Animated.View style={[fill, { position: 'absolute', left: 0, top: 0, height: KNOB + PAD * 2 }]} className="rounded-full bg-brand-orange-dark/35" />
       <Animated.View style={hint} className="absolute inset-0 items-center justify-center pl-12">
         <Text className="text-base font-bold text-ink">{label}</Text>
       </Animated.View>
       <Animated.View
         {...pan.panHandlers}
-        style={[knob, { marginLeft: PAD }]}
-        className="h-14 w-14 items-center justify-center rounded-full bg-surface shadow-sm">
+        style={[knob, { position: 'absolute', left: PAD, top: PAD, width: KNOB, height: KNOB }]}
+        className="items-center justify-center rounded-full bg-surface shadow-sm">
         <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
           <Path d="M5 12h14M13 6l6 6-6 6" stroke="#D9702F" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>

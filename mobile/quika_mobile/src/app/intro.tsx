@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
 import Animated, { Easing, cancelAnimation, FadeInDown, FadeInUp, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -9,6 +9,7 @@ import LanguageSlide from '@/components/intro/LanguageSlide';
 import PageIndicator from '@/components/intro/PageIndicator';
 import { SLIDES } from '@/components/intro/slides';
 import { useLanguage, type LanguageCode } from '@/lib/language';
+import { useSession } from '@/lib/session';
 import { useSplash } from '@/lib/splash';
 import SwipeButton from '@/components/SwipeButton';
 import { SafeAreaView } from '@/components/ui';
@@ -26,6 +27,13 @@ const realIndex = (paddedIndex: number) => (paddedIndex - 1 + COUNT) % COUNT;
 // The list is padded with a copy of the last slide in front and of the first behind,
 // and the scroll jumps back to the real slide once it lands on a copy.
 export default function Intro() {
+  const { signedOutTo } = useSession();
+  // Someone who just signed out has seen the intro already: go where they were sent (Welcome, or the sign-in page).
+  if (signedOutTo) return <Redirect href={signedOutTo === 'sign-in' ? '/sign-in' : '/welcome'} />;
+  return <IntroSlides />;
+}
+
+function IntroSlides() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const scroller = useRef<ScrollViewInstance>(null);

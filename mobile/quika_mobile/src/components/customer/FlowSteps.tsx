@@ -1,38 +1,41 @@
 import { Pressable, View } from 'react-native';
+
 import { Text } from '@/components/Text';
 
 export const FLOW_STEPS = [
-  { key: 'list', label: 'List' },
+  { key: 'list', label: 'Your list' },
   { key: 'market', label: 'Market' },
   { key: 'address', label: 'Delivery' },
   { key: 'quote', label: 'Estimate' },
 ] as const;
 export type FlowStepKey = (typeof FLOW_STEPS)[number]['key'];
 
-// Earlier steps are tappable so a customer can go back and change them.
+const INK = '#1A1A1A';
+const TRACK = 'rgba(26, 26, 26, 0.2)';
+
+/**
+ * The intro's page indicator, for the order flow: the current step is a wide ink
+ * pill, finished steps are ink dots you can tap to go back, the rest are faint.
+ */
 export default function FlowSteps({ current, onStepClick }: { current: FlowStepKey; onStepClick: (k: FlowStepKey) => void }) {
   const idx = FLOW_STEPS.findIndex((s) => s.key === current);
   return (
-    <View className="flex-row items-center gap-2">
-      {FLOW_STEPS.map((s, i) => {
-        const done = i < idx;
-        const isCurrent = i === idx;
-        return (
-          <View key={s.key} className="flex-row items-center gap-2">
-            <Pressable disabled={!done} onPress={() => onStepClick(s.key)} className="items-center gap-0.5">
-              <View
-                className={
-                  'h-7 w-7 items-center justify-center rounded-full ' +
-                  (done ? 'bg-brand-orange' : isCurrent ? 'border-2 border-brand-orange bg-brand-orange/15' : 'bg-sunken')
-                }>
-                <Text className={'text-xs font-bold ' + (done ? 'text-ink' : isCurrent ? 'text-brand-orange-dark' : 'text-faint')}>{done ? '✓' : i + 1}</Text>
-              </View>
-              <Text className={'text-[10px] font-semibold ' + (isCurrent ? 'text-ink' : 'text-faint')}>{s.label}</Text>
-            </Pressable>
-            {i < FLOW_STEPS.length - 1 ? <View className={'mb-3 h-0.5 w-5 ' + (done ? 'bg-brand-orange' : 'bg-line-strong')} /> : null}
-          </View>
-        );
-      })}
+    <View className="items-center gap-2">
+      <View className="flex-row items-center" style={{ gap: 6 }}>
+        {FLOW_STEPS.map((s, i) => (
+          <Pressable
+            key={s.key}
+            disabled={i >= idx}
+            hitSlop={8}
+            accessibilityLabel={s.label}
+            onPress={() => onStepClick(s.key)}
+            style={{ width: i === idx ? 36 : 10, height: 10, borderRadius: 5, backgroundColor: i <= idx ? INK : TRACK }}
+          />
+        ))}
+      </View>
+      <Text className="text-xs font-semibold text-muted">
+        Step {idx + 1} of {FLOW_STEPS.length} · {FLOW_STEPS[idx].label}
+      </Text>
     </View>
   );
 }

@@ -8,6 +8,7 @@ export type User = {
   role: Role;
   status: string;
   default_delivery_address?: string | null;
+  avatar_url?: string | null;
   must_prepay?: boolean;
 };
 
@@ -38,7 +39,14 @@ export type Earnings = {
   recent: { order_id: string; amount: string; delivered_at: string }[];
 };
 
-export type HubItem = { id: string; description: string; quantity: number | null; requested_note: string | null };
+export type HubItem = {
+  id: string;
+  description: string;
+  quantity: number | null;
+  requested_note: string | null;
+  /** 'unavailable' or 'dropped' means it was never bought, so the hub shouldn't expect it in the bag. */
+  availability?: string;
+};
 
 export type HubOrder = {
   id: string;
@@ -52,6 +60,10 @@ export type HubOrder = {
   hub_received_at: string | null;
   hub_missing_item_ids: string[];
   hub_receipt_note: string | null;
+  /** The 4-digit code the waiting rider shows; the shopkeeper must enter it to hand the order over. */
+  rider_code?: string | null;
+  /** When it was marked ready, so riders can see how long it has been waiting. */
+  ready_at?: string | null;
 };
 
 export type OrderItem = {

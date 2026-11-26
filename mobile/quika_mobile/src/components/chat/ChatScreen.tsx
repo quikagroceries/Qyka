@@ -1,29 +1,93 @@
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from 'react-native';
+import { Alert, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/Text';
 
+import CallScreen from '@/components/customer/CallScreen';
+import AgentProfileSheet from '@/components/customer/AgentProfileSheet';
 import { Avatar, SafeAreaView } from '@/components/ui';
 import { clockTime, dayLabel } from '@/lib/format';
-import { CONVERSATIONS, MESSAGES } from '@/lib/mock';
+import { CONVERSATIONS, MESSAGES, PEOPLE } from '@/lib/mock';
 import { useSession } from '@/lib/session';
 import type { Message } from '@/lib/types';
 
+const CAMERA = ['M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z', 'M15 13a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z'];
+const PHONE = ['M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z'];
+const SEND = ['m22 2-7 20-4-9-9-4Z', 'M22 2 11 13'];
+
+const Icon = ({ paths, color, size = 22, width = 2 }: { paths: string[]; color: string; size?: number; width?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round">
+    {paths.map((d) => (
+      <Path key={d} d={d} />
+    ))}
+  </Svg>
+);
+
 const QUICK_REPLIES = ['Hello', 'On it', 'Almost done', 'Thank you'];
 
-/** One order's chat. `backTo` is where the back arrow goes; `who` names the other side. UI only: sent messages live in this screen's state. */
+/** One order's chat. `backTo` is where the back arrow goes only when there is nothing to go back to (e.g. a deep link); otherwise it returns to where you came from; `who` names the other side. UI only: sent messages live in this screen's state. */
 export default function ChatScreen({ orderId, backTo, who }: { orderId: string; backTo: string; who: 'Customer' | 'Your agent' }) {
   const router = useRouter();
   const { user } = useSession();
   const [messages, setMessages] = useState<Message[]>(MESSAGES);
   const [text, setText] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [callOpen, setCallOpen] = useState(false);
   const scroller = useRef<ScrollViewInstance>(null);
+  const insets = useSafeAreaInsets();
+  const [keyboard, setKeyboard] = useState(false);
   const other = CONVERSATIONS.find((c) => c.order_id === orderId)?.other ?? CONVERSATIONS[0].other;
+  // On the customer's side the other person is the shopping agent, whose profile opens from the header.
+  const hasProfile = who === 'Your agent';
+  const agent = other ? { ...other, phone: PEOPLE.agent.phone } : null;
 
   useEffect(() => {
     scroller.current?.scrollToEnd({ animated: true });
   }, [messages.length]);
+
+  // With the keyboard up there is no home indicator to clear, so the card sits close to it.
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboard(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboard(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  function sendImage(uri: string) {
+    setMessages((cur) => [...cur, { id: `local-${cur.length}`, order_id: orderId, sender_id: user?.id ?? '', text: null, image_url: uri, created_at: new Date().toISOString() }]);
+  }
+
+  // UI only: the picture is shown in this chat and not uploaded anywhere.
+  async function pick(source: 'camera' | 'library') {
+    try {
+      const perm = source === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(source === 'camera' ? 'Camera access is off' : 'Photo access is off', 'Turn it on for Qyka in your phone settings to send pictures.');
+        return;
+      }
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
+          : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
+      if (!result.canceled && result.assets[0]) sendImage(result.assets[0].uri);
+    } catch {
+      Alert.alert(source === 'camera' ? "The camera isn't available" : "Couldn't open your photos", source === 'camera' ? 'Try choosing a photo from your library instead.' : 'Please try again.');
+    }
+  }
+
+  function addPhoto() {
+    Alert.alert('Send a photo', undefined, [
+      { text: 'Take a photo', onPress: () => pick('camera') },
+      { text: 'Choose from library', onPress: () => pick('library') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
 
   function send(body: string) {
     if (!body) return;
@@ -35,16 +99,36 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
     <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
         <View className="flex-row items-center gap-2 border-b border-line bg-canvas px-3 py-2">
-          <Pressable onPress={() => router.replace(backTo as never)} hitSlop={8} className="h-10 w-10 items-center justify-center rounded-full active:bg-sunken">
+          <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace(backTo as never))} hitSlop={8} className="h-10 w-10 items-center justify-center rounded-full active:bg-sunken">
             <Text className="text-2xl text-ink">‹</Text>
           </Pressable>
-          <Avatar uri={other?.avatar_url} name={other?.full_name} className="h-9 w-9" />
-          <View className="flex-1">
-            <Text className="text-base font-bold text-ink" numberOfLines={1}>
-              {other?.full_name || who}
-            </Text>
-            <Text className="text-xs text-muted">{who}</Text>
-          </View>
+          <Pressable
+            disabled={!hasProfile}
+            onPress={() => setProfileOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={hasProfile ? 'View agent profile' : undefined}
+            className="flex-1 flex-row items-center gap-3 rounded-full py-0.5 pr-2 active:bg-sunken">
+            <Avatar uri={other?.avatar_url} name={other?.full_name} className="h-9 w-9" />
+            <View className="flex-1">
+              <View className="flex-row items-center gap-1">
+                <Text className="shrink text-base font-bold text-ink" numberOfLines={1}>
+                  {other?.full_name || who}
+                </Text>
+                {hasProfile ? <Text className="text-xl leading-5 text-brand-orange-dark">›</Text> : null}
+              </View>
+              <Text className="text-xs text-muted">{hasProfile ? 'Your agent · tap for profile' : who}</Text>
+            </View>
+          </Pressable>
+          {hasProfile && agent?.phone ? (
+            <Pressable
+              onPress={() => setCallOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`Call ${other?.full_name || 'your agent'}`}
+              hitSlop={6}
+              className="h-11 w-11 items-center justify-center rounded-full active:bg-sunken">
+              <Icon paths={PHONE} color="#1A1A1A" size={22} />
+            </Pressable>
+          ) : null}
         </View>
 
         <ScrollView ref={scroller} className="flex-1" contentContainerClassName="px-4 py-3" keyboardShouldPersistTaps="handled">
@@ -88,36 +172,47 @@ export default function ChatScreen({ orderId, backTo, who }: { orderId: string; 
           })}
         </ScrollView>
 
-        <View className="gap-2 border-t border-line px-4 py-3">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2">
-            {QUICK_REPLIES.map((r) => (
-              <Pressable key={r} onPress={() => send(r)} className="rounded-full border border-line bg-surface px-3 py-1.5 active:border-brand-orange">
-                <Text className="text-sm font-semibold text-muted">{r}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-          <View className="flex-row items-center gap-2">
+        <View style={{ paddingBottom: keyboard ? 8 : Math.max(insets.bottom, 12), paddingHorizontal: 12, paddingTop: 6 }} className="gap-2">
+          {text.trim().length === 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 px-1">
+              {QUICK_REPLIES.map((r) => (
+                <Pressable key={r} onPress={() => send(r)} className="rounded-full border border-brand-orange/40 bg-brand-orange/15 px-4 py-2 active:bg-brand-orange/30">
+                  <Text className="text-sm font-bold text-brand-orange-dark">{r}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : null}
+          <View
+            className="flex-row items-end gap-1 rounded-[28px] border border-line bg-surface p-1.5"
+            style={{ shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 5 }, elevation: 6 }}>
+            <Pressable onPress={addPhoto} accessibilityRole="button" accessibilityLabel="Send a photo" hitSlop={4} className="h-11 w-11 items-center justify-center rounded-full active:bg-sunken">
+              <View style={{ marginTop: -3 }}>
+                <Icon paths={CAMERA} color="#1A1A1A" size={24} />
+              </View>
+            </Pressable>
             <TextInput
               value={text}
               onChangeText={setText}
               placeholder="Type a message"
               placeholderTextColor="#9B9B9B"
-              returnKeyType="send"
-              onSubmitEditing={() => send(text.trim())}
-              className="font-body min-h-[44px] flex-1 rounded-full border border-line-strong bg-surface px-4 text-base text-ink"
+              multiline
+              style={{ maxHeight: 120, paddingTop: 13, paddingBottom: 11, lineHeight: 20 }}
+              className="font-body min-h-[44px] flex-1 px-1 text-base text-ink"
             />
-            <Pressable accessibilityLabel="Send a photo" className="h-11 w-11 items-center justify-center rounded-full bg-sunken active:bg-line-strong">
-              <Text className="text-base text-muted">📷</Text>
-            </Pressable>
             <Pressable
               onPress={() => send(text.trim())}
+              disabled={text.trim().length === 0}
               accessibilityLabel="Send message"
-              className="h-11 w-11 items-center justify-center rounded-full bg-brand-orange active:bg-brand-orange-dark">
-              <Text className="text-lg font-extrabold text-ink">↑</Text>
+              className={'h-11 w-11 items-center justify-center rounded-full ' + (text.trim() ? 'bg-brand-orange active:bg-brand-orange-dark' : 'bg-sunken')}
+              style={({ pressed }) => ({ transform: [{ scale: pressed && text.trim() ? 0.94 : 1 }] })}>
+              <Icon paths={SEND} color={text.trim() ? '#1A1A1A' : '#B9B3A8'} size={20} width={2.25} />
             </Pressable>
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {hasProfile ? <CallScreen person={agent} visible={callOpen} onClose={() => setCallOpen(false)} /> : null}
+      {hasProfile ? <AgentProfileSheet person={agent} visible={profileOpen} onClose={() => setProfileOpen(false)} /> : null}
 
       <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
         <Pressable onPress={() => setPreview(null)} className="flex-1 items-center justify-center bg-black/90 p-4">

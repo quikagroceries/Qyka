@@ -2,6 +2,7 @@ import { Redirect } from 'expo-router';
 import { View } from 'react-native';
 import { Text } from '@/components/Text';
 
+import AppLoading from '@/components/AppLoading';
 import { Button, SafeAreaView } from '@/components/ui';
 import type { Role } from '@/lib/types';
 import { useSession } from '@/lib/session';
@@ -17,11 +18,15 @@ const HOME_COPY: Record<Role, string> = {
 // Sends each role to its own home. Roles without an app yet get a placeholder.
 export default function Home() {
   const { user, signOut } = useSession();
-  if (!user) return null;
-  if (user.role === 'customer') return <Redirect href="/customer/new-order" />;
-  if (user.role === 'agent') return <Redirect href="/agent" />;
-  if (user.role === 'rider') return <Redirect href="/rider" />;
-  if (user.role === 'shopkeeper') return <Redirect href="/shopkeeper" />;
+  if (!user) return <AppLoading />;
+  const to = user.role === 'customer' ? '/customer/new-order' : user.role === 'agent' ? '/agent' : user.role === 'rider' ? '/rider' : user.role === 'shopkeeper' ? '/shopkeeper' : null;
+  if (to)
+    return (
+      <>
+        <AppLoading />
+        <Redirect href={to} />
+      </>
+    );
   return (
     <SafeAreaView className="flex-1 bg-canvas">
       <View className="flex-1 justify-center gap-2 p-6">

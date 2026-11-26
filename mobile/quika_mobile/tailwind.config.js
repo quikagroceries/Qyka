@@ -12,6 +12,9 @@ module.exports = {
           'orange-dark': '#D9702F',
           green: '#A8AD5C',
           'green-dark': '#8F9448',
+          // Army green: the readable, darker partner of the olive. Text, icons and small marks for
+          // "done and trustworthy" states; olive stays as the light tint behind it. Never a CTA.
+          army: '#4F5B2E',
         },
         gold: '#F6C4A0',
         ink: '#1A1A1A',

@@ -4,6 +4,7 @@ import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } fr
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import AuthBackdrop from '@/components/auth/AuthBackdrop';
+import ResendCode from '@/components/auth/ResendCode';
 import CodeBoxes from '@/components/auth/CodeBoxes';
 import GoogleLogo from '@/components/auth/GoogleLogo';
 import PhoneField from '@/components/auth/PhoneField';
@@ -36,7 +37,7 @@ export default function SignUp() {
               <View className="h-11 w-11" />
             ) : (
               <Pressable
-                onPress={() => (step === 'code' ? setStep('details') : router.back())}
+                onPress={() => (step === 'code' ? setStep('details') : router.canGoBack() ? router.back() : router.replace('/welcome'))}
                 hitSlop={10}
                 className="h-11 w-11 items-center justify-center rounded-full bg-surface shadow-sm active:bg-sunken">
                 <Text className="text-2xl text-ink">‹</Text>
@@ -80,12 +81,7 @@ export default function SignUp() {
               <>
                 <CodeBoxes value={code} onChange={setCode} />
                 <Button label="Verify and create account" onPress={() => setStep('done')} />
-                <View className="flex-row items-center justify-center gap-1">
-                  <Text className="text-sm text-muted">Didn&apos;t get it?</Text>
-                  <Pressable hitSlop={8}>
-                    <Text className="text-sm font-bold text-brand-orange-dark">Resend code</Text>
-                  </Pressable>
-                </View>
+                <ResendCode onResend={() => setCode('')} />
               </>
             )}
           </Animated.View>
@@ -105,7 +101,7 @@ export default function SignUp() {
             <View className="items-center gap-3">
               <View className="flex-row items-center gap-1">
                 <Text className="text-sm text-muted">Already have an account?</Text>
-                <Pressable onPress={() => router.replace({ pathname: '/sign-in', params: { role: 'customer' } })} hitSlop={8}>
+                <Pressable onPress={() => router.dismissTo({ pathname: '/sign-in', params: { role: 'customer' } })} hitSlop={8}>
                   <Text className="text-sm font-bold text-brand-orange-dark">Sign in</Text>
                 </Pressable>
               </View>

@@ -34,3 +34,11 @@ export const clockTime = (iso: string) =>
 
 /** Clock time for today, otherwise the day: how the inbox dates a row. */
 export const whenLabel = (iso: string) => (dayLabel(iso) === 'Today' ? clockTime(iso) : dayLabel(iso));
+
+/** Splits a heading into the dark part and the peach part (the last word, or last two if the last is tiny: "is checked in"). */
+export function splitAccent(title: string): [string, string] {
+  const w = title.trim().split(/\s+/);
+  if (w.length === 1) return ['', w[0]];
+  const take = w.length > 2 && w[w.length - 1].length <= 3 ? 2 : 1;
+  return [w.slice(0, -take).join(' '), w.slice(-take).join(' ')];
+}

@@ -5,6 +5,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import AuthBackdrop from '@/components/auth/AuthBackdrop';
 import Logo from '@/components/Logo';
+import ResendCode from '@/components/auth/ResendCode';
 import CodeBoxes from '@/components/auth/CodeBoxes';
 import GoogleLogo from '@/components/auth/GoogleLogo';
 import PhoneField from '@/components/auth/PhoneField';
@@ -40,7 +41,7 @@ export default function SignIn() {
         <ScrollView contentContainerClassName="gap-6 px-5 pb-8 pt-6" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Animated.View entering={FadeInUp.duration(450)} className="flex-row items-center justify-between">
             <Pressable
-              onPress={() => (step === 'code' ? setStep('identify') : router.back())}
+              onPress={() => (step === 'code' ? setStep('identify') : router.canGoBack() ? router.back() : router.replace('/welcome'))}
               hitSlop={10}
               className="h-11 w-11 items-center justify-center rounded-full bg-surface shadow-sm active:bg-sunken">
               <Text className="text-2xl text-ink">‹</Text>
@@ -93,12 +94,7 @@ export default function SignIn() {
               <>
                 <CodeBoxes value={code} onChange={setCode} />
                 <Button label="Verify" onPress={() => signIn(picked)} />
-                <View className="flex-row items-center justify-center gap-1">
-                  <Text className="text-sm text-muted">Didn&apos;t get it?</Text>
-                  <Pressable hitSlop={8}>
-                    <Text className="text-sm font-bold text-brand-orange-dark">Resend code</Text>
-                  </Pressable>
-                </View>
+                <ResendCode onResend={() => setCode('')} />
               </>
             )}
           </Animated.View>
@@ -121,7 +117,7 @@ export default function SignIn() {
             ) : null}
             <Text className="text-sm text-muted">Not signing in as a {copy.label.toLowerCase()}?</Text>
             <View className="flex-row items-center gap-2">
-              <Pressable onPress={() => router.replace('/welcome')} hitSlop={8}>
+              <Pressable onPress={() => router.dismissTo('/welcome')} hitSlop={8}>
                 <Text className="text-sm font-bold text-brand-orange-dark">Choose a different option</Text>
               </Pressable>
               {picked !== 'shopkeeper' ? (
