@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
 import { api } from '@/lib/api';
+import { getToken } from '@/lib/token';
 import type { AgentOrder } from '@/lib/types';
 
 // Orders, from the server. Every screen that shows them reads one store, so a change shows up everywhere. The server has no push
@@ -27,6 +28,7 @@ function makeOrderStore(fetchList: () => Promise<AgentOrder[]>) {
   const store = {
     /** Fetches the person's orders. A failed refresh keeps what is on screen and records why. */
     async refresh() {
+      if (!getToken()) return; // a guest has no orders to ask for
       try {
         set({ orders: newestFirst(await fetchList()), loaded: true, error: '' });
       } catch (e) {
@@ -35,6 +37,7 @@ function makeOrderStore(fetchList: () => Promise<AgentOrder[]>) {
     },
     /** Fetches one order (so its page works even if the list hasn't loaded) and updates it in the list. Returns an error message, or null. */
     async load(id: string) {
+      if (!getToken()) return null;
       try {
         upsert(await api.getOrder(id));
         return null;

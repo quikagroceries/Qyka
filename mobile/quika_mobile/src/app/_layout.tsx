@@ -13,6 +13,7 @@ import SplashOverlay from '@/components/SplashOverlay';
 import { LanguageProvider } from '@/lib/language';
 import { SplashProvider, useSplash } from '@/lib/splash';
 import { SessionProvider, useSession } from '@/lib/session';
+import { SignInPromptProvider } from '@/lib/signInPrompt';
 
 // Signed-out people start on the intro slides, whatever order the screens are declared in.
 export const unstable_settings = { anchor: 'intro' };
@@ -61,8 +62,10 @@ export default function RootLayout() {
     <LanguageProvider>
       <SessionProvider>
         <SplashProvider>
-          <StatusBar style="dark" />
-          <Navigator fontsReady={fontsReady} />
+          <SignInPromptProvider>
+            <StatusBar style="dark" />
+            <Navigator fontsReady={fontsReady} />
+          </SignInPromptProvider>
         </SplashProvider>
       </SessionProvider>
     </LanguageProvider>

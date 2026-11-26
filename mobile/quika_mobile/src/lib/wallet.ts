@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
 import { api, type WalletEntry } from '@/lib/api';
+import { getToken } from '@/lib/token';
 
 // The customer's wallet: the balance, and every credit and debit. Read by the wallet screen, the Account page and the payment box,
 // so a top-up or a payment shows everywhere. Asked for again every few seconds while a screen uses it.
@@ -21,6 +22,7 @@ const subscribe = (l: () => void) => {
 
 export const walletStore = {
   async refresh() {
+    if (!getToken()) return;
     try {
       const [wallet, entries] = await Promise.all([api.getWallet(), api.getWalletTransactions()]);
       set({ balance: wallet.balance, entries, loaded: true, error: '' });
@@ -30,6 +32,7 @@ export const walletStore = {
   },
   /** Just the balance, for places that don't show the history. */
   async refreshBalance() {
+    if (!getToken()) return;
     try {
       set({ balance: (await api.getWallet()).balance });
     } catch {

@@ -76,6 +76,14 @@ SPECS: list[Spec] = [
     Spec("rider_max_active_jobs", "Safety limits", "Jobs a rider can hold at once", "A rider can't claim another job while holding this many.",
          "int", 1, 1, 10, "jobs"),
 
+    # --- Delivery area (immediately; a placed order keeps the fee it was quoted) ---
+    Spec("delivery_radius_km", "Delivery area", "Furthest we deliver", "Orders to an address further than this from the market are refused. 0 means no limit. Measured in a straight line.",
+         "int", 30, 0, 500, "km"),
+    Spec("delivery_included_km", "Delivery area", "Distance covered by the delivery fee", "Addresses within this distance of the market pay just the delivery fee.",
+         "int", 5, 0, 100, "km"),
+    Spec("delivery_per_km", "Delivery area", "Extra per km beyond that", "Added to the delivery fee for each started km past the covered distance. 0 keeps one flat fee.",
+         "decimal", 100, 0, 5000, "₦"),
+
     # --- Payouts (immediately) -----------------------------------------
     Spec("payout_min_naira", "Payouts", "Smallest withdrawal", "People can't withdraw less than this at once.",
          "int", 500, 100, 100_000, "₦"),

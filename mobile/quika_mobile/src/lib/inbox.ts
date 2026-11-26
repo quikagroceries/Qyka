@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
 import { api } from '@/lib/api';
+import { getToken } from '@/lib/token';
 import type { Conversation } from '@/lib/types';
 
 // The messages inbox from the server. There is no push yet, so a screen using it asks again every few seconds.
@@ -21,6 +22,7 @@ const subscribeInbox = (l: () => void) => {
 
 export const inboxStore = {
   async refresh() {
+    if (!getToken()) return;
     try {
       setInbox({ items: await api.getConversations(), loaded: true, error: '' });
     } catch (e) {

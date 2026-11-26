@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/Text';
+import PinPicker from '@/components/PinPicker';
 import { Field } from '@/components/ui';
 import { api, type PlaceSuggestion } from '@/lib/api';
 
@@ -23,6 +24,7 @@ export default function AddressPicker({ value, onChange, saved }: { value: Addre
   const [searching, setSearching] = useState(false);
   const [note, setNote] = useState('');
   const [choosing, setChoosing] = useState(!value.address);
+  const [pinning, setPinning] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const session = useRef(newSession());
   const latest = useRef('');
@@ -127,10 +129,23 @@ export default function AddressPicker({ value, onChange, saved }: { value: Addre
             </Pressable>
           </View>
           <Text className={'text-xs font-semibold ' + (value.latitude != null ? 'text-brand-army' : 'text-amber-700')}>
-            {value.latitude != null ? '✓ Location found on the map' : 'Not found on the map. Add a landmark so the rider can find you.'}
+            {value.latitude != null ? '✓ Location found on the map' : 'Not found on the map. Drop a pin, or add a landmark so the rider can find you.'}
           </Text>
+          <Pressable onPress={() => setPinning(true)} hitSlop={6} className="self-start">
+            <Text className="text-xs font-bold text-brand-orange-dark">{value.latitude != null ? 'Adjust the pin on the map' : 'Drop a pin on the map'}</Text>
+          </Pressable>
         </View>
       )}
+
+      <PinPicker
+        visible={pinning}
+        start={value.latitude != null && value.longitude != null ? { latitude: value.latitude, longitude: value.longitude } : null}
+        onClose={() => setPinning(false)}
+        onConfirm={(pin) => {
+          onChange({ ...value, latitude: pin.latitude, longitude: pin.longitude });
+          setPinning(false);
+        }}
+      />
 
       <Field
         value={value.landmark}

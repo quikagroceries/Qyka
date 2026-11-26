@@ -10,6 +10,8 @@ import PageHeader from '@/components/PageHeader';
 import SegmentedToggle from '@/components/SegmentedToggle';
 import { Text } from '@/components/Text';
 import { Button, Float, SafeAreaView, StatusBadge } from '@/components/ui';
+import GuestGate from '@/components/GuestGate';
+import { useSession } from '@/lib/session';
 import { ago, naira, shortId } from '@/lib/format';
 import { useMarkets } from '@/lib/catalog';
 import { orderStore, useOrderState } from '@/lib/orderStore';
@@ -20,7 +22,7 @@ type Filter = 'active' | 'history';
 const CLOCK = ['M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z', 'M12 6v6l4 2'];
 const CHECK = ['M20 6 9 17l-5-5'];
 
-export default function Track() {
+function TrackList() {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>('active');
 
@@ -144,4 +146,11 @@ export default function Track() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+export default function Track() {
+  const { guest } = useSession();
+  if (guest)
+    return <GuestGate art={require('../../../../../assets/illustrations/track.webp')} top="Follow your" accent="orders" body="Sign in to see your orders and follow them to your door." reason="Sign in to see and follow your orders." />;
+  return <TrackList />;
 }

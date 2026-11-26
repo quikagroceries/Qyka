@@ -13,9 +13,20 @@ async def _h(client, phone="+2348050007001"):
 
 
 @pytest.mark.asyncio
-async def test_search_needs_sign_in(client):
+async def test_guests_can_search(client):
     r = await client.get("/locations/search", params={"q": "allen", "session": "abcdefgh"})
-    assert r.status_code == 401
+    assert r.status_code == 200 and r.json()[0]["title"] == "Allen Avenue"
+    d = await client.get("/locations/place", params={"place_id": r.json()[0]["place_id"], "session": "abcdefgh"})
+    assert d.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_guest_search_is_rate_limited(client):
+    from app.locations import routes
+    routes._recent.clear()
+    codes = [(await client.get("/locations/search", params={"q": "allen", "session": "abcdefgh"})).status_code for _ in range(62)]
+    assert codes.count(429) == 2 and codes[0] == 200
+    routes._recent.clear()
 
 
 @pytest.mark.asyncio
@@ -93,3 +104,45 @@ async def test_order_keeps_pin_and_landmark(client, db_session_factory):
     assert r.status_code == 201, r.text
     o = r.json()
     assert (o["delivery_landmark"], o["dropoff_latitude"], o["dropoff_longitude"]) == ("Green gate", 6.6, 3.35)
+
+
+async def _market(db_session_factory, lat=6.5994, lng=3.3921):
+    from app.markets.models import Market
+    async with db_session_factory() as s:
+        m = Market(name="Mile 12", city="Lagos", state="Lagos", latitude=lat, longitude=lng)
+        s.add(m)
+        await s.commit()
+        return str(m.id)
+
+
+@pytest.mark.asyncio
+async def test_delivery_quote_by_distance(client, db_session_factory):
+    from decimal import Decimal
+    mid = await _market(db_session_factory)
+    q = lambda lat, lng: client.get("/locations/delivery-quote", params={"market_id": mid, "lat": lat, "lng": lng})  # noqa: E731
+    near = (await q(6.6018, 3.3515)).json()          # Allen Avenue, ~4 km: inside the covered distance
+    assert near["deliverable"] and near["distance_km"] < 5
+    mid_ = (await q(6.4474, 3.4723)).json()          # Lekki, ~20 km
+    assert mid_["deliverable"] and Decimal(mid_["delivery_fee"]) > Decimal(near["delivery_fee"])
+    far = (await q(7.38, 3.9)).json()                 # Ibadan, ~140 km
+    assert not far["deliverable"] and "30 km" in far["reason"]
+
+
+@pytest.mark.asyncio
+async def test_order_is_priced_for_distance_and_refused_when_too_far(client, db_session_factory):
+    from decimal import Decimal
+    mid = await _market(db_session_factory)
+    h = await _h(client)
+    item = [{"description": "Tomatoes", "listed_price": "500.00"}]
+    flat = (await client.post("/orders", headers=h, json={"market_id": mid, "delivery_address": "12 Allen Avenue", "items": item})).json()
+    lekki = (await client.post("/orders", headers=h, json={"market_id": mid, "delivery_address": "Lekki", "dropoff_latitude": 6.4474, "dropoff_longitude": 3.4723, "items": item})).json()
+    assert Decimal(lekki["estimated_value"]) > Decimal(flat["estimated_value"])
+    r = await client.post("/orders", headers=h, json={"market_id": mid, "delivery_address": "Ibadan", "dropoff_latitude": 7.38, "dropoff_longitude": 3.9, "items": item})
+    assert r.status_code == 422 and "We deliver up to 30 km" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_no_pin_or_no_market_coordinates_means_flat_fee(client, db_session_factory):
+    mid = await _market(db_session_factory, lat=None, lng=None)
+    q = (await client.get("/locations/delivery-quote", params={"market_id": mid, "lat": 7.38, "lng": 3.9})).json()
+    assert q["deliverable"] and q["distance_km"] is None

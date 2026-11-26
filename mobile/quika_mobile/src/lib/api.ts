@@ -146,6 +146,7 @@ export type AgentSummary = {
 export type Vendor = { id: string; market_id: string; name: string; stall_description: string | null };
 /** One line of the wallet's history. */
 export type WalletEntry = { id: string; order_id: string | null; direction: 'credit' | 'debit' | string; amount: string; balance_after: string; note: string | null; created_at: string };
+export type DeliveryQuote = { deliverable: boolean; distance_km: number | null; delivery_fee: string; reason: string | null };
 export type PlaceSuggestion = { place_id: string; title: string; subtitle: string };
 export type PlaceDetails = { place_id: string; address: string; latitude: number; longitude: number };
 export type AppNotification = { id: string; order_id: string | null; kind: string; message: string; is_read: boolean; created_at: string };
@@ -230,6 +231,7 @@ export const api = {
   receiveHubOrder: (id: string, body: { received_item_ids: string[]; note?: string; photos?: string[] }) => request<HubOrder>(`/hubs/orders/${id}/receive`, { method: 'POST', body }),
   markHubOrderReady: (id: string) => request<HubOrder>(`/hubs/orders/${id}/ready`, { method: 'POST' }),
   handoverHubOrder: (id: string, code: string) => request<HubOrder>(`/hubs/orders/${id}/handover`, { method: 'POST', body: { code } }),
+  deliveryQuote: (marketId: string, lat: number, lng: number) => request<DeliveryQuote>(`/locations/delivery-quote?market_id=${marketId}&lat=${lat}&lng=${lng}`),
   searchPlaces: (q: string, session: string) => request<PlaceSuggestion[]>(`/locations/search?q=${encodeURIComponent(q)}&session=${session}`),
   getPlace: (placeId: string, session: string) => request<PlaceDetails>(`/locations/place?place_id=${encodeURIComponent(placeId)}&session=${session}`),
   notifications: () => request<AppNotification[]>('/notifications'),

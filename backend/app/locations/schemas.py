@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic import BaseModel, Field
 
 
@@ -25,3 +27,10 @@ class PlaceOut(BaseModel):
     address: str
     latitude: float
     longitude: float
+
+
+class DeliveryQuoteOut(BaseModel):
+    deliverable: bool
+    distance_km: float | None
+    delivery_fee: Decimal
+    reason: str | None

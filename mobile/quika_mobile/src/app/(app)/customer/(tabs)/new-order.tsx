@@ -17,6 +17,7 @@ import { api } from '@/lib/api';
 import { clock, marketOpenNow, useMarkets, usePricing } from '@/lib/catalog';
 import { orderStore } from '@/lib/orderStore';
 import { useSession } from '@/lib/session';
+import { useSignInPrompt } from '@/lib/signInPrompt';
 import type { Market } from '@/lib/types';
 
 const MIN_ADDRESS = 8;
@@ -44,7 +45,8 @@ const MARKET_TILES: { art: ImageSourcePropType; tint: string }[] = [
 // then the estimate. State lives here so going back never loses anything.
 export default function NewOrder() {
   const router = useRouter();
-  const { user } = useSession();
+  const { user, guest } = useSession();
+  const askToSignIn = useSignInPrompt();
   const pricing = usePricing();
   const { markets, loading: marketsLoading, error: marketsError, retry: retryMarkets } = useMarkets();
 
@@ -58,6 +60,9 @@ export default function NewOrder() {
   const savedAddress: AddressValue | null = user?.default_delivery_address ? { address: user.default_delivery_address, landmark: user.default_delivery_landmark ?? '', latitude: user.default_delivery_latitude ?? null, longitude: user.default_delivery_longitude ?? null } : null;
   const [place_, setPlace] = useState<AddressValue>(savedAddress ?? EMPTY_ADDRESS);
   const address = place_.address;
+  // The delivery fee for this address's distance, once checked (otherwise the flat fee applies).
+  const [quote, setQuote] = useState<{ fee: number; km: number | null } | null>(null);
+  const [checking, setChecking] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [problem, setProblem] = useState('');
 
@@ -81,6 +86,7 @@ export default function NewOrder() {
   const budgetTotal = unpriced.length > 0 ? Number(budget) || 0 : 0;
   const goodsTotal = priced.reduce((s, r) => s + Number(r.price), 0) + budgetTotal;
 
+  const deliveryFee = quote ? quote.fee : pricing.deliveryFee;
   const serviceFee = goodsTotal * pricing.serviceFeeRate;
   const deposit = goodsTotal * pricing.depositRate;
 
@@ -92,10 +98,12 @@ export default function NewOrder() {
   const setRow = (i: number, patch: Partial<Row>) => setRows((cur) => cur.map((r, k) => (k === i ? { ...r, ...patch } : r)));
 
   // Sends the order to the server, which checks the market is open and works out the deposit. The deposit is paid on the order page.
-  const place = async () => {
+  const place = async (signedInJustNow = false) => {
     if (!market) return setStep('market');
     if (filled.length === 0) return setStep('list');
     if (address.trim().length < MIN_ADDRESS) return setStep('address');
+    // Guests build their whole order first; a phone number is only asked for here, at the last step, and then the order carries on.
+    if (guest && !signedInJustNow) return askToSignIn('We need your number so your agent and rider can reach you.', () => void place(true));
     setPlacing(true);
     setProblem('');
     try {
@@ -351,9 +359,23 @@ export default function NewOrder() {
             {problem ? <Text className="text-sm font-semibold text-red-700">{problem}</Text> : null}
             <Button
               label="Continue"
-              onPress={() => {
+              busy={checking}
+              onPress={async () => {
                 if (address.trim().length < MIN_ADDRESS) return setProblem('Enter the street and area, so your rider can find you.');
                 setProblem('');
+                setQuote(null);
+                if (market && place_.latitude != null && place_.longitude != null) {
+                  setChecking(true);
+                  try {
+                    const q = await api.deliveryQuote(market.id, place_.latitude, place_.longitude);
+                    if (!q.deliverable) return setProblem(q.reason ?? "We can't deliver to that address.");
+                    setQuote({ fee: Number(q.delivery_fee), km: q.distance_km });
+                  } catch {
+                    // Couldn't check: carry on with the flat fee. The server prices and checks the order itself.
+                  } finally {
+                    setChecking(false);
+                  }
+                }
                 setStep('quote');
               }}
             />
@@ -378,12 +400,13 @@ export default function NewOrder() {
             <Card>
               <View className="items-center py-2">
                 <Text className="text-sm font-semibold text-muted">Estimated total</Text>
-                <Text className="text-[40px] font-extrabold leading-[46px] tracking-tight text-ink">{naira(goodsTotal + pricing.deliveryFee)}</Text>
+                <Text className="text-[40px] font-extrabold leading-[46px] tracking-tight text-ink">{naira(goodsTotal + deliveryFee)}</Text>
                 <Text className="text-xs text-faint">goods + delivery, before the service fee</Text>
               </View>
               <View className="my-1 h-px bg-line-strong" />
               <View className="flex-row justify-between"><Text className="text-muted">Goods estimate</Text><Text className="font-semibold text-ink">{naira(goodsTotal)}</Text></View>
-              <View className="flex-row justify-between"><Text className="text-muted">Delivery quote</Text><Text className="font-semibold text-ink">{naira(pricing.deliveryFee)}</Text></View>
+              <View className="flex-row justify-between"><Text className="text-muted">Delivery quote</Text><Text className="font-semibold text-ink">{naira(deliveryFee)}</Text></View>
+              {quote?.km != null ? <Text className="text-xs text-faint">About {quote.km} km from {market?.name}. Further addresses cost a little more.</Text> : null}
               <Text className="text-xs text-faint">
                 Plus a {+(pricing.serviceFeeRate * 100).toFixed(1)}% service fee on what&apos;s actually bought (about {naira(serviceFee)} on this estimate).
               </Text>
@@ -396,7 +419,7 @@ export default function NewOrder() {
               ) : null}
               <Text className="text-xs text-faint">Delivering to: {address}</Text>
               {problem ? <Text className="text-center text-sm font-semibold text-red-700">{problem}</Text> : null}
-              <Button label="Place my order" busy={placing} onPress={place} />
+              <Button label="Place my order" busy={placing} onPress={() => void place()} />
             </Card>
           </>
         ) : null}

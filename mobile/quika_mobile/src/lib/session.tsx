@@ -22,7 +22,8 @@ type Session = {
   /** A customer who skipped sign-in to write a list straight away (no account, no token). */
   guest: boolean;
   /** Completes a sign-in with the token the server gave after the code was verified. */
-  acceptToken: (token: string) => Promise<void>;
+  /** Saves a sign-in and opens the app for that person. Returns who signed in. */
+  acceptToken: (token: string) => Promise<User>;
   continueAsGuest: () => void;
   /** Ends the session. `to` is where the signed-out app lands: the role picker (default) or straight to the sign-in page. */
   signOut: (to?: 'welcome' | 'sign-in') => void;
@@ -91,8 +92,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try {
       const me = await api.me();
       setSignedOutTo(null);
-      setUser(await viewFor(me));
+      const view = await viewFor(me);
+      setUser(view);
       setAgentStatus(me.role === 'agent' ? 'approved' : 'none');
+      return view;
     } catch (e) {
       await clearToken();
       throw e;

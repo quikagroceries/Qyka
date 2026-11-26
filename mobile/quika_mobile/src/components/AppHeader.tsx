@@ -8,6 +8,7 @@ import GuestSheet from '@/components/GuestSheet';
 import Logo from '@/components/Logo';
 import { Text } from '@/components/Text';
 import { Avatar } from '@/components/ui';
+import { useSignInPrompt } from '@/lib/signInPrompt';
 import { useNotifications, useNotificationSync } from '@/lib/notifications';
 import { useSession } from '@/lib/session';
 
@@ -30,7 +31,8 @@ type Props = {
  */
 export default function AppHeader({ route, navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { user, guest, signOut } = useSession();
+  const { user, guest } = useSession();
+  const ask = useSignInPrompt();
   const [guestOpen, setGuestOpen] = useState(false);
   const router = useRouter();
   useNotificationSync(!!user && !guest);
@@ -74,7 +76,7 @@ export default function AppHeader({ route, navigation }: Props) {
         onClose={() => setGuestOpen(false)}
         onSignIn={() => {
           setGuestOpen(false);
-          signOut('sign-in');
+          ask('Sign in to keep your orders and chat with your agent.');
         }}
       />
     </>

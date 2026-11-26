@@ -5,6 +5,7 @@ Everything that moves money goes through the float service. Route handlers
 call into here; they never touch the ledger or mutate status directly.
 """
 
+import dataclasses
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -22,6 +23,7 @@ from app.orders.models import Order, OrderItem
 from app.wallet import service as wallet_service
 from app.orders import assignment
 from app.notifications import service as notif_service
+from app.locations import delivery as delivery_area
 from app.markets import hours as market_hours
 from app.markets.models import Agent, Market
 from app.orders.state_machine import IllegalTransition, assert_can_transition
@@ -163,6 +165,12 @@ async def create_order(
             await platform.get(db, "orders_paused_message"),
         )
     cfg = await platform.pricing(db)
+    if dropoff_latitude is not None and dropoff_longitude is not None:
+        q = await delivery_area.quote(db, market, dropoff_latitude, dropoff_longitude)
+        if not q["deliverable"]:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, q["reason"])
+        # The order is priced, and keeps its price, for the distance it was placed with.
+        cfg = dataclasses.replace(cfg, delivery_fee=q["delivery_fee"])
     listed_items_total, estimated_value, deposit = await _estimates(
         db, customer_id, items, listed_items_total, must_prepay, cfg
     )
