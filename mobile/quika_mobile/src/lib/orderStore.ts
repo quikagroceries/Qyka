@@ -53,7 +53,9 @@ function makeOrderStore(fetchList: () => Promise<AgentOrder[]>) {
     },
   };
 
-  const useOrderState = () => useSyncExternalStore(subscribe, () => state);
+  // A plain function (not made inside the hook): the React Compiler mishandles a hook that closes over this store's changing `state`.
+  const getSnapshot = () => state;
+  const useOrderState = () => useSyncExternalStore(subscribe, getSnapshot);
   const useOrders = (): AgentOrder[] => useOrderState().orders;
   /** One order, or undefined if there isn't one with that id. */
   const useOrder = (id?: string | null): AgentOrder | undefined => useOrders().find((o) => o.id === id);

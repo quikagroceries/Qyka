@@ -11,6 +11,7 @@ import PhoneField from '@/components/auth/PhoneField';
 import { Button, Field, SafeAreaView } from '@/components/ui';
 import { Text } from '@/components/Text';
 import { api } from '@/lib/api';
+import { postSignIn } from '@/lib/postSignIn';
 import { useSession } from '@/lib/session';
 import { isEmail, isNgMobile } from '@/lib/validate';
 import type { Role } from '@/lib/types';
@@ -23,8 +24,8 @@ const ROLE_COPY: Record<string, { label: string; headline: string; art: number }
 };
 
 // Real sign-in: a one-time code is sent to your phone or email, and verifying it signs you in. The account's own role decides
-// which app opens. (In development builds, the role picked on Welcome is also requested for a brand-new account, and the
-// server returns the code so it can be filled in for you.)
+// which app opens. A brand-new account is always a customer; if an agent or rider option was picked on Welcome, the app
+// then opens that registration form (see postSignIn). In development builds the server returns the code so it can be filled in.
 export default function SignIn() {
   const router = useRouter();
   const { role: roleParam } = useLocalSearchParams<{ role?: string }>();
@@ -66,9 +67,11 @@ export default function SignIn() {
     setBusy(true);
     setError('');
     try {
-      const { access_token } = await api.verifyOtp(target, code, __DEV__ && picked !== 'customer' ? { role: picked } : {});
+      postSignIn.set(picked === 'agent' || picked === 'rider' ? picked : null);
+      const { access_token } = await api.verifyOtp(target, code, {});
       await acceptToken(access_token);
     } catch (e) {
+      postSignIn.clear();
       setError((e as Error).message);
       setBusy(false);
     }

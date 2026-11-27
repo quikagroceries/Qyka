@@ -1,10 +1,12 @@
 import { Redirect } from 'expo-router';
+import { useEffect } from 'react';
 import { View } from 'react-native';
 import { Text } from '@/components/Text';
 
 import AppLoading from '@/components/AppLoading';
 import { Button, SafeAreaView } from '@/components/ui';
 import type { Role } from '@/lib/types';
+import { postSignIn } from '@/lib/postSignIn';
 import { useSession } from '@/lib/session';
 
 const HOME_COPY: Record<Role, string> = {
@@ -18,8 +20,11 @@ const HOME_COPY: Record<Role, string> = {
 // Sends each role to its own home. Roles without an app yet get a placeholder.
 export default function Home() {
   const { user, signOut } = useSession();
+  useEffect(() => () => postSignIn.clear(), []);
   if (!user) return <AppLoading />;
-  const to = user.role === 'customer' ? '/customer/new-order' : user.role === 'agent' ? '/agent' : user.role === 'rider' ? '/rider' : user.role === 'shopkeeper' ? '/shopkeeper' : null;
+  // Signed in from "I shop the market" / "I deliver orders" as a plain customer account: open that registration form.
+  const applyRole = user.role === 'customer' ? postSignIn.peek() : null;
+  const to = applyRole ? (`/customer/apply?role=${applyRole}` as const) : user.role === 'customer' ? '/customer/new-order' : user.role === 'agent' ? '/agent' : user.role === 'rider' ? '/rider' : user.role === 'shopkeeper' ? '/shopkeeper' : null;
   if (to)
     return (
       <>

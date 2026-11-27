@@ -50,7 +50,8 @@ export const notificationStore = {
   },
 };
 
-export const useNotifications = () => useSyncExternalStore(subscribe, () => state);
+const getSnapshot = () => state;
+export const useNotifications = () => useSyncExternalStore(subscribe, getSnapshot);
 
 /** Keeps the list (and so the bell's badge) fresh while the header is on screen. */
 export function useNotificationSync(enabled: boolean, ms = 20000) {

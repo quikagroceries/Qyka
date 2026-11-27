@@ -45,7 +45,8 @@ export const walletStore = {
   },
 };
 
-export const useWallet = () => useSyncExternalStore(subscribe, () => state);
+const getSnapshot = () => state;
+export const useWallet = () => useSyncExternalStore(subscribe, getSnapshot);
 
 /** Keeps the wallet fresh while a screen is open. */
 export function useWalletSync(ms = 15000) {
